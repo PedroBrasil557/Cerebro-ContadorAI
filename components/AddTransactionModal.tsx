@@ -7,32 +7,42 @@ import { X } from 'lucide-react'
 import { CreditCard, NewTransaction } from '@/types_db' // Usando alias
 import { CATEGORIES } from '@/lib/constants' // Usando alias
 import { format } from 'date-fns'
+import { Modal } from '@/components/ui/Modal'; // Usando Modal genérico
+
+type TransactionType = 'expense' | 'income';
 
 type ModalProps = {
   isOpen: boolean
   onClose: () => void
-  // A prop agora é onSave e espera o tipo NewTransaction (sem user_id)
   onSave: (transaction: Omit<NewTransaction, 'user_id'>) => Promise<void>
   cards: CreditCard[]
+  initialType: TransactionType; // <--- CORREÇÃO: PROPRIEDADE FALTANDO
 }
 
 export default function AddTransactionModal({
   isOpen,
   onClose,
-  onSave, // Usando onSave
+  onSave,
   cards,
+  initialType, // <--- Recebido aqui
 }: ModalProps) {
-  const [type, setType] = useState<'expense' | 'income'>('expense')
+  
+  // CORREÇÃO: Usa initialType para definir o estado inicial
+  const [type, setType] = useState<TransactionType>(initialType) 
+  
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [category, setCategory] = useState('')
   const [creditCardId, setCreditCardId] = useState<string | null>(null)
 
+  // Garante que o estado do modal se ajuste se a prop initialType mudar
   useEffect(() => {
-    setCategory('')
-    setCreditCardId(null)
-  }, [type])
+    setType(initialType);
+    setCategory('');
+    setCreditCardId(null);
+  }, [initialType]);
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,7 +51,6 @@ export default function AddTransactionModal({
       return
     }
 
-    // Chama onSave com os dados do formulário
     onSave({
       type,
       description,
@@ -58,6 +67,7 @@ export default function AddTransactionModal({
     setDate(format(new Date(), 'yyyy-MM-dd'))
     setCategory('')
     setCreditCardId(null)
+    onClose(); // Fechar após salvar
   }
 
   const categoryOptions =
@@ -66,31 +76,14 @@ export default function AddTransactionModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={onClose}
+        <Modal 
+          isOpen={isOpen} 
+          onClose={onClose} 
+          title={type === 'income' ? 'Registrar Receita' : 'Registrar Despesa'}
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="relative w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={onClose}
-              className="absolute right-4 top-4 rounded-full p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <h2 className="mb-6 text-xl font-bold">Adicionar Transação</h2>
-
             <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
               <button
+                type="button"
                 onClick={() => setType('expense')}
                 className={`rounded-md px-4 py-2 text-sm font-medium transition ${
                   type === 'expense'
@@ -101,6 +94,7 @@ export default function AddTransactionModal({
                 Gasto
               </button>
               <button
+                type="button"
                 onClick={() => setType('income')}
                 className={`rounded-md px-4 py-2 text-sm font-medium transition ${
                   type === 'income'
@@ -124,7 +118,7 @@ export default function AddTransactionModal({
                 type="number"
                 placeholder="Valor (ex: 50.99)"
                 step="0.01"
-                min="0" // O usuário digita um valor positivo
+                min="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -169,13 +163,12 @@ export default function AddTransactionModal({
 
               <button
                 type="submit"
-                className="w-full rounded-lg bg-violet-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-violet-700"
+                className="w-full rounded-lg bg-brand-violet px-4 py-2.5 font-medium text-white transition-colors hover:bg-brand-violet-dark"
               >
                 Salvar Transação
               </button>
             </form>
-          </motion.div>
-        </motion.div>
+        </Modal>
       )}
     </AnimatePresence>
   )

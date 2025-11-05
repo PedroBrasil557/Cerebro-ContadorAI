@@ -3,7 +3,7 @@
 
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ActiveTab, EmergencyFund } from '@/types' 
+import { ActiveTab } from '@/types' 
 
 // Importando as views
 import DashboardView from './views/DashboardView'
@@ -12,46 +12,22 @@ import InvestmentsView from './views/InvestmentsView'
 import CalendarView from './views/CalendarView'
 import EmergencyFundView from './views/EmergencyFundView'
 
-// Define a função placeholder (fallback) para o caso em que a prop é undefined
+// Define a função placeholder (fallback)
 const NO_OP = () => {}; 
-
-type ViewContainerProps = {
-  activeTab: ActiveTab;
-  transactions: any[]; // Simplificado
-  goals: any[];       // Simplificado
-  cards: any[];       // Simplificado
-  emergencyFund: EmergencyFund | null; // Tipagem mais específica
-  cdiRate: number;
-  summary: {
-    currentBalance: number; // Adicionado aqui para passar
-    monthlyIncome: number;
-    monthlyExpense: number;
-    emergencyTotal: number;
-    emergencyTarget: number;
-    emergencyPercentage: number;
-  };
-  charts: {
-    categoryTotals: { name: string; value: number }[];
-    monthlyBalanceHistory: { name: string; Receitas: number; Despesas: number }[];
-  };
-  handlers: {
-    addGoal: (goal: any) => Promise<void>;
-    updateEmergencyFund: (amount: number, type: 'add' | 'remove' | 'set') => Promise<void>; // Handler completo
-    handleRedirect: (tab: ActiveTab) => void;
-  };
-}
-
 
 export default function ViewContainer({
   activeTab,
   ...props 
-}: ViewContainerProps) {
+}: {
+  activeTab: ActiveTab
+  [key: string]: any 
+}) {
   
   // Acessamos handlers de forma segura
-  const handleRedirect = props.handlers.handleRedirect; 
-  const addGoal = props.handlers.addGoal;
-  const updateEmergencyFund = props.handlers.updateEmergencyFund; // NOVO: Acessa o handler
-  
+  const handleRedirect = props.handlers?.handleRedirect as any || NO_OP; 
+  const addGoal = props.handlers?.addGoal as any || NO_OP;
+  const updateEmergencyFund = props.handlers?.updateEmergencyFund as any || NO_OP;
+  const onOpenTransactionModal = props.onOpenTransactionModal as any || NO_OP;
 
   const slideAnimation = {
     initial: { opacity: 0, x: 50 },
@@ -64,22 +40,25 @@ export default function ViewContainer({
     <AnimatePresence mode="wait">
       <motion.div
         key={activeTab}
-        {...slideAnimation}
-        className="p-4 md:p-8 w-full" // Garante que ocupa toda a largura disponível
+        // SOLUÇÃO: Passamos as props individualmente para evitar o erro do spread operator
+        initial={slideAnimation.initial}
+        animate={slideAnimation.animate}
+        exit={slideAnimation.exit}
+        transition={slideAnimation.transition}
+        // -- FIM DA SOLUÇÃO --
+        
+        className="p-4 md:p-8 w-full"
       >
-        {/* Renderização Condicional da View ATIVA */}
         {activeTab === 'dashboard' && (
           <DashboardView
-            summary={{
-                ...props.summary, 
-                currentBalance: props.summary.currentBalance // NOVO: Passando currentBalance
-            }}
+            summary={props.summary} 
             charts={props.charts}
             cards={props.cards}
             goals={props.goals}
             cdiRate={props.cdiRate}
             handleRedirect={handleRedirect} 
-            handleUpdateEmergencyFund={async (amount: number) => updateEmergencyFund(amount, 'add')} // NOVO: Passa o handler para o DashboardView
+            handleUpdateEmergencyFund={async (amount: number) => updateEmergencyFund(amount, 'add')}
+            onOpenTransactionModal={onOpenTransactionModal}
           />
         )}
         {activeTab === 'transacoes' && (
@@ -91,8 +70,7 @@ export default function ViewContainer({
             cdiRate={props.cdiRate}
             emergencyFund={props.emergencyFund}
             onAddGoal={addGoal}
-            handleRedirect={handleRedirect} 
-          />
+            handleRedirect={handleRedirect} activeTab={'dashboard'}          />
         )}
         {activeTab === 'calendario' && (
           <CalendarView transactions={props.transactions} />

@@ -1,38 +1,83 @@
-// components/views/InvestmentsView.tsx
+// components/ViewContainer.tsx
 'use client'
 
 import React from 'react'
-import { Goal, EmergencyFund, NewGoal } from '@/types_db'
-import AddGoalForm from '../investments/AddGoalForm'
-import GoalsList from '../investments/GoalsList'
-import InvestmentAdvisor from '../investments/InvestmentAdvisor'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ActiveTab } from '@/types' 
 
-type InvestmentsProps = {
-  goals: Goal[]
-  cdiRate: number
-  emergencyFund: EmergencyFund | null
-  onAddGoal: (goal: NewGoal) => Promise<void>
-}
+// Importando as views
+import DashboardView from '../views/DashboardView'
+import TransactionsView from '../views/TransactionsView'
+import InvestmentsView from '../views/InvestmentsView'
+import CalendarView from '../views/CalendarView'
+import EmergencyFundView from '../views/EmergencyFundView'
 
-export default function InvestmentsView({
-  goals,
-  cdiRate,
-  emergencyFund,
-  onAddGoal,
-}: InvestmentsProps) {
+// Define a função placeholder (fallback)
+const NO_OP = () => {}; 
+
+export default function ViewContainer({
+  activeTab,
+  // Tipagem simplificada para aceitar TUDO do MainAppLayout
+  ...props 
+}: {
+  activeTab: ActiveTab
+  [key: string]: any 
+}) {
+  
+  // Acessamos handlers de forma segura
+  const handleRedirect = props.handlers?.handleRedirect as any || NO_OP; 
+  const addGoal = props.handlers?.addGoal as any || NO_OP;
+  const updateEmergencyFund = props.handlers?.updateEmergencyFund as any || NO_OP;
+  const onOpenTransactionModal = props.onOpenTransactionModal as any || NO_OP;
+
+  const slideAnimation = {
+    initial: { opacity: 0, x: 50 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -50 },
+    transition: { type: 'spring', stiffness: 300, damping: 30 },
+  } as const
+
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="space-y-6">
-        <AddGoalForm onAddGoal={onAddGoal} />
-        <GoalsList goals={goals} cdiRate={cdiRate} />
-      </div>
-      <div>
-        <InvestmentAdvisor
-          goals={goals}
-          emergencyFund={emergencyFund}
-          cdiRate={cdiRate}
-        />
-      </div>
-    </div>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={activeTab}
+        {...slideAnimation}
+        className="p-4 md:p-8 w-full"
+      >
+        {activeTab === 'dashboard' && (
+          <DashboardView
+            summary={props.summary} 
+            charts={props.charts}
+            cards={props.cards}
+            goals={props.goals}
+            cdiRate={props.cdiRate}
+            handleRedirect={handleRedirect} 
+            handleUpdateEmergencyFund={async (amount: number) => updateEmergencyFund(amount, 'add')}
+            onOpenTransactionModal={onOpenTransactionModal}
+          />
+        )}
+        {activeTab === 'transacoes' && (
+          <TransactionsView transactions={props.transactions} />
+        )}
+        {activeTab === 'investimentos' && (
+          // CORREÇÃO FINAL: O InvestmentsView AGORA RECEBE handleRedirect
+          <InvestmentsView
+            goals={props.goals}
+            cdiRate={props.cdiRate}
+            emergencyFund={props.emergencyFund}
+            onAddGoal={addGoal}
+            handleRedirect={handleRedirect} activeTab={'dashboard'}          />
+        )}
+        {activeTab === 'calendario' && (
+          <CalendarView transactions={props.transactions} />
+        )}
+        {activeTab === 'emergencia' && (
+          <EmergencyFundView
+            fund={props.emergencyFund}
+            onUpdateFund={updateEmergencyFund}
+          />
+        )}
+      </motion.div>
+    </AnimatePresence>
   )
 }
