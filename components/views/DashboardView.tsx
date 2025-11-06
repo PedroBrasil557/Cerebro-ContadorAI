@@ -35,9 +35,9 @@ type DashboardViewProps = {
   onOpenTransactionModal: (type: 'income' | 'expense') => void; 
 }
 
-// --- COMPONENTE AUXILIAR: InsightCard (Omitido por brevidade) ---
+// --- COMPONENTE AUXILIAR: InsightCard ---
 const InsightCard = ({ icon: Icon, iconBg, iconColor, title, text }: any) => (
-  <div className="flex items-start gap-4 rounded-2xl bg-white p-5 shadow-sm dark:bg-gray-800">
+  <div className="flex items-start gap-4 rounded-2xl bg-white p-5 shadow-md dark:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all hover:shadow-xl">
     <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconBg}`}>
       <Icon className={`h-5 w-5 ${iconColor}`} />
     </div>
@@ -47,7 +47,6 @@ const InsightCard = ({ icon: Icon, iconBg, iconColor, title, text }: any) => (
     </div>
   </div>
 )
-
 
 export default function DashboardView({
   summary,
@@ -67,9 +66,9 @@ export default function DashboardView({
   ];
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
+    <div className="space-y-8 p-4 md:p-8 bg-gray-50 dark:bg-gray-900 transition-colors">
 
-      {/* 1. Cards de Resumo (Omitido) */}
+      {/* 1. Cards de Resumo */}
       <SummaryCards
         currentBalance={summary.currentBalance}
         monthlyIncome={summary.monthlyIncome}
@@ -83,56 +82,64 @@ export default function DashboardView({
 
       {/* 2. Gráficos e Orçamentos */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        
-        {/* Gráficos (Line + Pie) - OCUPA 3 COLUNAS */}
-        <div className="lg:col-span-3"> 
+        {/* Gráficos (Line + Pie) - ocupa 3 colunas */}
+        <div className="lg:col-span-3">
           <ChartsComponent
             categoryData={charts.categoryTotals}
             balanceData={charts.monthlyBalanceHistory}
           />
         </div>
 
-        {/* Orçamentos - OCUPA 2 COLUNAS (Espaço Reduzido) */}
-        <div className="lg:col-span-2"> 
+        {/* Orçamentos - ocupa 2 colunas */}
+        <div className="lg:col-span-2">
           <BudgetSummary budgets={mockBudgets} />
         </div>
       </div>
       
-      {/* 3. Colunas Inferiores (Omitido) */}
+      {/* 3. Colunas Inferiores */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        
+
+        {/* Insights Inteligentes + Cards */}
         <div className="flex flex-col gap-6 lg:col-span-2">
-           <h2 className="text-xl font-semibold text-text-dark dark:text-white">
-             Insights Inteligentes
-           </h2>
-           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-             <InsightCard
-                title="Economia Inteligente"
-                text="Você economizou 12% a mais que o mês anterior."
-                icon={Activity} 
-                iconBg="bg-summary-green-bg"
-                iconColor="text-summary-green-icon"
-              />
-              <InsightCard
-                title="Rendimento"
-                text="Seu investimento rendeu 4% este mês."
-                icon={Lightbulb} 
-                iconBg="bg-summary-blue-bg"
-                iconColor="text-summary-blue-icon"
-              />
-           </div>
+          <h2 className="text-xl font-semibold text-text-dark dark:text-white">
+            Insights Inteligentes
+          </h2>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <InsightCard
+              title="Economia Inteligente"
+              text="Você economizou 12% a mais que o mês anterior."
+              icon={Activity} 
+              iconBg="bg-summary-green-bg"
+              iconColor="text-summary-green-icon"
+            />
+            <InsightCard
+              title="Rendimento"
+              text="Seu investimento rendeu 4% este mês."
+              icon={Lightbulb} 
+              iconBg="bg-summary-blue-bg"
+              iconColor="text-summary-blue-icon"
+            />
+          </div>
         </div>
 
+        {/* Cards Laterais: Cartões e Metas */}
         <div className="space-y-6 lg:col-span-1">
+
+          {/* Cartões de Crédito */}
           <CreditCardSummary 
             cards={cards} 
             onCardClick={() => handleRedirect('transacoes')} 
           />
-          <GoalsList 
-            goals={goals} 
-            cdiRate={cdiRate} 
-            onGoalClick={() => handleRedirect('investimentos')} 
-          />
+
+          {/* Cards de Metas */}
+          <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-4 transition-all hover:shadow-2xl">
+            <GoalsList 
+              goals={goals} 
+              cdiRate={cdiRate} 
+              onGoalClick={() => handleRedirect('investimentos')} 
+              onAddValue={NO_OP} // Corrige erro do build
+            />
+          </div>
         </div>
       </div>
     </div>

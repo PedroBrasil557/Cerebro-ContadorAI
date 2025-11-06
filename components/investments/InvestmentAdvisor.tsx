@@ -1,69 +1,85 @@
+// components/investments/InvestmentAdvisor.tsx
 'use client'
 
 import React from 'react'
 import { Goal, EmergencyFund } from '@/types_db'
 import { ActiveTab } from '@/types'
+import { ArrowUpIcon, ArrowDownIcon } from 'lucide-react'
 
 type InvestmentAdvisorProps = {
   goals: Goal[]
   emergencyFund: EmergencyFund | null
   cdiRate: number
-  handleRedirect: (tab: ActiveTab) => void // <-- corrigido para ActiveTab
+  handleRedirect?: (tab: ActiveTab) => void
 }
 
 export default function InvestmentAdvisor({
   goals,
   emergencyFund,
   cdiRate,
-  handleRedirect,
+  handleRedirect = () => {},
 }: InvestmentAdvisorProps) {
-  // Total investido
-  const totalInvested = goals.reduce((acc, g) => acc + g.current_amount, 0)
+  // Simula sinal de desempenho (positivo/negativo)
+  const cdiPerformance = Math.random() > 0.5
+  const marketPerformance = Math.random() > 0.5
 
-  // Projeção simples: crescimento baseado no CDI
-  const projectedGrowth = totalInvested * Math.pow(1 + cdiRate, 1)
-  const change = projectedGrowth - totalInvested
-  const isUp = change >= 0
+  // Função para ação de investimento
+  const handleActionClick = () => {
+    alert('API de consultoria ainda não está pronta. Em breve estará disponível!')
+  }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg space-y-6">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+    <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6 transition-all hover:shadow-2xl">
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
         Consultor de Investimentos
       </h2>
 
-      {/* Total Investido */}
-      <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
-        <span className="text-gray-700 dark:text-gray-200 font-medium">Total Investido</span>
-        <span className="font-bold text-gray-900 dark:text-white">
-          {totalInvested.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-        </span>
+      {/* Resumo de metas */}
+      <div className="space-y-3">
+        <p className="text-gray-700 dark:text-gray-300">
+          Total de Metas: <span className="font-medium">{goals.length}</span>
+        </p>
+        <p className="text-gray-700 dark:text-gray-300">
+          Fundo de Emergência: 
+          <span className="font-medium ml-1">
+            {emergencyFund ? `R$ ${emergencyFund.current_amount.toLocaleString()}` : 'Não possui'}
+          </span>
+        </p>
       </div>
 
-      {/* Projeção CDI */}
-      <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
-        <span className="text-gray-700 dark:text-gray-200 font-medium">Projeção 12 meses</span>
-        <span className={`font-semibold ${isUp ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {projectedGrowth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          {isUp ? ' ▲' : ' ▼'}
-        </span>
-      </div>
-
-      {/* Fundo de Emergência */}
-      {emergencyFund && (
-        <div className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm">
-          <span className="text-gray-700 dark:text-gray-200 font-medium">Fundo de Emergência</span>
-          <span className="font-semibold text-gray-900 dark:text-white">
-            {emergencyFund.current_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+      {/* Indicadores de performance */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <span className="text-gray-800 dark:text-gray-200">CDI</span>
+          <span
+            className={`flex items-center gap-1 font-medium ${
+              cdiPerformance ? 'text-green-500' : 'text-red-500'
+            }`}
+          >
+            {cdiRate.toFixed(2)}% 
+            {cdiPerformance ? <ArrowUpIcon size={16} /> : <ArrowDownIcon size={16} />}
           </span>
         </div>
-      )}
 
-      {/* Botão funcional */}
+        <div className="flex items-center justify-between">
+          <span className="text-gray-800 dark:text-gray-200">Mercado Global</span>
+          <span
+            className={`flex items-center gap-1 font-medium ${
+              marketPerformance ? 'text-green-500' : 'text-red-500'
+            }`}
+          >
+            {marketPerformance ? '+2.5%' : '-1.7%'}
+            {marketPerformance ? <ArrowUpIcon size={16} /> : <ArrowDownIcon size={16} />}
+          </span>
+        </div>
+      </div>
+
+      {/* Botão de ação */}
       <button
-        onClick={() => alert('A API de detalhamento ainda não está pronta!')}
-        className="w-full py-3 px-4 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-colors shadow-md hover:shadow-lg"
+        onClick={handleActionClick}
+        className="w-full mt-4 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors shadow-md"
       >
-        Consultar Metas
+        Ver recomendações
       </button>
     </div>
   )

@@ -1,4 +1,3 @@
-// components/views/InvestmentsView.tsx
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
@@ -14,11 +13,11 @@ import { MOCK_MARKET_DATA } from '@/lib/mockData'
 // Função padrão caso handleRedirect não seja fornecido
 const NO_OP = () => {}
 
-// Verifica se é um número válido
+// Valida número
 const isValidNumber = (value: any): value is number =>
   typeof value === 'number' && !isNaN(value)
 
-// Converte qualquer valor para number, fallback 0
+// Converte para number seguro
 const toNumber = (value: number | undefined | null): number =>
   isValidNumber(value) ? value : 0
 
@@ -30,7 +29,9 @@ const normalizeGoal = (goal: Goal | NewGoal): Goal => ({
   id: 'id' in goal && goal.id ? goal.id : String(Date.now()),
   user_id: 'user_id' in goal && goal.user_id ? goal.user_id : 'local',
   created_at:
-    'created_at' in goal && goal.created_at ? goal.created_at : new Date().toISOString(),
+    'created_at' in goal && goal.created_at
+      ? goal.created_at
+      : new Date().toISOString(),
 })
 
 type InvestmentsProps = {
@@ -105,9 +106,9 @@ export default function InvestmentsView({
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 p-6 md:p-10 bg-gray-50 dark:bg-gray-900 transition-colors">
-      {/* ------------------- COLUNA PRINCIPAL ------------------- */}
+      {/* COLUNA PRINCIPAL */}
       <div className="space-y-8 lg:col-span-2">
-        {/* MARKET + CDI */}
+        {/* Market + CDI */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
           <div className="md:col-span-3">
             <MarketDataCard
@@ -123,12 +124,12 @@ export default function InvestmentsView({
           </div>
         </div>
 
-        {/* FORMULÁRIO DE NOVA META */}
+        {/* Formulário de Nova Meta */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-2xl">
           <AddGoalForm onAddGoal={handleAddNewGoal} />
         </div>
 
-        {/* LISTA DE METAS */}
+        {/* Lista de Metas */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-2xl">
           <GoalsList
             goals={goalsState}
@@ -139,7 +140,7 @@ export default function InvestmentsView({
         </div>
       </div>
 
-      {/* ------------------- COLUNA LATERAL: CONSULTOR IA ------------------- */}
+      {/* COLUNA LATERAL: Consultor IA */}
       <div className="lg:col-span-1 space-y-6">
         <InvestmentAdvisor
           goals={goalsState}
