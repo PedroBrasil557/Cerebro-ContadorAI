@@ -9,25 +9,22 @@ import { ArrowRight, Star } from 'lucide-react'
 type GoalsListProps = {
   goals: Goal[]
   cdiRate: number
-  onGoalClick: () => void // Novo prop para o redirecionamento
+  onGoalClick: () => void
+  onAddValue: (goalId: string, amount: number) => void // 👈 NOVO
 }
 
-export default function GoalsList({ goals, cdiRate, onGoalClick }: GoalsListProps) {
+export default function GoalsList({ goals, cdiRate, onGoalClick, onAddValue }: GoalsListProps) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <h3 className="mb-4 text-xl font-semibold text-text-dark dark:text-white">
         Minhas Metas
       </h3>
+
       <div className="space-y-4">
         {goals.length > 0 ? (
           goals.map((goal) => (
-            // Envolvendo o GoalCard em um elemento clicável
-            <div
-              key={goal.id}
-              onClick={onGoalClick} // Torna a meta clicável
-              className="cursor-pointer transition-transform duration-150 hover:scale-[1.01]"
-            >
-              <GoalCard goal={goal} cdiRate={cdiRate} isDashboard={true} />
+            <div key={goal.id} className="transition-transform duration-150 hover:scale-[1.01]">
+              <GoalCard goal={goal} cdiRate={cdiRate} onAddValue={onAddValue} />
             </div>
           ))
         ) : (
@@ -37,6 +34,7 @@ export default function GoalsList({ goals, cdiRate, onGoalClick }: GoalsListProp
           </div>
         )}
       </div>
+
       {goals.length > 0 && (
         <button 
           onClick={onGoalClick}

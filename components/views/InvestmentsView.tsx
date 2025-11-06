@@ -1,83 +1,153 @@
-// components/ViewContainer.tsx
+// components/views/InvestmentsView.tsx
 'use client'
 
-import React from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ActiveTab } from '@/types' 
+import React, { useState, useEffect, useCallback } from 'react'
+import { Goal, EmergencyFund, NewGoal } from '@/types_db'
+import { ActiveTab } from '@/types'
+import AddGoalForm from '../investments/AddGoalForm'
+import GoalsList from '../investments/GoalsList'
+import InvestmentAdvisor from '../investments/InvestmentAdvisor'
+import MarketDataCard, { MarketDataItem } from './MarketDataCard'
+import CdiCard from './CdiCard'
+import { MOCK_MARKET_DATA } from '@/lib/mockData'
 
-// Importando as views
-import DashboardView from '../views/DashboardView'
-import TransactionsView from '../views/TransactionsView'
-import InvestmentsView from '../views/InvestmentsView'
-import CalendarView from '../views/CalendarView'
-import EmergencyFundView from '../views/EmergencyFundView'
+// Função padrão caso handleRedirect não seja fornecido
+const NO_OP = () => {}
 
-// Define a função placeholder (fallback)
-const NO_OP = () => {}; 
+// Verifica se é um número válido
+const isValidNumber = (value: any): value is number =>
+  typeof value === 'number' && !isNaN(value)
 
-export default function ViewContainer({
-  activeTab,
-  // Tipagem simplificada para aceitar TUDO do MainAppLayout
-  ...props 
-}: {
-  activeTab: ActiveTab
-  [key: string]: any 
-}) {
-  
-  // Acessamos handlers de forma segura
-  const handleRedirect = props.handlers?.handleRedirect as any || NO_OP; 
-  const addGoal = props.handlers?.addGoal as any || NO_OP;
-  const updateEmergencyFund = props.handlers?.updateEmergencyFund as any || NO_OP;
-  const onOpenTransactionModal = props.onOpenTransactionModal as any || NO_OP;
+// Converte qualquer valor para number, fallback 0
+const toNumber = (value: number | undefined | null): number =>
+  isValidNumber(value) ? value : 0
 
-  const slideAnimation = {
-    initial: { opacity: 0, x: 50 },
-    animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -50 },
-    transition: { type: 'spring', stiffness: 300, damping: 30 },
-  } as const
+// Normaliza Goal ou NewGoal
+const normalizeGoal = (goal: Goal | NewGoal): Goal => ({
+  ...goal,
+  current_amount: toNumber(goal.current_amount),
+  target_amount: toNumber(goal.target_amount),
+  id: 'id' in goal && goal.id ? goal.id : String(Date.now()),
+  user_id: 'user_id' in goal && goal.user_id ? goal.user_id : 'local',
+  created_at:
+    'created_at' in goal && goal.created_at ? goal.created_at : new Date().toISOString(),
+})
+
+type InvestmentsProps = {
+  goals: Goal[]
+  cdiRate: number
+  emergencyFund: EmergencyFund | null
+  onAddGoal: (goal: NewGoal) => Promise<void>
+  handleRedirect?: (tab: ActiveTab) => void
+}
+
+export default function InvestmentsView({
+  goals,
+  cdiRate,
+  emergencyFund,
+  onAddGoal,
+  handleRedirect = NO_OP as (tab: ActiveTab) => void,
+}: InvestmentsProps) {
+  const [goalsState, setGoalsState] = useState<Goal[]>(() =>
+    goals.map(normalizeGoal)
+  )
+
+  useEffect(() => {
+    setGoalsState(goals.map(normalizeGoal))
+  }, [goals])
+
+  const handleAddValueToGoal = useCallback((goalId: string, amount: number) => {
+    const value = toNumber(amount)
+    if (value <= 0) return
+
+    setGoalsState((prevGoals) =>
+      prevGoals.map((goal) =>
+        goal.id === goalId
+          ? { ...goal, current_amount: goal.current_amount + value }
+          : goal
+      )
+    )
+  }, [])
+
+  const convertNewGoalToGoal = (newGoal: NewGoal): Goal => ({
+    id: String(Date.now()),
+    user_id: 'local',
+    created_at: new Date().toISOString(),
+    title: newGoal.title,
+    current_amount: toNumber(newGoal.current_amount),
+    target_amount: toNumber(newGoal.target_amount),
+  })
+
+  const handleAddNewGoal = useCallback(
+    async (goal: NewGoal) => {
+      const normalizedNewGoal: NewGoal = {
+        title: String(goal.title),
+        current_amount: toNumber(goal.current_amount),
+        target_amount: toNumber(goal.target_amount),
+      }
+
+      try {
+        await onAddGoal(normalizedNewGoal)
+      } catch (err) {
+        console.error('Erro ao persistir nova meta:', err)
+        return
+      }
+
+      const newGoal: Goal = convertNewGoalToGoal(normalizedNewGoal)
+      setGoalsState((prev) => [...prev, newGoal])
+    },
+    [onAddGoal]
+  )
+
+  const handleGoalClickInView = useCallback((goal?: Goal) => {
+    console.log('Meta clicada na aba Investimentos.', goal?.id ?? '')
+  }, [])
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={activeTab}
-        {...slideAnimation}
-        className="p-4 md:p-8 w-full"
-      >
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            summary={props.summary} 
-            charts={props.charts}
-            cards={props.cards}
-            goals={props.goals}
-            cdiRate={props.cdiRate}
-            handleRedirect={handleRedirect} 
-            handleUpdateEmergencyFund={async (amount: number) => updateEmergencyFund(amount, 'add')}
-            onOpenTransactionModal={onOpenTransactionModal}
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 p-6 md:p-10 bg-gray-50 dark:bg-gray-900 transition-colors">
+      {/* ------------------- COLUNA PRINCIPAL ------------------- */}
+      <div className="space-y-8 lg:col-span-2">
+        {/* MARKET + CDI */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
+          <div className="md:col-span-3">
+            <MarketDataCard
+              marketData={MOCK_MARKET_DATA as MarketDataItem[]}
+              className="shadow-xl rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-all"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <CdiCard
+              cdiRate={cdiRate}
+              className="shadow-xl rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-all"
+            />
+          </div>
+        </div>
+
+        {/* FORMULÁRIO DE NOVA META */}
+        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-2xl">
+          <AddGoalForm onAddGoal={handleAddNewGoal} />
+        </div>
+
+        {/* LISTA DE METAS */}
+        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-2xl">
+          <GoalsList
+            goals={goalsState}
+            cdiRate={cdiRate}
+            onGoalClick={() => handleGoalClickInView()}
+            onAddValue={handleAddValueToGoal}
           />
-        )}
-        {activeTab === 'transacoes' && (
-          <TransactionsView transactions={props.transactions} />
-        )}
-        {activeTab === 'investimentos' && (
-          // CORREÇÃO FINAL: O InvestmentsView AGORA RECEBE handleRedirect
-          <InvestmentsView
-            goals={props.goals}
-            cdiRate={props.cdiRate}
-            emergencyFund={props.emergencyFund}
-            onAddGoal={addGoal}
-            handleRedirect={handleRedirect} activeTab={'dashboard'}          />
-        )}
-        {activeTab === 'calendario' && (
-          <CalendarView transactions={props.transactions} />
-        )}
-        {activeTab === 'emergencia' && (
-          <EmergencyFundView
-            fund={props.emergencyFund}
-            onUpdateFund={updateEmergencyFund}
-          />
-        )}
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+
+      {/* ------------------- COLUNA LATERAL: CONSULTOR IA ------------------- */}
+      <div className="lg:col-span-1 space-y-6">
+        <InvestmentAdvisor
+          goals={goalsState}
+          emergencyFund={emergencyFund}
+          cdiRate={cdiRate}
+          handleRedirect={handleRedirect}
+        />
+      </div>
+    </div>
   )
 }

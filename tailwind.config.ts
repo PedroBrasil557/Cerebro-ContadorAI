@@ -14,7 +14,7 @@ const config: Config = {
         // TONS DE DARK MODE QUE FUNCIONAM
         'background-dark': '#2D3748', // Fundo principal (Azul Escuro Suave)
         'card-dark': '#2D3748', // Cor dos cards (Mais claro que o fundo)
-        'text-light-dark': '#FFFFFF', // Texto principal no dark mode (Branco)
+        'text-light-dark': '#c2c0c0ff', // Texto principal no dark mode (Branco)
         'text-secondary-dark': '#CBD5E0', // Texto secundário (Cinza Suave)
 
         // Cores de destaque (Voltam para o roxo/verde/vermelho padrão de UI)
@@ -26,8 +26,8 @@ const config: Config = {
         'summary-yellow-icon': '#FFC107',
 
         // Tons claros (mantidos como fallback)
-        'background-light': '#F8F9FA',
-        'sidebar-light': '#FFFFFF',
+        'background-light': '#8b9197ff',
+        'sidebar-light': '#8b9197ff',
         'text-dark': '#212529',
         'text-light': '#6C757D',
       },

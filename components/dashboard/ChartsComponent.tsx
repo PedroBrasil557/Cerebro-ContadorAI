@@ -15,7 +15,7 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts'
-import { PIE_CHART_COLORS } from '@/lib/constants'
+import { PIE_CHART_COLORS } from '../../lib/constants'
 import { formatCurrency } from '@/lib/utils'
 
 type ChartsProps = {
@@ -23,18 +23,18 @@ type ChartsProps = {
   balanceData: { name: string; Receitas: number; Despesas: number }[]
 }
 
-// ✅ Tooltip customizado com z-index alto (corrige problema de sobreposição)
-const CustomPieTooltip = ({ active, payload }: any) => {
+// Tooltip Customizado
+const CustomPieTooltip = ({ active, payload, totalValue }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload
-    const totalValue = payload.reduce((acc: number, entry: any) => acc + entry.value, 0)
-    const percent = (data.value / totalValue) * 100
+    const percent =
+      totalValue > 0 ? ((data.value / totalValue) * 100).toFixed(1) : '0.0'
 
     return (
-      <div className="z-50 rounded-md border border-gray-600 bg-card-dark p-3 text-sm text-white shadow-lg">
+      <div className="z-50 rounded-md border border-gray-500 bg-card-dark p-3 text-sm text-white shadow-lg">
         <p className="font-semibold">{data.name}</p>
-        <p className="text-gray-400">
-          Valor: {formatCurrency(data.value)} ({isNaN(percent) ? 0 : percent.toFixed(1)}%)
+        <p className="text-sm text-gray-400">
+          Valor: {formatCurrency(data.value)} ({percent}%)
         </p>
       </div>
     )
@@ -42,19 +42,25 @@ const CustomPieTooltip = ({ active, payload }: any) => {
   return null
 }
 
-// ✅ Legenda customizada mostrando nome, cor e percentual
-const CustomPieLegend = (props: any) => {
-  const { payload, totalValue } = props
+// Legenda Customizada
+const CustomPieLegend = ({ payload = [], totalValue = 0 }: any) => {
   return (
     <ul className="flex flex-col gap-3">
       {payload.map((entry: any, index: number) => {
-        const { name, value } = entry.payload
-        const percent = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : '0.0'
+        const data = entry.payload
+        const percent =
+          totalValue > 0 ? ((data.value / totalValue) * 100).toFixed(1) : '0.0'
+
         return (
           <li key={`item-${index}`} className="flex items-center gap-3 text-sm">
-            <span className="h-4 w-4 rounded" style={{ backgroundColor: entry.color }}></span>
-            <span className="text-text-secondary-dark">{name}</span>
-            <span className="font-semibold text-text-light-dark">({percent}%)</span>
+            <span
+              className="h-4 w-4 rounded"
+              style={{ backgroundColor: entry.color }}
+            ></span>
+            <span className="text-text-secondary-dark">{entry.value}</span>
+            <span className="font-semibold text-text-light-dark">
+              ({percent}%)
+            </span>
           </li>
         )
       })}
@@ -62,28 +68,27 @@ const CustomPieLegend = (props: any) => {
   )
 }
 
-export default function ChartsComponent({ categoryData, balanceData }: ChartsProps) {
-  // ✅ Total gasto para percentual
+export default function ChartsComponent({
+  categoryData,
+  balanceData,
+}: ChartsProps) {
   const totalSpent = categoryData.reduce((acc, entry) => acc + entry.value, 0)
 
-  // Exemplo de dados de evolução (substituir futuramente pelo real)
-  const evolutionData = balanceData.length
-    ? balanceData
-    : [
-        { name: 'Jan', Saldo: 2000 },
-        { name: 'Fev', Saldo: 1800 },
-        { name: 'Mar', Saldo: 3000 },
-        { name: 'Abr', Saldo: 2500 },
-        { name: 'Mai', Saldo: 3500 },
-        { name: 'Jun', Saldo: 4000 },
-      ]
+  const evolutionData = [
+    { name: 'Jan', Saldo: 2000 },
+    { name: 'Fev', Saldo: 1800 },
+    { name: 'Mar', Saldo: 3000 },
+    { name: 'Abr', Saldo: 2500 },
+    { name: 'Mai', Saldo: 3500 },
+    { name: 'Jun', Saldo: 4000 },
+  ]
 
   const hasCategoryData = categoryData && categoryData.some((d) => d.value > 0)
   const finalCategoryData = hasCategoryData ? categoryData : []
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-      {/* ======== 1. Gráfico de Evolução Mensal ======== */}
+      {/* Gráfico de Linha */}
       <div className="rounded-2xl border border-gray-700 bg-card-dark p-6 shadow-sm lg:col-span-2">
         <h3 className="mb-4 text-xl font-semibold text-text-light-dark">
           Evolução Mensal
@@ -115,7 +120,10 @@ export default function ChartsComponent({ categoryData, balanceData }: ChartsPro
               />
               <Tooltip
                 formatter={(value: number) => formatCurrency(value)}
-                contentStyle={{ backgroundColor: '#2D3748', border: 'none' }}
+                contentStyle={{
+                  backgroundColor: '#2D3748',
+                  border: 'none',
+                }}
               />
               <Line
                 type="monotone"
@@ -130,7 +138,7 @@ export default function ChartsComponent({ categoryData, balanceData }: ChartsPro
         </div>
       </div>
 
-      {/* ======== 2. Gráfico de Gastos por Categoria ======== */}
+      {/* Gráfico de Pizza */}
       <div className="rounded-2xl border border-gray-700 bg-card-dark p-6 shadow-sm lg:col-span-3">
         <h3 className="mb-4 text-xl font-semibold text-text-light-dark">
           Gastos por Categoria
@@ -149,7 +157,7 @@ export default function ChartsComponent({ categoryData, balanceData }: ChartsPro
                   dataKey="value"
                   nameKey="name"
                 >
-                  {finalCategoryData.map((_, index) => (
+                  {finalCategoryData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]}
@@ -157,7 +165,9 @@ export default function ChartsComponent({ categoryData, balanceData }: ChartsPro
                   ))}
                 </Pie>
                 <Tooltip
-                  content={<CustomPieTooltip />}
+                  content={
+                    <CustomPieTooltip totalValue={totalSpent} />
+                  }
                   wrapperStyle={{ zIndex: 1000 }}
                 />
                 <Legend
