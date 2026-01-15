@@ -32,14 +32,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 }
 
 type ChartsProps = {
-  // Dados dinâmicos esperados: [{ name: 'Jan', value: 2000 }, { name: 'Fev', value: 2500 }, ...]
   balanceData: { name: string; value: number }[]
-  // Ignoramos categoryData pois não vamos usar pizza aqui
   categoryData?: any 
 }
 
 export default function ChartsComponent({ balanceData }: ChartsProps) {
-  // Se não vier dados, usa um mock para não quebrar o layout
   const data =
     balanceData && balanceData.length > 0
       ? balanceData
@@ -85,14 +82,14 @@ export default function ChartsComponent({ balanceData }: ChartsProps) {
         </div>
       </div>
 
-      <div className="h-[300px] w-full">
+      {/* CORREÇÃO DO BUILD: Adicionado style={{ height: 300 }} */}
+      <div className="w-full" style={{ height: 300 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={data}
             margin={{ top: 10, right: 0, left: -15, bottom: 0 }}
           >
             <defs>
-              {/* Gradiente Violeta Vibrante */}
               <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={BRAND_COLOR} stopOpacity={0.6} />
                 <stop offset="95%" stopColor={BRAND_COLOR} stopOpacity={0} />
