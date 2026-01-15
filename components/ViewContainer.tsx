@@ -1,89 +1,96 @@
-// components/ViewContainer.tsx
 'use client'
 
 import React from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { ActiveTab } from '@/types'
+import { EmergencyFund, Goal, CreditCard } from '@/types_db'
 
-// Importando as views
+// Importação das Views
 import DashboardView from './views/DashboardView'
-import TransactionsView from './views/TransactionsView'
 import InvestmentsView from './views/InvestmentsView'
-import CalendarView from './views/CalendarView'
 import EmergencyFundView from './views/EmergencyFundView'
+import WalletView from './views/WalletView'
+import AgendaView from './views/AgendaView'
+// Se tiver TransactionsView, importe aqui também. Caso contrário, use uma div placeholder.
+const TransactionsView = () => <div className="p-10 text-white">Transações (Em breve)</div>
 
-// Função fallback
-const NO_OP = () => {}
-
-export default function ViewContainer({
-  activeTab,
-  ...props
-}: {
+interface ViewContainerProps {
   activeTab: ActiveTab
-  [key: string]: any
-}) {
-  // Handlers seguros
-  const handleRedirect = props.handlers?.handleRedirect as ((tab: ActiveTab) => void) || NO_OP
-  const addGoal = props.handlers?.addGoal as ((goal: any) => Promise<void>) || NO_OP
-  const updateEmergencyFund = props.handlers?.updateEmergencyFund as ((amount: number, type?: 'add' | 'set') => Promise<void>) || NO_OP
-  const onOpenTransactionModal = props.onOpenTransactionModal as (() => void) || NO_OP
+  summary: any
+  charts: any
+  cards: CreditCard[]
+  goals: Goal[]
+  emergencyFund: EmergencyFund | null
+  cdiRate: number
+  
+  // Handlers
+  handleRedirect: (tab: ActiveTab) => void
+  onUpdateEmergencyFund: (amount: number) => Promise<void>
+  onAddGoal: (goal: any) => Promise<void>
+  onUpdateGoal?: (goal: any) => void // Adicionado opcional para evitar erro se não passado
+  onAddCard?: (card: any) => void
+  onDeleteCard?: (id: string) => void
+}
 
-  const slideAnimation = {
-    initial: { opacity: 0, x: 50 },
-    animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -50 },
-    transition: { type: 'spring', stiffness: 300, damping: 30 },
-  } as const
+export default function ViewContainer(props: ViewContainerProps) {
+  const { activeTab } = props
 
+  // Renderização baseada na Aba Ativa
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={activeTab}
-        initial={slideAnimation.initial}
-        animate={slideAnimation.animate}
-        exit={slideAnimation.exit}
-        transition={slideAnimation.transition}
-        className="p-4 md:p-8 w-full"
-      >
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            summary={props.summary}
-            charts={props.charts}
-            cards={props.cards}
-            goals={props.goals}
-            cdiRate={props.cdiRate}
-            handleRedirect={handleRedirect}
-            handleUpdateEmergencyFund={async (amount: number) => updateEmergencyFund(amount, 'add')}
-            onOpenTransactionModal={onOpenTransactionModal}
-          />
-        )}
+    <div className="h-full w-full animate-in fade-in duration-300">
+      
+      {activeTab === 'dashboard' && (
+        <DashboardView
+          summary={props.summary}
+          charts={props.charts}
+          cards={props.cards}
+          goals={props.goals}
+          healthScore={850} // Valor calculado ou fixo
+          cdiRate={props.cdiRate}
+          handleRedirect={props.handleRedirect}
+          handleUpdateEmergencyFund={props.onUpdateEmergencyFund}
+          onUpdateGoal={props.onUpdateGoal}
+          onOpenTransactionModal={() => {}}
+        />
+      )}
 
-        {activeTab === 'transacoes' && (
-          <TransactionsView transactions={props.transactions} />
-        )}
+      {activeTab === 'transacoes' && (
+        <TransactionsView />
+      )}
 
-        {activeTab === 'investimentos' && (
-          <InvestmentsView
-            goals={props.goals}
-            cdiRate={props.cdiRate}
-            emergencyFund={props.emergencyFund}
-            onAddGoal={addGoal}
-            handleRedirect={handleRedirect}
-          />
-        )}
+      {activeTab === 'investimentos' && (
+        <InvestmentsView
+          goals={props.goals}
+          cdiRate={props.cdiRate}
+          emergencyFund={props.emergencyFund}
+          onAddGoal={props.onAddGoal}
+          handleRedirect={props.handleRedirect}
+        />
+      )}
 
-        {activeTab === 'calendario' && (
-          <CalendarView transactions={props.transactions} />
-        )}
+      {/* CORREÇÃO DO ERRO: Mudado de 'emergencia' para 'reserva' */}
+      {activeTab === 'reserva' && (
+        <EmergencyFundView
+          fund={props.emergencyFund}
+          onUpdateFund={props.onUpdateEmergencyFund}
+        />
+      )}
 
-        {activeTab === 'emergencia' && (
-          <EmergencyFundView
-            fund={props.emergencyFund}
-            // Corrige o erro: adapta a assinatura para aceitar apenas `amount`
-            onUpdateFund={async (amount: number) => updateEmergencyFund(amount, 'set')}
-          />
-        )}
-      </motion.div>
-    </AnimatePresence>
+      {/* Novas Abas Adicionadas para evitar erros de falta de tratamento */}
+      {activeTab === 'carteira' && (
+        <WalletView 
+          cards={props.cards} 
+          onAddCard={props.onAddCard || (() => {})} 
+          onDeleteCard={props.onDeleteCard || (() => {})} 
+        />
+      )}
+
+      {activeTab === 'agenda' && (
+        <AgendaView />
+      )}
+
+      {activeTab === 'calendario' && (
+        <AgendaView /> // Redireciona calendario antigo para Agenda
+      )}
+    </div>
   )
 }

@@ -1,88 +1,67 @@
-// components/Header.tsx
 'use client'
 
 import React from 'react'
-import { LogOut, Menu, Search, Bell } from 'lucide-react'
+import { Bell, Search, User, Menu } from 'lucide-react'
 import { ActiveTab } from '@/types'
-import Image from 'next/image'
 
-type HeaderProps = {
+interface HeaderProps {
   activeTab: ActiveTab
-  onLogout: () => void
-  onToggleMenu: () => void
-  userImageUrl?: string | null
+  user?: any
+  onToggleMenu?: () => void
 }
 
-export default function Header({
-  activeTab,
-  onLogout,
-  onToggleMenu,
-  userImageUrl,
-}: HeaderProps) {
-  const titles: Record<ActiveTab, string> = {
+export default function Header({ activeTab, user, onToggleMenu }: HeaderProps) {
+  
+  // CORREÇÃO AQUI: As chaves devem ser iguais ao type ActiveTab
+  const tabNames: Record<ActiveTab, string> = {
     dashboard: 'Dashboard',
     transacoes: 'Transações',
     investimentos: 'Investimentos',
-    calendario: 'Calendário',
-    emergencia: 'Reserva',
+    carteira: 'Minha Carteira', // Adicionado
+    agenda: 'Agenda Inteligente', // Adicionado
+    reserva: 'Reserva de Emergência', // CORRIGIDO: de 'emergencia' para 'reserva'
+    calendario: 'Calendário' // Mantido caso ainda exista no type, se não, pode remover
   }
 
-  // Escolhe uma imagem padrão caso userImageUrl esteja vazio ou nulo
-  const safeImageUrl =
-    userImageUrl && userImageUrl.trim() !== ''
-      ? userImageUrl
-      : '/default-avatar.png' // coloque uma imagem padrão em public/
-
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-gray-200 bg-white/80 px-6 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/80 md:h-20">
-      {/* Botão Hamburger (mobile) */}
-      <button
-        onClick={onToggleMenu}
-        className="text-gray-700 dark:text-gray-300 md:hidden"
-        aria-label="Abrir menu"
-      >
-        <Menu className="h-6 w-6" />
-      </button>
-
-      {/* Barra de Pesquisa */}
-      <div className="hidden flex-1 items-center justify-center md:flex">
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Pesquisar transações..."
-            className="w-full rounded-full border border-gray-300 bg-gray-50 py-2 pl-10 pr-4 text-sm focus:border-brand-violet focus:ring-1 focus:ring-brand-violet dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          />
-        </div>
+    <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-md px-6 md:px-10">
+      <div className="flex items-center gap-4">
+        {onToggleMenu && (
+          <button onClick={onToggleMenu} className="md:hidden text-gray-400 hover:text-white">
+            <Menu />
+          </button>
+        )}
+        <h1 className="text-xl font-bold text-white tracking-tight">
+          {tabNames[activeTab] || 'Cérebro.AI'}
+        </h1>
       </div>
 
-      {/* Ícones e Perfil */}
-      <div className="flex items-center gap-4">
-        <button className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-          <Bell className="h-5 w-5" />
-        </button>
-
-        <div className="relative h-9 w-9 overflow-hidden rounded-full">
-          {/* Só renderiza o <Image> se existir src válido */}
-          {safeImageUrl && (
-            <Image
-              src={safeImageUrl}
-              alt="Foto do Usuário"
-              fill
-              style={{ objectFit: 'cover' }}
-              className="hover:opacity-80 transition-opacity"
+      <div className="flex items-center gap-4 md:gap-6">
+        {/* Barra de Busca (Visual) */}
+        <div className="hidden md:flex relative items-center">
+            <Search className="absolute left-3 h-4 w-4 text-gray-500"/>
+            <input 
+              placeholder="Buscar..." 
+              className="h-10 w-64 rounded-full bg-white/5 pl-10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand-primary" 
             />
-          )}
         </div>
 
-        {/* Botão de Logout (desktop) */}
-        <button
-          onClick={onLogout}
-          className="hidden items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white md:flex"
-        >
-          <LogOut className="h-4 w-4" />
-          Sair
+        {/* Notificações */}
+        <button className="relative p-2 text-gray-400 hover:text-white transition">
+          <Bell className="h-5 w-5" />
+          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
         </button>
+
+        <div className="h-6 w-px bg-white/10 mx-1" />
+
+        {/* Perfil */}
+        <div className="flex items-center gap-3">
+             <div className="text-right hidden md:block">
+                <p className="text-xs font-bold text-white leading-none">Pedro Brasil</p>
+                <p className="text-[10px] text-brand-primary">Pro</p>
+             </div>
+             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 border border-white/10" />
+        </div>
       </div>
     </header>
   )
