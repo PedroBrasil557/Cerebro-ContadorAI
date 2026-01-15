@@ -1,135 +1,95 @@
-// components/dashboard/BudgetSummary.tsx
 'use client'
 
 import React from 'react'
-// CORREÇÃO: Adicionamos a importação de motion
-import { motion } from 'framer-motion' 
-import { TrendingDown, Settings } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { PieChart, Settings, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { STATUS_COLORS } from '@/lib/constants'
 
-type Budget = {
-  category: string
-  spent: number
-  limit: number
-}
+// Props esperadas: array de orçamentos
+export default function BudgetSummary({ budgets }: { budgets: any[] }) {
+  // Cálculos dinâmicos
+  const totalLimit = budgets.reduce((sum, b) => sum + b.limit, 0) || 1 // Evita divisão por zero
+  const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0)
+  const remaining = Math.max(0, totalLimit - totalSpent)
+  // Calcula porcentagem total, limitando a 100% para o gráfico não quebrar visualmente
+  const pct = Math.min((totalSpent / totalLimit) * 100, 100)
 
-type BudgetSummaryProps = {
-  budgets: Budget[]
-}
-
-const BudgetRing = ({ percentage, color }: { percentage: number, color: string }) => {
-    const radius = 25;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (percentage / 100) * circumference;
-
-    return (
-        <svg className="h-full w-full" viewBox="0 0 60 60">
-            {/* Fundo Cinza */}
-            <circle
-                className="text-gray-200 dark:text-gray-600"
-                strokeWidth="7"
-                stroke="currentColor"
-                fill="transparent"
-                r={radius}
-                cx="30"
-                cy="30"
-            />
-            {/* Progresso Colorido */}
-            <circle
-                className={`transition-all duration-700`}
-                strokeWidth="7"
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
-                strokeLinecap="round"
-                stroke={color}
-                fill="transparent"
-                r={radius}
-                cx="30"
-                cy="30"
-                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
-            />
-        </svg>
-    );
-};
-
-export default function BudgetSummary({ budgets }: BudgetSummaryProps) {
-    const totalLimit = budgets.reduce((sum, b) => sum + b.limit, 0);
-    const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
-    const overallPercentage = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0;
-
-    const getColor = (percentage: number) => {
-        if (percentage >= 100) return STATUS_COLORS.danger;
-        if (percentage >= 70) return STATUS_COLORS.warning;
-        return STATUS_COLORS.success;
-    };
-
-    const overallColor = getColor(overallPercentage);
+  // Configuração do círculo SVG
+  const radius = 40
+  const circumference = 2 * Math.PI * radius // ~251
+  const offset = circumference - (pct / 100) * circumference
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800 h-full">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold text-text-dark dark:text-white">
-          Orçamentos (Mês)
-        </h3>
-        <button className="text-text-light hover:text-brand-violet transition-colors" aria-label="Gerenciar orçamentos">
-          <Settings className="h-5 w-5" />
+    <div className="glass-panel flex h-full flex-col rounded-2xl border border-white/5 bg-[#111] p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-violet-400">
+          <PieChart className="h-5 w-5" />
+          <h3 className="text-lg font-bold text-white">Orçamento Mensal</h3>
+        </div>
+        <button className="text-gray-500 transition hover:text-white">
+          <Settings className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Visão Geral (Anel Central) */}
-      <div className="flex justify-center items-center gap-6 mb-6 border-b border-gray-100 pb-6 dark:border-gray-700">
-        <div className="relative h-24 w-24">
-            <BudgetRing percentage={overallPercentage} color={overallColor} />
-            <div className="absolute inset-0 flex flex-col justify-center items-center">
-                <span className="text-2xl font-bold" style={{ color: overallColor }}>
-                    {Math.round(overallPercentage)}%
-                </span>
-                <span className="text-xs text-text-light">Total</span>
-            </div>
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 py-2">
+        {/* Container do Gráfico sem bordas extras */}
+        <div className="relative flex h-40 w-40 items-center justify-center">
+          {/* SVG Rotacionado para começar do topo */}
+          <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
+            {/* Círculo de Fundo */}
+            <circle
+              className="text-white/5"
+              strokeWidth="8"
+              stroke="currentColor"
+              fill="transparent"
+              r={radius}
+              cx="50"
+              cy="50"
+            />
+
+            {/* Círculo de Progresso Animado (Violeta Neon) */}
+            <motion.circle
+              className="text-violet-500 drop-shadow-[0_0_10px_rgba(139,92,246,0.6)] transition-all duration-1000 ease-out"
+              strokeWidth="8"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              stroke="currentColor"
+              fill="transparent"
+              r={radius}
+              cx="50"
+              cy="50"
+              initial={{ strokeDashoffset: circumference }}
+              animate={{ strokeDashoffset: offset }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-3xl font-black tracking-tight text-white">
+              {Math.round(pct)}%
+            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-violet-300">
+              Consumido
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col text-sm">
-            <span className="font-semibold text-text-dark dark:text-white">
-                Gasto: {formatCurrency(totalSpent)}
-            </span>
-            <span className="text-text-light">
-                Limite: {formatCurrency(totalLimit)}
-            </span>
-            {overallPercentage >= 100 && (
-                <span className="text-red-500 font-medium mt-1">Limite Excedido!</span>
-            )}
+
+        {/* Resumo de Valores */}
+        <div className="space-y-1 text-center">
+          <p className="text-sm font-medium text-gray-400">Disponível para gastar</p>
+          <p className="text-2xl font-black text-white">
+            {formatCurrency(remaining)}
+          </p>
+          <p className="text-xs text-gray-500">
+            de um total de {formatCurrency(totalLimit)}
+          </p>
         </div>
       </div>
 
-      {/* Lista de Orçamentos por Categoria */}
-      <div className="space-y-3 max-h-64 overflow-y-auto">
-        {budgets.map((budget) => {
-          const percentage = (budget.spent / budget.limit) * 100;
-          const color = getColor(percentage);
-
-          return (
-            <div key={budget.category} className="flex items-center gap-4">
-              <TrendingDown className="h-5 w-5 shrink-0" style={{ color: color }} />
-              <div className="flex-1">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="font-medium text-text-dark dark:text-white">{budget.category}</span>
-                  <span className="text-text-light">{Math.round(percentage)}%</span>
-                </div>
-                {/* Barra de Progresso */}
-                <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                    <motion.div
-                        className="h-2 rounded-full"
-                        style={{ backgroundColor: color }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${percentage > 100 ? 100 : percentage}%` }}
-                        transition={{ duration: 0.5 }}
-                    />
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* Botão de Detalhes */}
+      <button className="group mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-white transition-all hover:border-violet-500 hover:bg-violet-500">
+        Ver detalhes por categoria{' '}
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+      </button>
     </div>
-  );
+  )
 }

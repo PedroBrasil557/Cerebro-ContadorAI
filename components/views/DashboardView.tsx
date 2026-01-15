@@ -1,146 +1,110 @@
-// components/views/DashboardView.tsx
 'use client'
 
 import React from 'react'
-import { CreditCard, Goal } from '@/types_db'
+// CORREÇÃO 1: ActiveTab vem de 'types', CreditCard e Goal vêm de 'types_db'
 import { ActiveTab } from '@/types' 
+import { CreditCard, Goal } from '@/types_db' 
+
 import SummaryCards from '../dashboard/SummaryCard'
 import ChartsComponent from '../dashboard/ChartsComponent'
 import CreditCardSummary from '../dashboard/CreditCardSummary'
 import GoalsList from '../investments/GoalsList'
 import BudgetSummary from '../dashboard/BudgetSummary' 
-import { HelpCircle, Activity, Lightbulb } from 'lucide-react' 
+import FinancialHealthGauge from '../dashboard/FinancialHealthGauge'
 
-const NO_OP = () => {}; 
-
-// --- TIPAGEM COMPLETA ---
-type DashboardViewProps = {
-  summary: {
-    currentBalance: number
-    monthlyIncome: number
-    monthlyExpense: number
-    emergencyTotal: number
-    emergencyTarget: number
-    emergencyPercentage: number
-  }
-  charts: {
-    categoryTotals: { name: string; value: number }[]
-    monthlyBalanceHistory: { name: string; Receitas: number; Despesas: number }[]
-  }
-  cards: CreditCard[]
-  goals: Goal[] 
-  cdiRate: number
-  handleRedirect: (tab: ActiveTab) => void 
-  handleUpdateEmergencyFund: (amount: number) => Promise<void>;
-  onOpenTransactionModal: (type: 'income' | 'expense') => void; 
-}
-
-// --- COMPONENTE AUXILIAR: InsightCard ---
-const InsightCard = ({ icon: Icon, iconBg, iconColor, title, text }: any) => (
-  <div className="flex items-start gap-4 rounded-2xl bg-white p-5 shadow-md dark:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all hover:shadow-xl">
-    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconBg}`}>
-      <Icon className={`h-5 w-5 ${iconColor}`} />
-    </div>
-    <div>
-      <h4 className="mb-1 font-semibold text-text-dark dark:text-white">{title}</h4>
-      <p className="text-sm text-text-light">{text}</p>
-    </div>
-  </div>
-)
+// CORREÇÃO 2: Adicionado TrendingUp na importação
+import { Activity, Lightbulb, TrendingUp, Wallet } from 'lucide-react' 
+import { formatCurrency } from '@/lib/utils'
 
 export default function DashboardView({
   summary,
   charts,
   cards,
   goals,
+  healthScore,
   cdiRate,
-  handleRedirect = NO_OP as (tab: ActiveTab) => void, 
-  handleUpdateEmergencyFund, 
-  onOpenTransactionModal,
-}: DashboardViewProps) {
-  
-  const mockBudgets = [
-    { category: 'Alimentação', spent: 650, limit: 1000 },
-    { category: 'Transporte', spent: 1200, limit: 1000 }, 
-    { category: 'Lazer', spent: 300, limit: 500 },
-  ];
+  handleRedirect,
+  onUpdateGoal,
+}: any) {
+
+  // CORREÇÃO 3: Função obrigatória para resolver o erro do GoalsList
+  const handleGoalAddValue = (goalId: string, value: number) => {
+     const goal = goals.find((g: Goal) => g.id === goalId)
+     if (goal && onUpdateGoal) {
+        onUpdateGoal({ ...goal, current_amount: goal.current_amount + value })
+     }
+  }
 
   return (
-    <div className="space-y-8 p-4 md:p-8 bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="space-y-8 p-6 md:p-8 animate-in fade-in duration-500">
 
-      {/* 1. Cards de Resumo */}
-      <SummaryCards
-        currentBalance={summary.currentBalance}
-        monthlyIncome={summary.monthlyIncome}
-        monthlyExpense={summary.monthlyExpense}
-        emergencyTotal={summary.emergencyTotal}
-        emergencyTarget={summary.emergencyTarget}
-        emergencyPercentage={summary.emergencyPercentage}
-        onAddReserve={handleUpdateEmergencyFund} 
-        onOpenTransactionModal={onOpenTransactionModal} 
-      />
-
-      {/* 2. Gráficos e Orçamentos */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        {/* Gráficos (Line + Pie) - ocupa 3 colunas */}
-        <div className="lg:col-span-3">
-          <ChartsComponent
-            categoryData={charts.categoryTotals}
-            balanceData={charts.monthlyBalanceHistory}
-          />
+      {/* 1. SEÇÃO TOPO: Cards Editáveis + Saúde Financeira */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
+        <div className="xl:col-span-3 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+           <SummaryCards {...summary} />
         </div>
+        <div className="xl:col-span-1">
+           <FinancialHealthGauge score={healthScore} />
+        </div>
+      </div>
 
-        {/* Orçamentos - ocupa 2 colunas */}
-        <div className="lg:col-span-2">
-          <BudgetSummary budgets={mockBudgets} />
+      {/* 2. MEIO: Gráficos + Orçamento */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2"> 
+          <ChartsComponent categoryData={charts.categoryTotals} balanceData={charts.monthlyBalanceHistory} />
+        </div>
+        <div className="lg:col-span-1"> 
+          <BudgetSummary budgets={[
+             { category: 'Alimentação', spent: 850, limit: 1200 },
+             { category: 'Transporte', spent: 400, limit: 600 },
+             { category: 'Assinaturas', spent: 150, limit: 150 },
+          ]} />
         </div>
       </div>
       
-      {/* 3. Colunas Inferiores */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* 3. BASE: Metas e Carteira */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+         {/* CORREÇÃO 3: Passando a prop onAddValue aqui */}
+         <GoalsList 
+            goals={goals} 
+            cdiRate={cdiRate} 
+            onGoalClick={() => handleRedirect('investimentos')}
+            onAddValue={handleGoalAddValue}
+         />
 
-        {/* Insights Inteligentes + Cards */}
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <h2 className="text-xl font-semibold text-text-dark dark:text-white">
-            Insights Inteligentes
-          </h2>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <InsightCard
-              title="Economia Inteligente"
-              text="Você economizou 12% a mais que o mês anterior."
-              icon={Activity} 
-              iconBg="bg-summary-green-bg"
-              iconColor="text-summary-green-icon"
-            />
-            <InsightCard
-              title="Rendimento"
-              text="Seu investimento rendeu 4% este mês."
-              icon={Lightbulb} 
-              iconBg="bg-summary-blue-bg"
-              iconColor="text-summary-blue-icon"
-            />
-          </div>
-        </div>
+         {/* Widget de Carteira */}
+         <div className="glass-panel relative flex flex-col justify-between overflow-hidden rounded-2xl p-6 border border-white/10 bg-[#111]">
+            <div className="flex justify-between items-center z-10">
+               <div className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-brand-primary" />
+                  <h3 className="text-xl font-bold text-white">Minha Carteira</h3>
+               </div>
+               <button onClick={() => handleRedirect('carteira')} className="text-xs font-bold uppercase text-brand-primary hover:text-white transition">
+                  Gerenciar
+               </button>
+            </div>
 
-        {/* Cards Laterais: Cartões e Metas */}
-        <div className="space-y-6 lg:col-span-1">
-
-          {/* Cartões de Crédito */}
-          <CreditCardSummary 
-            cards={cards} 
-            onCardClick={() => handleRedirect('transacoes')} 
-          />
-
-          {/* Cards de Metas */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-4 transition-all hover:shadow-2xl">
-            <GoalsList 
-              goals={goals} 
-              cdiRate={cdiRate} 
-              onGoalClick={() => handleRedirect('investimentos')} 
-              onAddValue={NO_OP} // Corrige erro do build
-            />
-          </div>
-        </div>
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 z-10">
+               {cards && cards.slice(0, 2).map((card: any) => (
+                  <div key={card.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition cursor-pointer">
+                     <div className="flex items-center gap-3">
+                        <div className="h-8 w-12 rounded bg-gradient-to-br from-gray-600 to-black" />
+                        <div>
+                           <p className="font-bold text-white text-sm">{card.name}</p>
+                           <p className="text-[10px] text-gray-400">**** {card.limit.toString().slice(0,4)}</p>
+                        </div>
+                     </div>
+                     <div className="mt-3 flex justify-between items-end border-t border-white/5 pt-2">
+                        <p className="text-[10px] text-gray-500">Limite</p>
+                        <p className="text-sm font-bold text-white">{formatCurrency(card.limit)}</p>
+                     </div>
+                  </div>
+               ))}
+               <button onClick={() => handleRedirect('carteira')} className="flex items-center justify-center rounded-xl border border-dashed border-white/10 text-gray-500 hover:text-white hover:border-white transition">
+                  <span className="text-xs font-bold">+ Adicionar</span>
+               </button>
+            </div>
+         </div>
       </div>
     </div>
   )

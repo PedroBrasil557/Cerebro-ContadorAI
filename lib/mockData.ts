@@ -107,6 +107,13 @@ export const MOCK_EMERGENCY_FUND: EmergencyFund & { target_amount: number } = {
   created_at: formatISO(new Date()),
   target_amount: 16000, // <-- A META DA RESERVA (ex: R$ 16.000)
 }
+import { Notification } from "@/types_db";
+
+export const MOCK_NOTIFICATIONS: Notification[] = [
+  { id: '1', title: 'Fatura Próxima', message: 'Cartão Violeta vence amanhã', time: '2h atrás', read: false, type: 'alert' },
+  { id: '2', title: 'Meta Atingida', message: 'Você atingiu 50% da meta Carro Novo', time: '1d atrás', read: true, type: 'success' },
+  { id: '3', title: 'Rendimento', message: 'Seu CDI rendeu R$ 45,00 hoje', time: '3d atrás', read: true, type: 'info' },
+];
 
 export const MOCK_CDI_RATE = 0.1165 // 11.65% a.a.
 

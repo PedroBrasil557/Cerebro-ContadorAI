@@ -161,6 +161,7 @@ export interface Database {
         ]
       }
     }
+    
     Views: {
       [_ in never]: never
     }
@@ -175,7 +176,22 @@ export interface Database {
     }
   }
 }
+export type Notification = {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  type: 'alert' | 'success' | 'info';
+}
 
+export type CalendarEvent = {
+  id: string;
+  title: string;
+  date: string; // ISO string
+  type: 'bill' | 'meeting' | 'generic';
+  participants?: string[];
+}
 // Exportações de tipos para facilitar
 export type Transaction = Database['public']['Tables']['transactions']['Row']
 export type Goal = Database['public']['Tables']['goals']['Row']

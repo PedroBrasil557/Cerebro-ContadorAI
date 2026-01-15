@@ -1,40 +1,29 @@
-// components/dashboard/ChartsComponent.tsx
 'use client'
 
 import React from 'react'
 import {
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   CartesianGrid,
 } from 'recharts'
-import { PIE_CHART_COLORS } from '../../lib/constants'
+import { TrendingUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-type ChartsProps = {
-  categoryData: { name: string; value: number }[]
-  balanceData: { name: string; Receitas: number; Despesas: number }[]
-}
+// Cor Violeta Vibrante da Marca
+const BRAND_COLOR = '#8B5CF6'
 
-// Tooltip Customizado
-const CustomPieTooltip = ({ active, payload, totalValue }: any) => {
+// Tooltip personalizado para o gráfico
+const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    const data = payload[0].payload
-    const percent =
-      totalValue > 0 ? ((data.value / totalValue) * 100).toFixed(1) : '0.0'
-
     return (
-      <div className="z-50 rounded-md border border-gray-500 bg-card-dark p-3 text-sm text-white shadow-lg">
-        <p className="font-semibold">{data.name}</p>
-        <p className="text-sm text-gray-400">
-          Valor: {formatCurrency(data.value)} ({percent}%)
+      <div className="rounded-xl border border-white/10 bg-[#151515]/90 p-3 shadow-xl backdrop-blur-sm">
+        <p className="mb-1 text-xs font-medium text-gray-400">{label}</p>
+        <p className="text-sm font-bold text-white">
+          {formatCurrency(payload[0].value)}
         </p>
       </div>
     )
@@ -42,149 +31,112 @@ const CustomPieTooltip = ({ active, payload, totalValue }: any) => {
   return null
 }
 
-// Legenda Customizada
-const CustomPieLegend = ({ payload = [], totalValue = 0 }: any) => {
-  return (
-    <ul className="flex flex-col gap-3">
-      {payload.map((entry: any, index: number) => {
-        const data = entry.payload
-        const percent =
-          totalValue > 0 ? ((data.value / totalValue) * 100).toFixed(1) : '0.0'
-
-        return (
-          <li key={`item-${index}`} className="flex items-center gap-3 text-sm">
-            <span
-              className="h-4 w-4 rounded"
-              style={{ backgroundColor: entry.color }}
-            ></span>
-            <span className="text-text-secondary-dark">{entry.value}</span>
-            <span className="font-semibold text-text-light-dark">
-              ({percent}%)
-            </span>
-          </li>
-        )
-      })}
-    </ul>
-  )
+type ChartsProps = {
+  // Dados dinâmicos esperados: [{ name: 'Jan', value: 2000 }, { name: 'Fev', value: 2500 }, ...]
+  balanceData: { name: string; value: number }[]
+  // Ignoramos categoryData pois não vamos usar pizza aqui
+  categoryData?: any 
 }
 
-export default function ChartsComponent({
-  categoryData,
-  balanceData,
-}: ChartsProps) {
-  const totalSpent = categoryData.reduce((acc, entry) => acc + entry.value, 0)
+export default function ChartsComponent({ balanceData }: ChartsProps) {
+  // Se não vier dados, usa um mock para não quebrar o layout
+  const data =
+    balanceData && balanceData.length > 0
+      ? balanceData
+      : [
+          { name: 'Jan', value: 15000 },
+          { name: 'Fev', value: 18200 },
+          { name: 'Mar', value: 17500 },
+          { name: 'Abr', value: 21000 },
+          { name: 'Mai', value: 19800 },
+          { name: 'Jun', value: 24500 },
+        ]
 
-  const evolutionData = [
-    { name: 'Jan', Saldo: 2000 },
-    { name: 'Fev', Saldo: 1800 },
-    { name: 'Mar', Saldo: 3000 },
-    { name: 'Abr', Saldo: 2500 },
-    { name: 'Mai', Saldo: 3500 },
-    { name: 'Jun', Saldo: 4000 },
-  ]
-
-  const hasCategoryData = categoryData && categoryData.some((d) => d.value > 0)
-  const finalCategoryData = hasCategoryData ? categoryData : []
+  const latestValue = data[data.length - 1].value
+  const previousValue = data[data.length - 2]?.value || latestValue
+  const isTrendingUp = latestValue >= previousValue
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-      {/* Gráfico de Linha */}
-      <div className="rounded-2xl border border-gray-700 bg-card-dark p-6 shadow-sm lg:col-span-2">
-        <h3 className="mb-4 text-xl font-semibold text-text-light-dark">
-          Evolução Mensal
-        </h3>
-        <div className="h-80 w-full">
-          <ResponsiveContainer>
-            <LineChart
-              data={evolutionData}
-              margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#4A5568"
-              />
-              <XAxis
-                dataKey="name"
-                fontSize={12}
-                stroke="#CBD5E0"
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                fontSize={12}
-                stroke="#CBD5E0"
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `R$${value / 1000}k`}
-              />
-              <Tooltip
-                formatter={(value: number) => formatCurrency(value)}
-                contentStyle={{
-                  backgroundColor: '#2D3748',
-                  border: 'none',
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="Saldo"
-                stroke="#7C3AED"
-                strokeWidth={3}
-                dot={{ r: 5 }}
-                activeDot={{ r: 7 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+    <div className="glass-panel flex h-full flex-col rounded-2xl border border-white/5 bg-[#111] p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="flex items-center gap-2 text-xl font-bold text-white">
+            <TrendingUp className="h-5 w-5 text-violet-400" />
+            Evolução Patrimonial
+          </h3>
+          <p className="text-sm text-gray-400">Histórico dos últimos 6 meses</p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-bold text-white">
+            {formatCurrency(latestValue)}
+          </p>
+          <p
+            className={`flex items-center justify-end gap-1 text-xs font-bold ${
+              isTrendingUp ? 'text-emerald-400' : 'text-red-400'
+            }`}
+          >
+            {isTrendingUp ? (
+              <TrendingUp className="h-3 w-3" />
+            ) : (
+              <TrendingUp className="h-3 w-3 rotate-180" />
+            )}
+            Tendência {isTrendingUp ? 'Positiva' : 'Negativa'}
+          </p>
         </div>
       </div>
 
-      {/* Gráfico de Pizza */}
-      <div className="rounded-2xl border border-gray-700 bg-card-dark p-6 shadow-sm lg:col-span-3">
-        <h3 className="mb-4 text-xl font-semibold text-text-light-dark">
-          Gastos por Categoria
-        </h3>
-        <div className="h-80 w-full">
-          {finalCategoryData.length > 0 ? (
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie
-                  data={finalCategoryData}
-                  cx="40%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={100}
-                  paddingAngle={3}
-                  dataKey="value"
-                  nameKey="name"
-                >
-                  {finalCategoryData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={
-                    <CustomPieTooltip totalValue={totalSpent} />
-                  }
-                  wrapperStyle={{ zIndex: 1000 }}
-                />
-                <Legend
-                  content={<CustomPieLegend totalValue={totalSpent} />}
-                  layout="vertical"
-                  verticalAlign="middle"
-                  align="right"
-                  wrapperStyle={{ paddingLeft: '10%' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-text-secondary-dark">
-              Sem dados de despesa para exibir no gráfico.
-            </div>
-          )}
-        </div>
+      <div className="h-[300px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={data}
+            margin={{ top: 10, right: 0, left: -15, bottom: 0 }}
+          >
+            <defs>
+              {/* Gradiente Violeta Vibrante */}
+              <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={BRAND_COLOR} stopOpacity={0.6} />
+                <stop offset="95%" stopColor={BRAND_COLOR} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="rgba(255,255,255,0.05)"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#6B7280', fontSize: 12 }}
+              dy={10}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#6B7280', fontSize: 12 }}
+              tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+              dx={-10}
+            />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
+            />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke={BRAND_COLOR}
+              strokeWidth={3}
+              fillOpacity={1}
+              fill="url(#colorBalance)"
+              activeDot={{
+                r: 6,
+                stroke: '#fff',
+                strokeWidth: 2,
+                fill: BRAND_COLOR,
+              }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
