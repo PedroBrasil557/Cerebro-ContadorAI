@@ -1,90 +1,95 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Goal, NewGoal, EmergencyFund } from '@/types_db'
-import { ActiveTab } from '@/types'
-import MarketDataCard from '../investments/MarketDataCard'
-import CdiCard from '../investments/CdiCard'
+import { TrendingUp, Plus, Target, DollarSign, Bitcoin } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 
-const MOCK_MARKET_DATA = [
-  { name: 'S&P 500', value: 5085.3, change: 0.85, direction: 'up' },
-  { name: 'IBOVESPA', value: 128540.0, change: 0.15, direction: 'up' },
-  { name: 'Bitcoin', value: 345000.00, change: -1.2, direction: 'down' }
-];
+export default function InvestmentsView({ goals, cdiRate, marketRates, onAddGoal }: any) {
+  const [showGoalForm, setShowGoalForm] = useState(false)
+  const [newGoal, setNewGoal] = useState({ title: '', target_amount: '' })
 
-interface InvestmentsProps {
-  goals: Goal[]
-  cdiRate: number
-  emergencyFund?: EmergencyFund | null // Adicionado para corrigir o erro
-  onAddGoal?: (goal: NewGoal) => Promise<void> | void
-  handleRedirect?: (tab: ActiveTab) => void
-}
-
-export default function InvestmentsView({ goals, cdiRate, emergencyFund, onAddGoal }: InvestmentsProps) {
-  const [title, setTitle] = useState('')
-  const [amount, setAmount] = useState('')
-
-  const handleCreate = async () => {
-    if (title && amount && onAddGoal) {
-      await onAddGoal({ title, target_amount: Number(amount) })
-      setTitle('')
-      setAmount('')
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onAddGoal({
+        title: newGoal.title,
+        target_amount: Number(newGoal.target_amount)
+    })
+    setShowGoalForm(false)
+    setNewGoal({ title: '', target_amount: '' })
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-8 animate-in fade-in">
-      <div className="border-b border-white/10 pb-4">
-         <h2 className="text-3xl font-bold text-white">Central de Investimentos</h2>
-         <p className="text-gray-400">Gestão inteligente de patrimônio</p>
+    <div className="p-8 space-y-8 animate-in fade-in">
+      <div className="flex justify-between items-center">
+         <h2 className="text-3xl font-bold text-white">Investimentos & Metas</h2>
+         <button onClick={() => setShowGoalForm(!showGoalForm)} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg font-bold transition">
+            <Plus className="h-5 w-5" /> Nova Meta
+         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-[#151515] border border-white/10 rounded-2xl overflow-hidden">
-                 <MarketDataCard marketData={MOCK_MARKET_DATA} />
+      {/* Painel de Mercado em Tempo Real */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-[#111] border border-white/10 p-6 rounded-2xl">
+              <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-green-500/20 rounded-lg"><TrendingUp className="h-5 w-5 text-green-500" /></div>
+                  <span className="text-gray-400 text-sm">CDI (Anual)</span>
               </div>
-              <div className="bg-[#151515] border border-white/10 rounded-2xl overflow-hidden">
-                 <CdiCard cdiRate={cdiRate} />
+              <p className="text-2xl font-bold text-white">{(cdiRate * 100).toFixed(2)}%</p>
+          </div>
+          
+          <div className="bg-[#111] border border-white/10 p-6 rounded-2xl">
+              <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-blue-500/20 rounded-lg"><DollarSign className="h-5 w-5 text-blue-500" /></div>
+                  <span className="text-gray-400 text-sm">Dólar (USD/BRL)</span>
               </div>
-           </div>
-           
-           <div className="p-6 bg-[#151515] border border-white/10 rounded-2xl">
-              <h3 className="text-white font-bold mb-4">Adicionar Nova Meta</h3>
-              <div className="space-y-4">
-                <input 
-                    placeholder="Nome da Meta (ex: Viagem)" 
-                    value={title} 
-                    onChange={e => setTitle(e.target.value)} 
-                    className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-violet-500 outline-none" 
-                />
-                <input 
-                    type="number" 
-                    placeholder="Valor Alvo (R$)" 
-                    value={amount} 
-                    onChange={e => setAmount(e.target.value)} 
-                    className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:border-violet-500 outline-none" 
-                />
-                <button 
-                    onClick={handleCreate} 
-                    className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-lg transition"
-                >
-                    Criar Meta
-                </button>
+              <p className="text-2xl font-bold text-white">R$ {marketRates?.usd?.toFixed(2) || '---'}</p>
+          </div>
+
+          <div className="bg-[#111] border border-white/10 p-6 rounded-2xl">
+              <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-orange-500/20 rounded-lg"><Bitcoin className="h-5 w-5 text-orange-500" /></div>
+                  <span className="text-gray-400 text-sm">Bitcoin (BTC)</span>
               </div>
-           </div>
-        </div>
-        
-        <div className="bg-[#151515] border border-violet-500/20 rounded-2xl p-6 h-full flex flex-col justify-between">
-            <div>
-                <h3 className="text-violet-400 font-bold mb-2">Consultor Inteligente</h3>
-                <p className="text-sm text-gray-400">
-                    Sua reserva de emergência atual no caixa é de <span className="text-white font-bold">R$ {emergencyFund?.current_amount || 0}</span>.
-                </p>
-            </div>
-            <button className="w-full bg-white/5 hover:bg-white/10 text-white py-2 rounded-lg text-sm mt-4">Ver Recomendações</button>
-        </div>
+              <p className="text-2xl font-bold text-white">
+                 {marketRates?.btc ? formatCurrency(marketRates.btc) : '---'}
+              </p>
+          </div>
+      </div>
+
+      {showGoalForm && (
+          <form onSubmit={handleSubmit} className="bg-[#111] border border-white/10 p-6 rounded-xl space-y-4">
+              <input placeholder="Nome da Meta (Ex: Viagem)" value={newGoal.title} onChange={e => setNewGoal({...newGoal, title: e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-lg text-white" required />
+              <input placeholder="Valor Alvo (R$)" type="number" value={newGoal.target_amount} onChange={e => setNewGoal({...newGoal, target_amount: e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-lg text-white" required />
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold">Criar Meta</button>
+          </form>
+      )}
+
+      {/* Lista de Metas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+         {goals.map((goal: any) => {
+             const progress = (goal.current_amount / goal.target_amount) * 100
+             return (
+                 <div key={goal.id} className="bg-[#111] border border-white/10 p-6 rounded-2xl space-y-4">
+                     <div className="flex justify-between">
+                         <h3 className="font-bold text-white">{goal.title}</h3>
+                         <Target className="h-5 w-5 text-violet-500" />
+                     </div>
+                     <div>
+                         <div className="flex justify-between text-sm mb-1">
+                             <span className="text-gray-400">Progresso</span>
+                             <span className="text-white font-bold">{progress.toFixed(0)}%</span>
+                         </div>
+                         <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+                             <div className="h-full bg-violet-600 transition-all duration-500" style={{ width: `${progress}%` }} />
+                         </div>
+                     </div>
+                     <div className="flex justify-between text-sm">
+                         <span className="text-gray-500">Atual: {formatCurrency(goal.current_amount)}</span>
+                         <span className="text-gray-500">Alvo: {formatCurrency(goal.target_amount)}</span>
+                     </div>
+                 </div>
+             )
+         })}
       </div>
     </div>
   )
