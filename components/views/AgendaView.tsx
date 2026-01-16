@@ -1,122 +1,98 @@
 'use client'
 
 import React, { useState } from 'react'
+import { Plus, Check, X, Clock, Calendar as CalendarIcon, User } from 'lucide-react'
 import { ClientAppointment } from '@/types_db'
-import { Calendar, Check, X, Clock, User, Plus } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import AddAppointmentModal from '@/components/AddAppointmentModal'
 
-interface AgendaProps {
+interface AgendaViewProps {
   appointments: ClientAppointment[]
   setAppointments: React.Dispatch<React.SetStateAction<ClientAppointment[]>>
-  onComplete: (id: string) => void
+  onUpdateStatus: (id: string, status: 'concluido' | 'faltou' | 'remarcar') => void
+  onAddAppointment: (appt: any) => void
 }
 
-export default function AgendaView({ appointments, setAppointments, onComplete }: AgendaProps) {
-  const [showModal, setShowModal] = useState(false)
-  
-  // Form State
-  const [newClient, setNewClient] = useState('')
-  const [service, setService] = useState('')
-  const [value, setValue] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
-  const [percentage, setPercentage] = useState(20)
-
-  const handleAdd = () => {
-    const newAppt: ClientAppointment = {
-      id: Math.random().toString(),
-      clientName: newClient,
-      service,
-      value: Number(value),
-      date,
-      time,
-      status: 'agendado',
-      caixaPercentage: percentage
-    }
-    setAppointments([...appointments, newAppt])
-    setShowModal(false)
-    // Reset form...
-  }
+export default function AgendaView({ appointments, setAppointments, onUpdateStatus, onAddAppointment }: AgendaViewProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   return (
-    <div className="p-6 md:p-8 space-y-6 animate-in fade-in">
-      <div className="flex justify-between items-center">
-        <div>
-           <h2 className="text-3xl font-bold text-white">Agenda Smart</h2>
-           <p className="text-gray-400">Gerencie clientes e automatize seu caixa.</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition">
-           <Plus className="h-5 w-5" /> Novo Agendamento
-        </button>
+    <div className="p-6 md:p-8 animate-in fade-in space-y-8">
+      
+      <AddAppointmentModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={onAddAppointment}
+      />
+
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+         <div>
+            <h2 className="text-3xl font-bold text-white">Agenda Smart</h2>
+            <p className="text-gray-400">Gerencie clientes e automatize seu caixa.</p>
+         </div>
+         <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-5 py-3 rounded-xl font-bold transition shadow-lg shadow-violet-900/20"
+         >
+            <Plus className="h-5 w-5" /> Novo Agendamento
+         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {appointments.length === 0 && (
-           <div className="col-span-full text-center py-20 text-gray-500 border border-dashed border-white/10 rounded-2xl">
-              Nenhum agendamento para hoje.
-           </div>
-        )}
-        
-        {appointments.map(appt => (
-          <div key={appt.id} className={`p-5 rounded-2xl border ${appt.status === 'concluido' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/10 bg-[#111]'} relative overflow-hidden group`}>
-             <div className="flex justify-between items-start mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {appointments.map((appt) => (
+          <div key={appt.id} className="bg-[#111] border border-white/10 rounded-2xl p-6 hover:border-violet-500/30 transition group">
+             
+             <div className="flex justify-between items-start mb-6">
                 <div className="flex items-center gap-3">
-                   <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-violet-400"><User className="h-5 w-5"/></div>
+                   <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400 group-hover:text-violet-400 group-hover:bg-violet-500/10 transition">
+                      <User className="h-5 w-5" />
+                   </div>
                    <div>
-                      <h3 className="font-bold text-white">{appt.clientName}</h3>
+                      {/* Tenta ler clientName (frontend) ou client_name (banco) */}
+                      <h3 className="font-bold text-white leading-none mb-1">
+                          {appt.clientName || (appt as any).client_name}
+                      </h3>
                       <p className="text-xs text-gray-400">{appt.service}</p>
                    </div>
                 </div>
                 <div className="text-right">
-                   <p className="font-bold text-white">{formatCurrency(appt.value)}</p>
-                   <p className="text-[10px] text-gray-500">{appt.caixaPercentage}% p/ Caixa</p>
+                   <p className="font-bold text-white">{formatCurrency(Number(appt.value))}</p>
+                   <p className="text-[10px] text-gray-500">
+                       {appt.caixaPercentage || (appt as any).caixa_percentage || 20}% p/ Caixa
+                   </p>
                 </div>
-             </div>
-             
-             <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
-                <span className="flex items-center gap-1"><Calendar className="h-3 w-3"/> {appt.date}</span>
-                <span className="flex items-center gap-1"><Clock className="h-3 w-3"/> {appt.time}</span>
              </div>
 
-             {appt.status === 'agendado' ? (
-                <div className="flex gap-2 mt-2">
-                   <button onClick={() => onComplete(appt.id)} className="flex-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white py-2 rounded-lg text-xs font-bold transition flex justify-center items-center gap-1">
-                      <Check className="h-3 w-3" /> Concluir
-                   </button>
-                   <button className="flex-1 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white py-2 rounded-lg text-xs font-bold transition">
-                      Remarcar
-                   </button>
-                   <button className="flex-1 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-2 rounded-lg text-xs font-bold transition">
-                      Faltou
-                   </button>
+             <div className="flex items-center gap-4 mb-6 text-sm text-gray-400 bg-black/20 p-3 rounded-lg border border-white/5">
+                <div className="flex items-center gap-1.5">
+                   <CalendarIcon className="h-4 w-4 text-violet-500" />
+                   <span>{appt.date}</span>
                 </div>
-             ) : (
-                <div className="mt-2 text-center py-2 bg-emerald-500/10 text-emerald-500 rounded-lg text-xs font-bold border border-emerald-500/20">
-                   Concluído (Valor adicionado ao saldo)
+                <div className="h-4 w-px bg-white/10" />
+                <div className="flex items-center gap-1.5">
+                   <Clock className="h-4 w-4 text-violet-500" />
+                   <span>{appt.time}</span>
                 </div>
-             )}
+             </div>
+
+             <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => onUpdateStatus(appt.id, 'concluido')} className="flex items-center justify-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white py-2.5 rounded-lg text-xs font-bold transition border border-emerald-500/20">
+                   <Check className="h-3 w-3" /> Concluir
+                </button>
+                <button onClick={() => onUpdateStatus(appt.id, 'remarcar')} className="flex items-center justify-center gap-1.5 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white py-2.5 rounded-lg text-xs font-bold transition border border-orange-500/20">
+                   <Clock className="h-3 w-3" /> Remarcar
+                </button>
+                <button onClick={() => onUpdateStatus(appt.id, 'faltou')} className="flex items-center justify-center gap-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white py-2.5 rounded-lg text-xs font-bold transition border border-red-500/20">
+                   <X className="h-3 w-3" /> Faltou
+                </button>
+             </div>
           </div>
         ))}
       </div>
 
-      {/* Modal Simplificado de Adição */}
-      {showModal && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[#151515] p-6 rounded-2xl border border-white/10 w-full max-w-md space-y-4">
-               <h3 className="text-xl font-bold text-white">Novo Cliente</h3>
-               <input placeholder="Nome do Cliente" className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white" value={newClient} onChange={e => setNewClient(e.target.value)} />
-               <input placeholder="Procedimento" className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white" value={service} onChange={e => setService(e.target.value)} />
-               <div className="grid grid-cols-2 gap-4">
-                  <input type="number" placeholder="Valor (R$)" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white" value={value} onChange={e => setValue(e.target.value)} />
-                  <input type="number" placeholder="% Caixa (20)" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white" value={percentage} onChange={e => setPercentage(Number(e.target.value))} />
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <input type="date" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white" value={date} onChange={e => setDate(e.target.value)} />
-                  <input type="time" className="bg-black/50 border border-white/10 rounded-lg p-3 text-white" value={time} onChange={e => setTime(e.target.value)} />
-               </div>
-               <button onClick={handleAdd} className="w-full bg-violet-600 py-3 rounded-lg font-bold text-white">Salvar na Agenda</button>
-               <button onClick={() => setShowModal(false)} className="w-full text-gray-500 py-2">Cancelar</button>
-            </div>
+      {appointments.length === 0 && (
+         <div className="text-center py-20 bg-white/5 rounded-2xl border border-dashed border-white/10">
+            <p className="text-gray-400">Nenhum agendamento pendente.</p>
          </div>
       )}
     </div>

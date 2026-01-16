@@ -1,15 +1,25 @@
-// app/layout.tsx
 import './globals.css'
-import React from 'react'
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 
-export const metadata = {
-  title: 'Cerebro',
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'Cérebro.AI Financeiro',
+  description: 'Gestão Financeira Inteligente',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      {/* ADICIONADO: suppressHydrationWarning={true} */}
+      <body className={inter.className} suppressHydrationWarning={true}>
+        {children}
+      </body>
     </html>
   )
 }
