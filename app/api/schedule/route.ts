@@ -5,10 +5,16 @@ import nodemailer from 'nodemailer'
 import ical, { ICalCalendarMethod } from 'ical-generator'
 
 export async function POST(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies })
 
   /* ───────────────────────────────
-     1. AUTENTICAÇÃO
+     1. SUPABASE CLIENT (TIPAGEM CORRETA)
+  ─────────────────────────────── */
+  const supabase = createRouteHandlerClient({
+    cookies
+  })
+
+  /* ───────────────────────────────
+     2. AUTENTICAÇÃO
   ─────────────────────────────── */
   const {
     data: { user },
@@ -16,14 +22,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
 
   if (authError || !user || !user.email) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   /* ───────────────────────────────
-     2. BODY
+     3. BODY
   ─────────────────────────────── */
   const body = await request.json()
 
@@ -46,7 +49,7 @@ export async function POST(request: Request) {
 
   try {
     /* ───────────────────────────────
-       3. INSERT NO SUPABASE
+       4. DATABASE
     ─────────────────────────────── */
     const { data: appointment, error: dbError } = await supabase
       .from('appointments')
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
     if (dbError) throw dbError
 
     /* ───────────────────────────────
-       4. iCAL
+       5. iCAL
     ─────────────────────────────── */
     const startTime = new Date(`${date}T${time}:00`)
     const endTime = new Date(startTime.getTime() + 60 * 60 * 1000)
@@ -89,10 +92,7 @@ Cliente: ${client_name}
 Serviço: ${service}
 Valor: R$ ${Number(value).toFixed(2)}
 Contato: ${client_email || 'Não informado'}
-
-Gerado automaticamente pelo Cérebro.AI
       `,
-      location: 'Local de Atendimento',
       organizer: {
         name: 'Cérebro.AI',
         email: 'no-reply@cerebro.ai'
@@ -106,7 +106,7 @@ Gerado automaticamente pelo Cérebro.AI
     })
 
     /* ───────────────────────────────
-       5. EMAIL
+       6. EMAIL
     ─────────────────────────────── */
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       const transporter = nodemailer.createTransport({
@@ -120,8 +120,8 @@ Gerado automaticamente pelo Cérebro.AI
       await transporter.sendMail({
         from: `"Cérebro.AI" <${process.env.SMTP_USER}>`,
         to: user.email,
-        subject: `📅 Novo agendamento - ${client_name}`,
-        text: `Novo agendamento em ${date} às ${time}.`,
+        subject: `📅 Novo agendamento`,
+        text: `Agendamento confirmado para ${date} às ${time}.`,
         icalEvent: {
           filename: 'invite.ics',
           method: 'request',
@@ -130,10 +130,7 @@ Gerado automaticamente pelo Cérebro.AI
       })
     }
 
-    return NextResponse.json({
-      success: true,
-      data: appointment
-    })
+    return NextResponse.json({ success: true, data: appointment })
 
   } catch (error: any) {
     console.error('Schedule Error:', error)
