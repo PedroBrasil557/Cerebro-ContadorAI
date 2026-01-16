@@ -23,3 +23,10 @@ export const formatCurrency = (amount: number, currency: string = 'BRL'): string
       year: 'numeric',
     }).format(date);
   };
+  // lib/utils.ts
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}

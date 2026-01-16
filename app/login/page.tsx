@@ -1,139 +1,106 @@
 'use client'
 
-import React, { useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Lock, Mail, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import { Lock, Mail, Loader2, ArrowRight, Zap } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [view, setView] = useState<'sign-in' | 'sign-up'>('sign-in')
-  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
 
     try {
-      if (view === 'sign-in') {
-        // LOGIN
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-        if (error) throw error
-        router.push('/')
-        router.refresh()
-      } else {
-        // CADASTRO
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${location.origin}/auth/callback`,
-          },
-        })
-        if (error) throw error
-        alert('Verifique seu email para confirmar o cadastro!')
-        setView('sign-in')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Ocorreu um erro ao tentar entrar.')
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) throw error
+      router.push('/')
+      router.refresh()
+    } catch (error: any) {
+      toast.error('Erro de autenticação', { description: error.message })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-white p-4">
-      <div className="w-full max-w-md bg-[#111] border border-white/10 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 blur-[80px] rounded-full pointer-events-none" />
-        <div className="relative z-10">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-black tracking-tighter mb-2">
-              CÉREBRO <span className="text-violet-600">.AI</span>
-            </h1>
-            <p className="text-gray-400 text-sm">
-              {view === 'sign-in' ? 'Bem-vindo de volta, Gestor.' : 'Crie sua conta e assuma o controle.'}
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-[#050505] relative overflow-hidden text-white">
+      {/* Background Effects */}
+      <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
+
+      <div className="w-full max-w-md p-6 relative z-10 animate-in fade-in zoom-in duration-500">
+        <div className="bg-[#111111]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+          
+          <div className="flex flex-col items-center mb-8">
+            <div className="h-14 w-14 bg-gradient-to-tr from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/25">
+              <Zap className="h-7 w-7 text-white fill-white" />
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+              CÉREBRO.AI
+            </h2>
+            <p className="text-gray-500 text-sm mt-2 font-medium">Acesse seu painel administrativo</p>
           </div>
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3.5 h-4 w-4 text-gray-500" />
-                <input 
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-violet-500 transition"
-                  placeholder="seu@email.com"
-                />
+          <form className="space-y-5" onSubmit={handleLogin}>
+            <div className="space-y-4">
+              <div className="group">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-500 group-focus-within:text-indigo-500 transition-colors" />
+                  </div>
+                  <input
+                    type="email"
+                    required
+                    className="block w-full pl-12 pr-4 py-4 bg-black/50 border border-white/10 rounded-xl text-sm placeholder-gray-600 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none"
+                    placeholder="exemplo@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className="group">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-500 group-focus-within:text-indigo-500 transition-colors" />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    className="block w-full pl-12 pr-4 py-4 bg-black/50 border border-white/10 rounded-xl text-sm placeholder-gray-600 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none"
+                    placeholder="Sua senha secreta"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase ml-1">Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3.5 h-4 w-4 text-gray-500" />
-                <input 
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-violet-500 transition"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 mt-2 shadow-lg shadow-violet-900/20"
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="animate-spin h-5 w-5" />
               ) : (
                 <>
-                  {view === 'sign-in' ? 'Entrar no Sistema' : 'Criar Conta Grátis'}
-                  <ArrowRight className="h-4 w-4" />
+                  Entrar no Sistema
+                  <ArrowRight className="h-5 w-5" />
                 </>
               )}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <button 
-              onClick={() => {
-                setView(view === 'sign-in' ? 'sign-up' : 'sign-in')
-                setError(null)
-              }}
-              className="text-sm text-gray-400 hover:text-white transition"
-            >
-              {view === 'sign-in' 
-                ? 'Não tem uma conta? ' 
-                : 'Já tem uma conta? '}
-              <span className="text-violet-400 font-bold underline decoration-violet-400/30 underline-offset-4">
-                {view === 'sign-in' ? 'Cadastre-se' : 'Faça Login'}
-              </span>
-            </button>
-          </div>
         </div>
       </div>
     </div>
