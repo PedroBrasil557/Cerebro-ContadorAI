@@ -1,175 +1,158 @@
-// components/AddTransactionModal.tsx
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
-import { CreditCard, NewTransaction } from '@/types_db' // Usando alias
-import { CATEGORIES } from '@/lib/constants' // Usando alias
-import { format } from 'date-fns'
-import { Modal } from '@/components/ui/Modal'; // Usando Modal genérico
+import React, { useState } from 'react'
+import { X, TrendingUp, TrendingDown, RefreshCcw } from 'lucide-react'
+import { TransactionType, NewTransaction } from '@/types_db'
 
-type TransactionType = 'expense' | 'income';
+// Categorias simples para evitar erros de importação
+const CATEGORIES = [
+  'Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 
+  'Educação', 'Serviços', 'Assinaturas', 'Salário', 'Investimento', 'Outros'
+]
 
-type ModalProps = {
+interface AddTransactionModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (transaction: Omit<NewTransaction, 'user_id'>) => Promise<void>
-  cards: CreditCard[]
-  initialType: TransactionType; // <--- CORREÇÃO: PROPRIEDADE FALTANDO
+  onSave: (transaction: NewTransaction) => void
 }
 
-export default function AddTransactionModal({
-  isOpen,
-  onClose,
-  onSave,
-  cards,
-  initialType, // <--- Recebido aqui
-}: ModalProps) {
-  
-  // CORREÇÃO: Usa initialType para definir o estado inicial
-  const [type, setType] = useState<TransactionType>(initialType) 
-  
+export default function AddTransactionModal({ isOpen, onClose, onSave }: AddTransactionModalProps) {
+  const [type, setType] = useState<TransactionType>('despesa_variavel')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [category, setCategory] = useState('')
-  const [creditCardId, setCreditCardId] = useState<string | null>(null)
 
-  // Garante que o estado do modal se ajuste se a prop initialType mudar
-  useEffect(() => {
-    setType(initialType);
-    setCategory('');
-    setCreditCardId(null);
-  }, [initialType]);
-
+  if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!description || !amount || !date || !category) {
-      alert('Por favor, preencha todos os campos obrigatórios.')
-      return
-    }
+
+    const numericAmount = parseFloat(amount.replace(',', '.'))
+    if (!numericAmount || !description) return
+
+    // Lógica de Sinal: Se for receita é positivo, se for despesa é negativo
+    const finalAmount = type === 'receita' ? Math.abs(numericAmount) : -Math.abs(numericAmount)
 
     onSave({
       type,
       description,
-      // IMPORTANTE: Despesas são negativas, Receitas são positivas
-      amount: type === 'expense' ? -Math.abs(parseFloat(amount)) : Math.abs(parseFloat(amount)),
-      date,
-      category,
-      credit_card_id: type === 'expense' ? creditCardId : null,
+      amount: finalAmount,
+      category: category || 'Geral',
+      date: new Date().toISOString(),
     })
-    
-    // Resetar formulário
+
+    // Limpar e Fechar
     setDescription('')
     setAmount('')
-    setDate(format(new Date(), 'yyyy-MM-dd'))
     setCategory('')
-    setCreditCardId(null)
-    onClose(); // Fechar após salvar
+    onClose()
   }
 
-  const categoryOptions =
-    type === 'expense' ? CATEGORIES.expense : CATEGORIES.income
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <Modal 
-          isOpen={isOpen} 
-          onClose={onClose} 
-          title={type === 'income' ? 'Registrar Receita' : 'Registrar Despesa'}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl relative">
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
         >
-            <div className="mb-4 grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
-              <button
-                type="button"
-                onClick={() => setType('expense')}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-                  type === 'expense'
-                    ? 'bg-white text-gray-900 shadow dark:bg-gray-800 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
-              >
-                Gasto
-              </button>
-              <button
-                type="button"
-                onClick={() => setType('income')}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-                  type === 'income'
-                    ? 'bg-white text-gray-900 shadow dark:bg-gray-800 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
-              >
-                Receita
-              </button>
-            </div>
+          <X className="h-5 w-5" />
+        </button>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input
-                type="text"
-                placeholder="Descrição"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-              <input
-                type="number"
-                placeholder="Valor (ex: 50.99)"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                <option value="" disabled>
-                  Selecione a Categoria
-                </option>
-                {categoryOptions.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+        <h2 className="text-xl font-bold text-white mb-6">Nova Transação</h2>
 
-              {type === 'expense' && cards.length > 0 && (
-                <select
-                  value={creditCardId || ''}
-                  onChange={(e) =>
-                    setCreditCardId(e.target.value || null)
-                  }
-                  className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Pagamento (Dinheiro/Débito)</option>
-                  {cards.map((card) => (
-                    <option key={card.id} value={card.id}>
-                      Cartão: {card.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* Seletor de Tipo */}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setType('receita')}
+              className={`flex flex-col items-center justify-center p-3 rounded-xl border transition ${
+                type === 'receita' 
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                  : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              <TrendingUp className="h-5 w-5 mb-1" />
+              <span className="text-xs font-bold">Receita</span>
+            </button>
 
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-brand-violet px-4 py-2.5 font-medium text-white transition-colors hover:bg-brand-violet-dark"
-              >
-                Salvar Transação
-              </button>
-            </form>
-        </Modal>
-      )}
-    </AnimatePresence>
+            <button
+              type="button"
+              onClick={() => setType('despesa_variavel')}
+              className={`flex flex-col items-center justify-center p-3 rounded-xl border transition ${
+                type === 'despesa_variavel' 
+                  ? 'bg-red-500/20 border-red-500 text-red-400' 
+                  : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              <TrendingDown className="h-5 w-5 mb-1" />
+              <span className="text-xs font-bold">Variável</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setType('despesa_fixa')}
+              className={`flex flex-col items-center justify-center p-3 rounded-xl border transition ${
+                type === 'despesa_fixa' 
+                  ? 'bg-orange-500/20 border-orange-500 text-orange-400' 
+                  : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              <RefreshCcw className="h-5 w-5 mb-1" />
+              <span className="text-xs font-bold">Fixa</span>
+            </button>
+          </div>
+
+          {/* Valor */}
+          <div>
+            <label className="text-xs text-gray-500 font-bold uppercase ml-1">Valor</label>
+            <input 
+              type="number"
+              step="0.01"
+              placeholder="0,00"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-2xl font-bold text-white outline-none focus:border-violet-500 transition"
+              autoFocus
+            />
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <label className="text-xs text-gray-500 font-bold uppercase ml-1">Descrição</label>
+            <input 
+              type="text"
+              placeholder="Ex: Supermercado, Salário..."
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-violet-500 transition"
+            />
+          </div>
+
+          {/* Categoria */}
+          <div>
+            <label className="text-xs text-gray-500 font-bold uppercase ml-1">Categoria</label>
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-violet-500 transition appearance-none"
+            >
+              <option value="">Selecione...</option>
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          <button 
+            type="submit"
+            className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-4 rounded-xl transition mt-4 shadow-lg shadow-violet-900/20"
+          >
+            Confirmar Transação
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }

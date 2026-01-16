@@ -1,60 +1,60 @@
-// components/investments/AddGoalForm.tsx
 'use client'
 
 import React, { useState } from 'react'
+import { Plus } from 'lucide-react'
 import { NewGoal } from '@/types_db'
 
-export default function AddGoalForm({
-  onAddGoal,
-}: {
-  onAddGoal: (goal: NewGoal) => void
-}) {
+interface AddGoalFormProps {
+  onAdd: (goal: NewGoal) => void
+}
+
+export default function AddGoalForm({ onAdd }: AddGoalFormProps) {
   const [title, setTitle] = useState('')
   const [targetAmount, setTargetAmount] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title || !targetAmount) {
-      alert('Por favor, preencha todos os campos.')
-      return
-    }
-    onAddGoal({
+    if (!title || !targetAmount) return
+
+    onAdd({
       title,
       target_amount: parseFloat(targetAmount),
-      current_amount: 0,
+      // REMOVIDO: current_amount: 0 (O erro acontecia aqui, pois o MainAppLayout já define isso)
     })
+
     setTitle('')
     setTargetAmount('')
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
-    >
-      <h3 className="mb-4 text-lg font-semibold">Adicionar Nova Meta</h3>
-      <div className="space-y-4">
-        <input
-          type="text"
-          placeholder="Nome da Meta (ex: Viagem, Carro Novo)"
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="text-xs text-gray-400 font-bold uppercase">Nome da Meta</label>
+        <input 
+          type="text" 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          placeholder="Ex: Viagem para Londres"
+          className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-violet-500 transition mt-1"
         />
-        <input
-          type="number"
-          placeholder="Valor Alvo (ex: 20000)"
+      </div>
+      <div>
+        <label className="text-xs text-gray-400 font-bold uppercase">Valor Alvo</label>
+        <input 
+          type="number" 
           value={targetAmount}
           onChange={(e) => setTargetAmount(e.target.value)}
-          className="w-full rounded-md border-gray-300 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          placeholder="0.00"
+          className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-violet-500 transition mt-1"
         />
-        <button
-          type="submit"
-          className="w-full rounded-lg bg-violet-600 px-4 py-2 font-medium text-white transition-colors hover:bg-violet-700"
-        >
-          Criar Meta
-        </button>
       </div>
+      <button 
+        type="submit" 
+        className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl transition"
+      >
+        <Plus className="h-4 w-4" />
+        Criar Meta
+      </button>
     </form>
   )
 }

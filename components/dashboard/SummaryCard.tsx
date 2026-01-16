@@ -4,18 +4,16 @@ import React, { useState } from 'react'
 import { Wallet, TrendingUp, TrendingDown, Edit2, Check, PiggyBank } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { ResponsiveContainer, AreaChart, Area } from 'recharts'
-import { motion } from 'framer-motion'
 
 const CHART_COLORS = {
-  brand: '#8B5CF6', // Violeta Vibrante
-  success: '#10B981', // Verde Neon
-  danger: '#EF4444',  // Vermelho Neon
+  brand: '#8B5CF6',
+  success: '#10B981',
+  danger: '#EF4444',
 }
 
 const generateSparkData = (trend: 'up' | 'down' | 'brand') => {
   const baseValue = trend === 'down' ? 100 : 50;
   const multiplier = trend === 'down' ? -5 : 5;
-  
   return Array.from({ length: 20 }, (_, i) => {
     const randomVariance = Math.random() * 30 - 15;
     let value = baseValue + (i * multiplier) + randomVariance;
@@ -30,7 +28,6 @@ const EditableCard = ({ title, value, onChange, icon: Icon, trend, subtitle }: a
   const data = generateSparkData(trend)
   
   let chartColor = trend === 'brand' ? CHART_COLORS.brand : trend === 'up' ? CHART_COLORS.success : CHART_COLORS.danger;
-  
   const iconClass = trend === 'brand' ? 'text-violet-400 bg-violet-500/10' : trend === 'up' ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10';
   const textClass = trend === 'brand' ? 'text-violet-400' : trend === 'up' ? 'text-emerald-400' : 'text-red-400';
 
@@ -61,7 +58,6 @@ const EditableCard = ({ title, value, onChange, icon: Icon, trend, subtitle }: a
         <p className={`mt-2 text-xs font-bold uppercase tracking-wider ${textClass}`}>{subtitle}</p>
       </div>
 
-      {/* CORREÇÃO DO BUILD: Adicionado style={{ height: 112 }} para garantir altura explícita */}
       <div className="absolute bottom-0 left-0 right-0 opacity-30 group-hover:opacity-50 transition-opacity pointer-events-none mix-blend-screen" style={{ height: 112 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>

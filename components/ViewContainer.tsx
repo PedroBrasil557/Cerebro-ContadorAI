@@ -2,39 +2,61 @@
 
 import React from 'react'
 import { ActiveTab } from '@/types'
-import { EmergencyFund, Goal, CreditCard } from '@/types_db'
+import { 
+  EmergencyFund, 
+  Goal, 
+  CreditCard, 
+  Transaction, 
+  ClientAppointment, 
+  CaixaData, 
+  NewGoal 
+} from '@/types_db'
 
 // Importação das Views
 import DashboardView from './views/DashboardView'
 import InvestmentsView from './views/InvestmentsView'
-import EmergencyFundView from './views/EmergencyFundView'
 import WalletView from './views/WalletView'
 import AgendaView from './views/AgendaView'
-// Se tiver TransactionsView, importe aqui também. Caso contrário, use uma div placeholder.
-const TransactionsView = () => <div className="p-10 text-white">Transações (Em breve)</div>
+import CaixaView from './views/CaixaView'
+import TransactionsView from './views/TransactionsView'
+import EmergencyFundView from './views/EmergencyFundView'
+import ProfileView from './views/ProfileView'
 
 interface ViewContainerProps {
+  // Navegação e Usuário
   activeTab: ActiveTab
+  handleRedirect: (tab: ActiveTab) => void
+  user?: any
+
+  // Dados Financeiros Gerais
   summary: any
   charts: any
   cards: CreditCard[]
   goals: Goal[]
   emergencyFund: EmergencyFund | null
   cdiRate: number
+
+  // NOVOS DADOS (Essenciais para o funcionamento do sistema atualizado)
+  transactions: Transaction[]     // <--- Agora passado para o Dashboard
+  appointments: ClientAppointment[]
+  caixaData: CaixaData
   
-  // Handlers
-  handleRedirect: (tab: ActiveTab) => void
+  // Handlers (Ações)
   onUpdateEmergencyFund: (amount: number) => Promise<void>
-  onAddGoal: (goal: any) => Promise<void>
-  onUpdateGoal?: (goal: any) => void // Adicionado opcional para evitar erro se não passado
+  onAddGoal: (goal: NewGoal) => Promise<void>
+  onUpdateGoal?: (goal: any) => void 
   onAddCard?: (card: any) => void
   onDeleteCard?: (id: string) => void
+
+  // Handlers Novos
+  onAddTransaction: (t: Transaction) => void
+  setAppointments: React.Dispatch<React.SetStateAction<ClientAppointment[]>>
+  onCompleteAppointment: (id: string) => void
 }
 
 export default function ViewContainer(props: ViewContainerProps) {
   const { activeTab } = props
 
-  // Renderização baseada na Aba Ativa
   return (
     <div className="h-full w-full animate-in fade-in duration-300">
       
@@ -44,17 +66,22 @@ export default function ViewContainer(props: ViewContainerProps) {
           charts={props.charts}
           cards={props.cards}
           goals={props.goals}
-          healthScore={850} // Valor calculado ou fixo
+          healthScore={850} 
           cdiRate={props.cdiRate}
+          
+          // DADOS CONECTADOS AO NOVO ORÇAMENTO INTELIGENTE
+          transactions={props.transactions} 
+          
           handleRedirect={props.handleRedirect}
-          handleUpdateEmergencyFund={props.onUpdateEmergencyFund}
           onUpdateGoal={props.onUpdateGoal}
-          onOpenTransactionModal={() => {}}
         />
       )}
 
       {activeTab === 'transacoes' && (
-        <TransactionsView />
+        <TransactionsView 
+            transactions={props.transactions} 
+            onAddTransaction={props.onAddTransaction} 
+        />
       )}
 
       {activeTab === 'investimentos' && (
@@ -67,15 +94,6 @@ export default function ViewContainer(props: ViewContainerProps) {
         />
       )}
 
-      {/* CORREÇÃO DO ERRO: Mudado de 'emergencia' para 'reserva' */}
-      {activeTab === 'reserva' && (
-        <EmergencyFundView
-          fund={props.emergencyFund}
-          onUpdateFund={props.onUpdateEmergencyFund}
-        />
-      )}
-
-      {/* Novas Abas Adicionadas para evitar erros de falta de tratamento */}
       {activeTab === 'carteira' && (
         <WalletView 
           cards={props.cards} 
@@ -84,12 +102,28 @@ export default function ViewContainer(props: ViewContainerProps) {
         />
       )}
 
-      {activeTab === 'agenda' && (
-        <AgendaView />
+      {(activeTab === 'agenda' || activeTab === 'calendario') && (
+        <AgendaView 
+            appointments={props.appointments}
+            setAppointments={props.setAppointments}
+            onComplete={props.onCompleteAppointment}
+        />
       )}
 
-      {activeTab === 'calendario' && (
-        <AgendaView /> // Redireciona calendario antigo para Agenda
+      {activeTab === 'caixa' && (
+        <CaixaView data={props.caixaData} />
+      )}
+
+      {activeTab === 'perfil' && (
+        <ProfileView user={props.user} />
+      )}
+      
+      {activeTab === 'reserva' && (
+         props.emergencyFund ? (
+            <EmergencyFundView fund={props.emergencyFund} onUpdateFund={props.onUpdateEmergencyFund} />
+         ) : (
+            <div className="p-8 text-white">Carregando Reserva...</div>
+         )
       )}
     </div>
   )
