@@ -1,30 +1,64 @@
-// app/page.tsx
 'use client'
 
-import { Session } from '@supabase/auth-helpers-nextjs'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client' // <--- Importação nova
 import MainAppLayout from '@/components/MainAppLayout'
-import { MOCK_USER } from '@/lib/mockData' // Usando alias
-
-// Criamos uma sessão "falsa" para passar como prop
-// Isso simula um usuário logado
-const MOCK_SESSION: Session = {
-  access_token: 'mock-token',
-  refresh_token: 'mock-refresh',
-  user: {
-    id: MOCK_USER.id,
-    email: MOCK_USER.email,
-    app_metadata: {},
-    user_metadata: {},
-    aud: 'authenticated',
-    created_at: new Date().toISOString(),
-  },
-  token_type: 'bearer',
-  expires_in: 3600,
-  expires_at: Math.floor(Date.now() / 1000) + 3600,
-}
+import { Loader2 } from 'lucide-react'
 
 export default function App() {
-  // Renderiza diretamente o layout principal do aplicativo
-  // e passa a sessão mocada como prop.
-  return <MainAppLayout session={MOCK_SESSION} />
+  const [session, setSession] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient() // <--- Instância nova
+
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        // Tenta pegar a sessão atual (Agora funciona com @supabase/ssr)
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+
+        if (!currentSession) {
+          router.replace('/login')
+          return
+        }
+
+        setSession(currentSession)
+        setLoading(false)
+
+      } catch (error) {
+        console.error("Erro no login:", error)
+        router.replace('/login')
+      }
+    }
+
+    // Ouve mudanças (login/logout) em tempo real
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setSession(session)
+        setLoading(false)
+      } else {
+        router.replace('/login')
+      }
+    })
+
+    checkUser()
+
+    return () => subscription.unsubscribe()
+  }, [router, supabase])
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#0a0a0a]">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
+  // Só renderiza se tiver sessão
+  if (session) {
+    return <MainAppLayout session={session} />
+  }
+
+  return null
 }

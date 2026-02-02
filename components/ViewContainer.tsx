@@ -1,130 +1,90 @@
 'use client'
 
 import React from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ActiveTab } from '@/types'
-import { 
-  EmergencyFund, 
-  Goal, 
-  CreditCard, 
-  Transaction, 
-  ClientAppointment, 
-  CaixaData, 
-  NewGoal 
-} from '@/types_db'
+import { Transaction, ClientAppointment, Goal, CaixaData, CreditCard, UserProfile } from '@/types_db'
 
-// Importação das Views
+// Import Views
 import DashboardView from './views/DashboardView'
+import AgendaView from './views/AgendaView'
+import TransactionsView from './views/TransactionsView'
 import InvestmentsView from './views/InvestmentsView'
 import WalletView from './views/WalletView'
-import AgendaView from './views/AgendaView'
 import CaixaView from './views/CaixaView'
-import TransactionsView from './views/TransactionsView'
-import EmergencyFundView from './views/EmergencyFundView'
 import ProfileView from './views/ProfileView'
 
 interface ViewContainerProps {
-  // Navegação e Usuário
   activeTab: ActiveTab
   handleRedirect: (tab: ActiveTab) => void
-  user?: any
+  user: any 
 
-  // Dados Financeiros Gerais
-  summary: any
-  charts: any
+  summary: {
+    balance: number; income: number; expense: number; emergencyTotal: number;
+    setBalance?: any; setIncome?: any; setExpense?: any; setEmergency?: any; 
+  }
+  
+  charts: {
+      monthlyBalanceHistory: any[]
+      range: '1M' | '3M' | '6M' | '1A'
+      setRange: (r: any) => void
+  }
+
   cards: CreditCard[]
   goals: Goal[]
-  emergencyFund: EmergencyFund | null
+  emergencyFund: any
   cdiRate: number
-
-  // NOVOS DADOS (Essenciais para o funcionamento do sistema atualizado)
-  transactions: Transaction[]     // <--- Agora passado para o Dashboard
+  transactions: Transaction[]
   appointments: ClientAppointment[]
   caixaData: CaixaData
-  
-  // Handlers (Ações)
-  onUpdateEmergencyFund: (amount: number) => Promise<void>
-  onAddGoal: (goal: NewGoal) => Promise<void>
-  onUpdateGoal?: (goal: any) => void 
-  onAddCard?: (card: any) => void
-  onDeleteCard?: (id: string) => void
+  healthScore: number
 
-  // Handlers Novos
-  onAddTransaction: (t: Transaction) => void
-  setAppointments: React.Dispatch<React.SetStateAction<ClientAppointment[]>>
-  onCompleteAppointment: (id: string) => void
+  onUpdateEmergencyFund: (val: number) => void
+  onAddGoal: (goal: any) => void
+  onUpdateGoal: (goal: any) => void
+  onAddCard: (card: any) => void
+  onDeleteCard: (id: string) => void
+  onAddTransaction: (t: any) => void
+  setAppointments: any
+  onUpdateStatus: (id: string, status: string) => void
+  onAddAppointment: (appt: any) => void
 }
 
-export default function ViewContainer(props: ViewContainerProps) {
-  const { activeTab } = props
+export default function ViewContainer({ 
+  activeTab, handleRedirect, user, summary, transactions, appointments, goals, caixaData, onAddTransaction, onAddGoal, onUpdateStatus, onAddAppointment, charts
+}: ViewContainerProps) {
+
+  const pageVariants = { initial: { opacity: 0, y: 10 }, enter: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }
 
   return (
-    <div className="h-full w-full animate-in fade-in duration-300">
-      
-      {activeTab === 'dashboard' && (
-        <DashboardView
-          summary={props.summary}
-          charts={props.charts}
-          cards={props.cards}
-          goals={props.goals}
-          healthScore={850} 
-          cdiRate={props.cdiRate}
-          
-          // DADOS CONECTADOS AO NOVO ORÇAMENTO INTELIGENTE
-          transactions={props.transactions} 
-          
-          handleRedirect={props.handleRedirect}
-          onUpdateGoal={props.onUpdateGoal}
-        />
-      )}
+    <AnimatePresence mode='wait'>
+      <motion.div key={activeTab} initial="initial" animate="enter" exit="exit" variants={pageVariants} transition={{ duration: 0.2 }} className="w-full h-full">
+        
+        {(activeTab as string) === 'dashboard' && (
+          <DashboardView 
+            summary={summary}
+            recentTransactions={transactions.slice(0, 5)}
+            onNavigate={handleRedirect}
+            chartData={charts.monthlyBalanceHistory}
+            chartRange={charts.range}
+            setChartRange={charts.setRange}
+            transactions={transactions}
+            goals={goals}
+          />
+        )}
 
-      {activeTab === 'transacoes' && (
-        <TransactionsView 
-            transactions={props.transactions} 
-            onAddTransaction={props.onAddTransaction} 
-        />
-      )}
-
-      {activeTab === 'investimentos' && (
-        <InvestmentsView
-          goals={props.goals}
-          cdiRate={props.cdiRate}
-          emergencyFund={props.emergencyFund}
-          onAddGoal={props.onAddGoal}
-          handleRedirect={props.handleRedirect}
-        />
-      )}
-
-      {activeTab === 'carteira' && (
-        <WalletView 
-          cards={props.cards} 
-          onAddCard={props.onAddCard || (() => {})} 
-          onDeleteCard={props.onDeleteCard || (() => {})} 
-        />
-      )}
-
-      {(activeTab === 'agenda' || activeTab === 'calendario') && (
-        <AgendaView 
-            appointments={props.appointments}
-            setAppointments={props.setAppointments}
-            onComplete={props.onCompleteAppointment}
-        />
-      )}
-
-      {activeTab === 'caixa' && (
-        <CaixaView data={props.caixaData} />
-      )}
-
-      {activeTab === 'perfil' && (
-        <ProfileView user={props.user} />
-      )}
-      
-      {activeTab === 'reserva' && (
-         props.emergencyFund ? (
-            <EmergencyFundView fund={props.emergencyFund} onUpdateFund={props.onUpdateEmergencyFund} />
-         ) : (
-            <div className="p-8 text-white">Carregando Reserva...</div>
-         )
-      )}
-    </div>
+        {(activeTab as string) === 'agenda smart' && <AgendaView appointments={appointments} onStatusChange={onUpdateStatus} onAddAppointment={onAddAppointment} />}
+        
+        {(activeTab as string) === 'transações' && <TransactionsView transactions={transactions} onAddTransaction={onAddTransaction} />}
+        
+        {(activeTab as string) === 'investimentos' && <InvestmentsView goals={goals} onAddGoal={onAddGoal} />}
+        
+        {(activeTab as string) === 'minha carteira' && <WalletView />}
+        
+        {(activeTab as string) === 'caixa empresarial' && <CaixaView data={caixaData} />}
+        
+        {(activeTab as string) === 'meu perfil' && <ProfileView user={user} />}
+      </motion.div>
+    </AnimatePresence>
   )
 }

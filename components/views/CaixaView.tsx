@@ -1,258 +1,213 @@
 'use client'
 
-import React, { useState } from 'react'
-import { CaixaData } from '@/types_db'
-import { formatCurrency } from '@/lib/utils'
+import React from 'react'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { 
-  Landmark, TrendingUp, TrendingDown, ShieldCheck, 
-  PieChart, Activity, AlertTriangle, ArrowRight, Calendar, DollarSign 
+  ShieldCheck, AlertTriangle, TrendingUp, Lock, CalendarClock, 
+  Info, Settings2, AlertOctagon, Landmark, PiggyBank, History, Activity
 } from 'lucide-react'
-import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip, CartesianGrid } from 'recharts'
+import { CaixaData } from '@/types_db' 
+import { formatCurrency } from '@/lib/utils'
 
-// Dados Mockados para Projeção de Fluxo de Caixa (Premium Feature)
-const CASH_FLOW_DATA = [
-  { name: 'Sem 1', entrada: 5000, saida: 2000, saldo: 3000 },
-  { name: 'Sem 2', entrada: 7500, saida: 3500, saldo: 7000 },
-  { name: 'Sem 3', entrada: 4200, saida: 1200, saldo: 10000 },
-  { name: 'Sem 4', entrada: 8900, saida: 4000, saldo: 14900 },
-]
+const calculateRunway = (reserve: number, monthlyCost: number) => {
+  if (monthlyCost === 0) return 99
+  return reserve / monthlyCost
+}
 
-export default function CaixaView({ data }: { data: CaixaData }) {
-  const [activeTab, setActiveTab] = useState<'geral' | 'provisao' | 'impostos'>('geral')
+const GlassCard = ({ children, className = "", glow = false }: any) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className={`relative bg-[#09090b]/60 backdrop-blur-xl border border-white/[0.06] rounded-3xl overflow-hidden shadow-2xl ${className}`}
+  >
+    {glow && <div className="absolute -top-20 -right-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />}
+    <div className="relative z-10">{children}</div>
+  </motion.div>
+)
 
-  // Cálculos Premium
-  const burnRate = 1200 // Gasto médio mensal fixo (Exemplo)
-  const runway = data.currentBalance / burnRate // Meses de vida
-  const taxProvision = data.currentBalance * 0.15 // 15% para impostos
-  const profitDistribution = data.currentBalance * 0.20 // 20% Lucro Sócios
+const StatusBadge = ({ status }: { status: 'healthy' | 'warning' | 'critical' }) => {
+  const config = {
+    healthy: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: ShieldCheck, text: 'Caixa Saudável' },
+    warning: { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle, text: 'Atenção Necessária' },
+    critical: { color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertOctagon, text: 'Nível Crítico' }
+  }[status]
+  const Icon = config.icon
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${config.bg} ${config.border} ${config.color}`}>
+      <Icon size={14} />
+      <span className="text-xs font-bold uppercase tracking-wide">{config.text}</span>
+    </div>
+  )
+}
+
+const KPICard = ({ label, value, subtext, icon: Icon, trend }: any) => (
+  <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-colors group">
+    <div className="flex justify-between items-start mb-2">
+      <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+        <Icon size={18} />
+      </div>
+      {trend && (
+        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${trend > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+          {trend > 0 ? '+' : ''}{trend}%
+        </span>
+      )}
+    </div>
+    <div>
+      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1">{label}</p>
+      <h3 className="text-xl font-black text-white">{value}</h3>
+      {subtext && <p className="text-[10px] text-gray-400 mt-1">{subtext}</p>}
+    </div>
+  </div>
+)
+
+const Simulator = ({ currentReserve, monthlyBurn }: { currentReserve: number, monthlyBurn: number }) => {
+  const [extraContribution, setExtraContribution] = useState(0)
+  const [months, setMonths] = useState(6)
+  const projectedReserve = currentReserve + (extraContribution * months)
+  const projectedRunway = calculateRunway(projectedReserve, monthlyBurn)
 
   return (
-    <div className="relative min-h-screen w-full animate-in fade-in duration-500 overflow-hidden">
-      
-      {/* BACKGROUND THEME OVERRIDE (Azul Caixa Premium) */}
-      <div className="absolute inset-0 bg-[#002855] z-0">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#F68B1F] opacity-10 blur-[120px] rounded-full mix-blend-screen pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#005CA9] opacity-20 blur-[100px] rounded-full pointer-events-none" />
+    <GlassCard className="p-6 h-full flex flex-col justify-between">
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Settings2 className="text-emerald-400 h-5 w-5" />
+          <h3 className="text-lg font-bold text-white">Simulador de Futuro</h3>
+        </div>
+        <p className="text-sm text-gray-400 mb-6">Veja como aportes extras impactam a segurança.</p>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-gray-400 uppercase">
+              <label>Aporte Extra Mensal</label>
+              <span className="text-emerald-400">{formatCurrency(extraContribution)}</span>
+            </div>
+            <input type="range" min="0" max="5000" step="100" value={extraContribution} onChange={(e) => setExtraContribution(Number(e.target.value))} className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-gray-400 uppercase">
+              <label>Período de Acumulação</label>
+              <span className="text-white">{months} meses</span>
+            </div>
+            <input type="range" min="1" max="24" step="1" value={months} onChange={(e) => setMonths(Number(e.target.value))} className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+          </div>
+        </div>
       </div>
-
-      <div className="relative z-10 p-6 md:p-8 space-y-8">
-        
-        {/* HEADER CORPORATIVO */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/10 pb-6">
-           <div>
-              <div className="flex items-center gap-2 mb-2">
-                 <div className="bg-[#F68B1F] p-1.5 rounded-md">
-                    <Landmark className="h-5 w-5 text-white" />
-                 </div>
-                 <span className="text-[#F68B1F] font-bold tracking-widest text-xs uppercase">Corporate Treasury</span>
-              </div>
-              <h2 className="text-4xl font-black text-white tracking-tight">Caixa Empresarial</h2>
-              <p className="text-blue-200">Gestão de alta performance e controle de liquidez.</p>
-           </div>
-           
-           {/* KPI de Runway (Sobrevivência) */}
-           <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-xl flex items-center gap-4">
-              <div className={`p-3 rounded-full ${runway > 6 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                 <Activity className="h-6 w-6" />
-              </div>
-              <div>
-                 <p className="text-xs text-blue-200 uppercase font-bold">Runway (Sobrevivência)</p>
-                 <p className="text-xl font-bold text-white">{runway.toFixed(1)} Meses</p>
-              </div>
-           </div>
+      <div className="mt-8 p-4 rounded-xl bg-gradient-to-r from-emerald-900/40 to-black border border-emerald-500/20">
+        <p className="text-xs text-emerald-200 font-medium mb-1">Projeção de Runway</p>
+        <div className="flex items-end gap-2">
+          <span className="text-3xl font-black text-white">{projectedRunway.toFixed(1)}</span>
+          <span className="text-sm font-bold text-gray-400 mb-1">meses</span>
         </div>
-
-        {/* CARDS DE LIQUIDEZ (Visual Bancário) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           {/* Card Principal - Saldo */}
-           <div className="col-span-1 md:col-span-2 bg-gradient-to-br from-[#005CA9] to-[#003566] p-8 rounded-2xl shadow-2xl border border-white/10 relative overflow-hidden group">
-              <div className="absolute right-0 top-0 h-full w-1/2 bg-[url('/bg-grid.svg')] opacity-10" />
-              <div className="relative z-10">
-                 <p className="text-blue-200 font-medium mb-1">Saldo Disponível (Livre)</p>
-                 <h3 className="text-5xl font-black text-white mb-6">{formatCurrency(data.currentBalance)}</h3>
-                 
-                 <div className="flex gap-4">
-                    <div className="flex items-center gap-2 text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
-                       <TrendingUp className="h-4 w-4" />
-                       <span className="text-sm font-bold">+12% vs. mês anterior</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-blue-200 bg-white/5 px-3 py-1 rounded-lg border border-white/10">
-                       <ShieldCheck className="h-4 w-4" />
-                       <span className="text-sm">Reserva Protegida</span>
-                    </div>
-                 </div>
-              </div>
-           </div>
-
-           {/* Painel de Obrigações (Side Panel) */}
-           <div className="bg-[#001D3D] border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
-              <div>
-                 <h4 className="text-white font-bold flex items-center gap-2 mb-4">
-                    <AlertTriangle className="h-4 w-4 text-[#F68B1F]" /> Obrigações Futuras
-                 </h4>
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                       <span className="text-sm text-blue-200">Provisão Impostos (15%)</span>
-                       <span className="text-white font-bold">{formatCurrency(taxProvision)}</span>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                       <span className="text-sm text-blue-200">Distribuição Lucros (20%)</span>
-                       <span className="text-white font-bold">{formatCurrency(profitDistribution)}</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2">
-                       <span className="text-sm text-gray-400">Total Comprometido</span>
-                       <span className="text-[#F68B1F] font-bold">{formatCurrency(taxProvision + profitDistribution)}</span>
-                    </div>
-                 </div>
-              </div>
-              <button className="w-full mt-4 bg-[#F68B1F] hover:bg-[#d47313] text-white font-bold py-3 rounded-lg transition shadow-lg shadow-orange-900/20">
-                 Realizar Aportes
-              </button>
-           </div>
-        </div>
-
-        {/* ÁREA DE GESTÃO AVANÇADA */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           
-           {/* Gráfico de Fluxo de Caixa (Chart) */}
-           <div className="lg:col-span-2 bg-[#001D3D] border border-white/10 rounded-2xl p-6">
-              <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-400" /> Fluxo de Caixa Projetado
-                 </h3>
-                 <select className="bg-[#002855] border border-white/10 text-white text-sm rounded-lg p-2 outline-none">
-                    <option>Próximos 30 dias</option>
-                    <option>Este Trimestre</option>
-                 </select>
-              </div>
-              
-              <div className="h-[300px] w-full">
-                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={CASH_FLOW_DATA}>
-                       <defs>
-                          <linearGradient id="colorSaldo" x1="0" y1="0" x2="0" y2="1">
-                             <stop offset="5%" stopColor="#F68B1F" stopOpacity={0.3}/>
-                             <stop offset="95%" stopColor="#F68B1F" stopOpacity={0}/>
-                          </linearGradient>
-                       </defs>
-                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
-                       <Tooltip 
-                          contentStyle={{ backgroundColor: '#002855', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                          itemStyle={{ color: '#fff' }}
-                       />
-                       <Area type="monotone" dataKey="saldo" stroke="#F68B1F" strokeWidth={3} fillOpacity={1} fill="url(#colorSaldo)" />
-                    </AreaChart>
-                 </ResponsiveContainer>
-              </div>
-           </div>
-
-           {/* Cofres Inteligentes (Vaults) */}
-           <div className="space-y-6">
-              <div className="bg-gradient-to-br from-[#003566] to-[#001D3D] border border-white/10 rounded-2xl p-6">
-                 <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                    <PieChart className="h-5 w-5 text-blue-400" /> Distribuição Automática
-                 </h3>
-                 <p className="text-xs text-blue-200 mb-6">
-                    Baseado na regra dos 20%, cada entrada é automaticamente segmentada.
-                 </p>
-                 
-                 <div className="space-y-4">
-                    {/* Cofre 1 */}
-                    <div>
-                       <div className="flex justify-between text-sm mb-1">
-                          <span className="text-white">Reinvestimento</span>
-                          <span className="text-emerald-400 font-bold">60%</span>
-                       </div>
-                       <div className="h-2 bg-black/40 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 w-[60%]" />
-                       </div>
-                    </div>
-                    {/* Cofre 2 */}
-                    <div>
-                       <div className="flex justify-between text-sm mb-1">
-                          <span className="text-white">Reserva de Risco</span>
-                          <span className="text-[#F68B1F] font-bold">20%</span>
-                       </div>
-                       <div className="h-2 bg-black/40 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#F68B1F] w-[20%]" />
-                       </div>
-                    </div>
-                    {/* Cofre 3 */}
-                    <div>
-                       <div className="flex justify-between text-sm mb-1">
-                          <span className="text-white">Lucro Líquido</span>
-                          <span className="text-blue-400 font-bold">20%</span>
-                       </div>
-                       <div className="h-2 bg-black/40 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 w-[20%]" />
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              {/* Botão de Auditoria */}
-              <button className="w-full group flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition">
-                 <div className="flex items-center gap-3">
-                    <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400">
-                       <DollarSign className="h-5 w-5" />
-                    </div>
-                    <div className="text-left">
-                       <p className="text-sm font-bold text-white">Extrato Consolidado</p>
-                       <p className="text-xs text-gray-400">Baixar relatório fiscal</p>
-                    </div>
-                 </div>
-                 <ArrowRight className="h-4 w-4 text-gray-500 group-hover:text-white transition" />
-              </button>
-           </div>
-        </div>
-
-        {/* TABELA DE REGISTROS RECENTES (Estilo Enterprise) */}
-        <div className="bg-[#001D3D] border border-white/10 rounded-2xl overflow-hidden">
-           <div className="p-6 border-b border-white/10 flex justify-between items-center">
-              <h3 className="font-bold text-white">Últimas Movimentações de Caixa</h3>
-              <button className="text-xs text-blue-300 hover:text-white transition">Ver todas</button>
-           </div>
-           <div className="p-0">
-              <table className="w-full text-sm text-left">
-                 <thead className="bg-[#002855] text-blue-200 uppercase text-xs font-bold">
-                    <tr>
-                       <th className="px-6 py-4">Data</th>
-                       <th className="px-6 py-4">Origem/Destino</th>
-                       <th className="px-6 py-4">Categoria</th>
-                       <th className="px-6 py-4 text-right">Valor</th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-white/5 text-gray-300">
-                    {data.entries.length > 0 ? data.entries.map((entry, i) => (
-                       <tr key={i} className="hover:bg-white/5 transition">
-                          <td className="px-6 py-4 flex items-center gap-2">
-                             <Calendar className="h-3 w-3 text-gray-500" />
-                             {new Date(entry.date).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 font-medium text-white">{entry.source}</td>
-                          <td className="px-6 py-4">
-                             <span className="px-2 py-1 rounded-full text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                                Entrada
-                             </span>
-                          </td>
-                          <td className="px-6 py-4 text-right font-bold text-emerald-400">
-                             +{formatCurrency(entry.amount)}
-                          </td>
-                       </tr>
-                    )) : (
-                       <tr>
-                          <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                             Nenhum registro encontrado no período.
-                          </td>
-                       </tr>
-                    )}
-                 </tbody>
-              </table>
-           </div>
-        </div>
-
+        <div className="mt-2 text-xs text-gray-500">Saldo: <span className="text-white font-bold">{formatCurrency(projectedReserve)}</span></div>
       </div>
+    </GlassCard>
+  )
+}
+
+interface CaixaViewProps {
+  data: CaixaData
+}
+
+export default function CaixaView({ data }: CaixaViewProps) {
+  const safeData = data || { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] }
+  const estimatedMonthlyBurn = safeData.monthlyGoal * 0.5 
+  const runway = calculateRunway(safeData.currentBalance, estimatedMonthlyBurn)
+  
+  let status: 'healthy' | 'warning' | 'critical' = 'healthy'
+  if (runway < 2) status = 'critical'
+  else if (runway < 4) status = 'warning'
+
+  const percentReached = Math.min((safeData.currentBalance / safeData.monthlyGoal) * 100, 100)
+
+  return (
+    <div className="p-6 md:p-10 space-y-8 max-w-[1800px] mx-auto pb-32">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+         <div>
+            <div className="flex items-center gap-3 mb-2">
+               <h1 className="text-4xl font-black text-white tracking-tight">Caixa Empresarial</h1>
+               <StatusBadge status={status} />
+            </div>
+            <p className="text-gray-400 font-light max-w-lg">Gestão inteligente da reserva de segurança.</p>
+         </div>
+         <div className="bg-[#0f0f0f] border border-white/10 px-5 py-3 rounded-xl flex flex-col items-end">
+             <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-widest mb-1 group cursor-help">Runway <Info size={12} /></div>
+             <div className="flex items-baseline gap-1">
+                <span className={`text-3xl font-black ${status === 'healthy' ? 'text-emerald-400' : status === 'warning' ? 'text-amber-400' : 'text-rose-400'}`}>{runway.toFixed(1)}</span>
+                <span className="text-sm font-bold text-white">Meses</span>
+             </div>
+         </div>
+      </header>
+
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+         <GlassCard className="lg:col-span-2 p-8 relative overflow-hidden flex flex-col justify-between min-h-[320px]" glow>
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/40 via-[#09090b] to-[#09090b] z-0" />
+            <div className="relative z-10">
+               <div className="flex justify-between items-start mb-8">
+                  <div className="flex items-center gap-3">
+                     <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]"><Lock size={24} /></div>
+                     <div><h2 className="text-lg font-bold text-white">Reserva Disponível</h2><p className="text-xs text-emerald-200/60 font-medium">Líquido</p></div>
+                  </div>
+                  <button className="text-xs font-bold text-emerald-400 hover:text-emerald-300 uppercase tracking-widest border border-emerald-500/20 px-4 py-2 rounded-lg bg-emerald-500/5 hover:bg-emerald-500/10 transition">Resgatar</button>
+               </div>
+               <div className="mb-8"><h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-100 to-emerald-300 tracking-tight drop-shadow-lg">{formatCurrency(safeData.currentBalance)}</h1></div>
+            </div>
+            <div className="relative z-10 space-y-3">
+               <div className="flex justify-between text-xs font-bold text-emerald-200/80 uppercase tracking-wider"><span>Progresso da Meta</span><span>{percentReached.toFixed(0)}% de {formatCurrency(safeData.monthlyGoal)}</span></div>
+               <div className="h-4 w-full bg-black/40 rounded-full overflow-hidden p-1 border border-white/5 backdrop-blur-sm">
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${percentReached}%` }} transition={{ duration: 1.5, ease: "easeOut" }} className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full relative overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                     <div className="absolute inset-0 bg-white/20 animate-pulse-slow" />
+                  </motion.div>
+               </div>
+            </div>
+         </GlassCard>
+         <div className="grid grid-rows-3 gap-4">
+             <KPICard label="Giro Mensal" value="R$ 18.450" subtext="Média 3 meses" icon={Activity} trend={12} />
+             <KPICard label="Entrada Média" value="R$ 2.100" subtext="Aportes" icon={TrendingUp} trend={5} />
+             <KPICard label="Imposto Estimado" value={`R$ ${(safeData.currentBalance * (safeData.taxRate/100)).toFixed(2)}`} subtext={`Reserva (${safeData.taxRate}%)`} icon={Landmark} />
+         </div>
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         <GlassCard className="p-8 flex flex-col justify-center">
+            <div className="flex items-center gap-3 mb-6">
+               <div className={`p-3 rounded-xl border ${status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'}`}><Activity size={24} /></div>
+               <h3 className="text-xl font-bold text-white">Saúde do Caixa</h3>
+            </div>
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/5 mb-6">
+               <p className="text-lg text-white font-medium leading-relaxed">
+                  {status === 'healthy' ? "Parabéns! Caixa robusto." : status === 'warning' ? "Atenção: Reserva cobre < 4 meses." : "Crítico: Priorize o caixa."}
+               </p>
+            </div>
+         </GlassCard>
+         <Simulator currentReserve={safeData.currentBalance} monthlyBurn={estimatedMonthlyBurn} />
+      </section>
+
+      <section>
+         <div className="flex items-center justify-between mb-6">
+             <div className="flex items-center gap-2"><History className="text-gray-400" /><h2 className="text-xl font-bold text-white">Entradas Recentes</h2></div>
+         </div>
+         <div className="space-y-3">
+             {safeData.entries.length > 0 ? safeData.entries.map((t) => (
+                <GlassCard key={t.id} className="p-4 flex items-center justify-between group hover:border-white/10 transition-all">
+                   <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-full border ${t.type === 'receita' || t.type === 'transferencia' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                         {(t.type === 'receita' || t.type === 'transferencia') ? <PiggyBank size={18} /> : <Landmark size={18} />}
+                      </div>
+                      <div>
+                         <p className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors">{t.description}</p>
+                         <p className="text-xs text-gray-500 flex items-center gap-2"><CalendarClock size={12} /> {new Date(t.date).toLocaleDateString()} <span className="w-1 h-1 rounded-full bg-gray-700" /> {t.source || 'Sistema'}</p>
+                      </div>
+                   </div>
+                   <div className="text-right">
+                      <p className={`font-mono font-bold text-base ${(t.type === 'receita' || t.type === 'transferencia') ? 'text-emerald-400' : 'text-white'}`}>{(t.type === 'receita' || t.type === 'transferencia') ? '+' : ''} {formatCurrency(t.amount)}</p>
+                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{(t.type === 'receita' || t.type === 'transferencia') ? 'Recebido' : 'Pago'}</p>
+                   </div>
+                </GlassCard>
+             )) : (
+                <div className="text-center py-10 text-gray-500 bg-white/5 rounded-xl border border-white/5">Nenhuma movimentação registrada.</div>
+             )}
+         </div>
+      </section>
     </div>
   )
 }

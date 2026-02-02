@@ -1,73 +1,115 @@
-import { CreditCard, Goal, Transaction } from '@/types_db'
+import { CreditCard, UserProfile, Transaction, Goal, ClientAppointment } from '@/types_db'
 
-export const MOCK_USER = {
-  id: 'user-123',
-  name: 'Pedro Brasil',
-  email: 'pedro@cerebro.ai',
-  avatar: 'https://github.com/shadcn.png'
+export const MOCK_USER: UserProfile = {
+  id: 'mock-user-1',
+  full_name: 'Pedro Brasil',
+  email: 'pedro@exemplo.com',
+  avatar_url: 'https://github.com/shadcn.png',
+  plan: 'pro',
+  location: 'São Paulo, SP',
+  bio: 'Empreendedor e Investidor.',
+  created_at: new Date().toISOString()
 }
-
-export const MOCK_NOTIFICATIONS = [
-  { id: 1, text: 'Fatura do Nubank fecha amanhã', read: false },
-  { id: 2, text: 'Meta "Londres" atingiu 38%', read: true },
-  { id: 3, text: 'Recebimento de R$ 3.500 confirmado', read: true },
-]
 
 export const MOCK_CARDS: CreditCard[] = [
   {
     id: 'card-1',
     user_id: MOCK_USER.id,
-    name: 'Nubank',
-    type: 'credito',
-    limitOrBalance: 12500, // Novo campo obrigatório
-    limit: 12500,          // Mantido para compatibilidade
-    color: '#820ad1',
-    due_day: 10
+    name: 'Nubank Ultravioleta',
+    limit: 50000,
+    current_invoice: 3450.90,
+    due_date: '2026-02-10',
+    color_start: '#820ad1',
+    color_end: '#400080',
+    brand: 'Mastercard',
+    used: 15
   },
   {
     id: 'card-2',
     user_id: MOCK_USER.id,
-    name: 'Inter',
-    type: 'debito',
-    limitOrBalance: 850.20,
-    color: '#ff7a00',
-    due_day: 5
+    name: 'XP Visa Infinite',
+    limit: 80000,
+    current_invoice: 1200.00,
+    due_date: '2026-02-15',
+    color_start: '#111111',
+    color_end: '#333333',
+    brand: 'Visa',
+    used: 5
+  }
+]
+
+export const MOCK_TRANSACTIONS: Transaction[] = [
+  {
+    id: 't1',
+    user_id: MOCK_USER.id,
+    description: 'Recebimento de Cliente',
+    amount: 15000,
+    type: 'receita',
+    category: 'Serviços',
+    date: new Date().toISOString(),
+    status: 'concluido'
   },
   {
-    id: 'card-3',
+    id: 't2',
     user_id: MOCK_USER.id,
-    name: 'XP Visa Infinite',
-    type: 'credito',
-    limitOrBalance: 45000,
-    limit: 45000,
-    color: '#000000',
-    due_day: 15
+    description: 'Servidor AWS',
+    amount: -850,
+    type: 'despesa_fixa',
+    category: 'Software',
+    date: new Date().toISOString(),
+    status: 'concluido'
   }
 ]
 
 export const MOCK_GOALS: Goal[] = [
   {
-    id: 'goal-1',
+    id: 'g1',
     user_id: MOCK_USER.id,
-    title: 'Viagem para Londres',
-    target_amount: 20000,
-    current_amount: 7500,
-    created_at: '2023-01-15'
+    title: 'Reserva de Emergência',
+    target_amount: 100000,
+    current_amount: 35000,
+    deadline: '2026-12-31',
+    color: '#10b981',
+    color_start: '#10b981',
+    color_end: '#059669',
+    icon: 'Shield',
+    created_at: new Date().toISOString()
+  }
+]
+
+export const MOCK_APPOINTMENTS: ClientAppointment[] = [
+  {
+    id: 'a1',
+    user_id: MOCK_USER.id,
+    client_name: 'Empresa X',
+    service: 'Consultoria Financeira',
+    date: new Date().toISOString(),
+    value: 5000,
+    status: 'agendado'
+  }
+]
+
+// --- ADICIONADO PARA CORRIGIR O ERRO ---
+export const MOCK_NOTIFICATIONS = [
+  {
+    id: '1',
+    title: 'Meta Atingida! 🎯',
+    message: 'Você atingiu 35% da sua meta de Reserva de Emergência.',
+    time: '2h atrás',
+    read: false,
   },
   {
-    id: 'goal-2',
-    user_id: MOCK_USER.id,
-    title: 'Carro Novo',
-    target_amount: 50000,
-    current_amount: 15000,
-    created_at: '2023-03-10'
+    id: '2',
+    title: 'Fatura Fechada',
+    message: 'A fatura do Nubank vence em 5 dias.',
+    time: '5h atrás',
+    read: true,
   },
   {
-    id: 'goal-3',
-    user_id: MOCK_USER.id,
-    title: 'MacBook Pro',
-    target_amount: 12000,
-    current_amount: 12000, // Concluída
-    created_at: '2023-06-01'
+    id: '3',
+    title: 'Novo Agendamento',
+    message: 'Reunião com Empresa X confirmada.',
+    time: '1d atrás',
+    read: true,
   }
 ]
