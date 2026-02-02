@@ -1,38 +1,31 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { Session } from '@supabase/supabase-js' // Importação do Tipo Session
 import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { financeService } from '@/services/financeService'
 import { 
-  LayoutDashboard, Calendar, PieChart, LogOut, 
-  TrendingUp, ShieldCheck, Zap, Menu, FileText, User, Bell, Settings 
+  CalendarClock, Search, Bell, Menu, LogOut, ChevronDown, 
+  Command, Sparkles, Loader2 
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-// SE ESTES IMPORTS FICAREM VERMELHOS, RODE O PASSO 1 NO TERMINAL
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, 
-  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-
-import ViewContainer from './ViewContainer'
-import { ActiveTab } from '@/types'
-import { CreditCard, Goal, Transaction, ClientAppointment, CaixaData, UserProfile, NewGoal } from '@/types_db'
-import { MOCK_CARDS, MOCK_NOTIFICATIONS } from '@/lib/mockData' 
-import { Bell, Search, Menu, LogOut, Loader2, Sparkles, ChevronDown, CalendarClock, Command } from 'lucide-react'
 import { Toaster, toast } from 'sonner'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { financeService } from '@/services/financeService' 
 
-import AIAssistant from '@/components/ai/AIAssistant' 
-import Navigation from './Navigation'
+// Tipos
+import { ActiveTab } from '@/types'
+import { 
+  CreditCard, Goal, Transaction, ClientAppointment, 
+  CaixaData, UserProfile, NewGoal 
+} from '@/types_db'
+
+// Dados Mockados
+import { MOCK_CARDS, MOCK_NOTIFICATIONS } from '@/lib/mockData'
+
+// Componentes
 import ViewContainer from './ViewContainer'
-import { motion, AnimatePresence } from 'framer-motion'
+import Navigation from './Navigation'
+import AIAssistant from '@/components/ai/AIAssistant'
 
 // --- COMPONENTE TOPBAR PREMIUM ---
 const TopBar = ({ title, user, profile, notifications, onToggleMenu, onNavigate, onLogout }: any) => {
@@ -369,7 +362,14 @@ export default function MainAppLayout({ session }: { session: Session }) {
               
               cards={cards}
               goals={goals}
-              emergencyFund={{ id: '1', current_amount: caixa.currentBalance, goal_amount: 50000 }}
+              // CORREÇÃO: O objeto agora bate com a interface EmergencyFund
+              emergencyFund={{ 
+                current_amount: caixa.currentBalance, 
+                monthly_expenses: 5000, 
+                months_covered: Math.floor(caixa.currentBalance / 5000), 
+                target_months: 6, 
+                status: 'safe' 
+              }}
               cdiRate={13.65}
               transactions={transactions}
               appointments={appointments}
@@ -385,7 +385,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
               setAppointments={setAppointments} 
               onUpdateStatus={handleUpdateStatus}
               onAddAppointment={handleAddAppointment} 
-           />
+            />
            
            <div className="h-24" /> 
         </div>
