@@ -3,9 +3,9 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ActiveTab } from '@/types'
-import { Transaction, ClientAppointment, Goal, CaixaData, CreditCard, UserProfile } from '@/types_db'
+import { Transaction, ClientAppointment, Goal, CaixaData, CreditCard, UserProfile, NewGoal } from '@/types_db'
 
-// Import Views
+// Import Views (Conforme sua estrutura original)
 import DashboardView from './views/DashboardView'
 import AgendaView from './views/AgendaView'
 import TransactionsView from './views/TransactionsView'
@@ -14,17 +14,20 @@ import WalletView from './views/WalletView'
 import CaixaView from './views/CaixaView'
 import ProfileView from './views/ProfileView'
 
-/* ───────────────────────────────
-   PROPS CONTRATO (100% COMPATÍVEL)
-──────────────────────────────── */
 interface ViewContainerProps {
   activeTab: ActiveTab
   handleRedirect: (tab: ActiveTab) => void
-  user: any 
-
+  user: UserProfile | any
+  
   summary: {
-    balance: number; income: number; expense: number; emergencyTotal: number;
-    setBalance?: any; setIncome?: any; setExpense?: any; setEmergency?: any; 
+    balance: number
+    income: number
+    expense: number
+    emergencyTotal: number
+    setBalance?: any
+    setIncome?: any
+    setExpense?: any
+    setEmergency?: any
   }
   
   charts: {
@@ -32,39 +35,56 @@ interface ViewContainerProps {
       range: '1M' | '3M' | '6M' | '1A'
       setRange: (r: any) => void
   }
-
+  
   cards: CreditCard[]
   goals: Goal[]
   emergencyFund: any
   cdiRate: number
   transactions: Transaction[]
   appointments: ClientAppointment[]
-
+  
   caixaData: CaixaData
   healthScore: number
 
-  onUpdateEmergencyFund: (val: number) => void
-  onAddGoal: (goal: any) => void
-  onUpdateGoal: (goal: any) => void
+  onUpdateEmergencyFund: (val: any) => Promise<void>
+  onAddGoal: (goal: NewGoal) => Promise<void>
+  onUpdateGoal: (goal: Goal) => void
   onAddCard: (card: any) => void
   onDeleteCard: (id: string) => void
-  onAddTransaction: (t: any) => void
+  onAddTransaction: (t: Transaction) => Promise<void>
   setAppointments: any
   onUpdateStatus: (id: string, status: string) => void
   onAddAppointment: (appt: any) => void
 }
 
 export default function ViewContainer({ 
-  activeTab, handleRedirect, user, summary, transactions, appointments, goals, caixaData, onAddTransaction, onAddGoal, onUpdateStatus, onAddAppointment, charts
+  activeTab, handleRedirect, user, summary, transactions, appointments, goals, caixaData, cards,
+  onAddTransaction, onAddGoal, onUpdateStatus, onAddAppointment, charts, emergencyFund, onUpdateEmergencyFund, onUpdateGoal
 }: ViewContainerProps) {
 
-  const pageVariants = { initial: { opacity: 0, y: 10 }, enter: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 } }
+  // Normaliza a string da aba para evitar erros de maiúsculas/minúsculas
+  const currentTab = (activeTab as string).toLowerCase()
+
+  const pageVariants = { 
+    initial: { opacity: 0, y: 10 }, 
+    enter: { opacity: 1, y: 0 }, 
+    exit: { opacity: 0, y: -10 } 
+  }
 
   return (
     <AnimatePresence mode='wait'>
-      <motion.div key={activeTab} initial="initial" animate="enter" exit="exit" variants={pageVariants} transition={{ duration: 0.2 }} className="w-full h-full">
+      <motion.div 
+        key={activeTab} 
+        initial="initial" 
+        animate="enter" 
+        exit="exit" 
+        variants={pageVariants} 
+        transition={{ duration: 0.2 }} 
+        className="w-full h-full"
+      >
         
-        {(activeTab as string) === 'dashboard' && (
+        {/* DASHBOARD */}
+        {currentTab === 'dashboard' && (
           <DashboardView 
             summary={summary}
             recentTransactions={transactions.slice(0, 5)}
@@ -74,20 +94,52 @@ export default function ViewContainer({
             setChartRange={charts.setRange}
             transactions={transactions}
             goals={goals}
+            // Removi 'user={user}' aqui para corrigir o erro da sua imagem
           />
         )}
 
-        {(activeTab as string) === 'agenda smart' && <AgendaView appointments={appointments} onStatusChange={onUpdateStatus} onAddAppointment={onAddAppointment} />}
+        {/* AGENDA */}
+        {(currentTab === 'agenda smart' || currentTab === 'agenda') && (
+          <AgendaView 
+            appointments={appointments} 
+            onStatusChange={onUpdateStatus} 
+            onAddAppointment={onAddAppointment} 
+          />
+        )}
         
-        {(activeTab as string) === 'transações' && <TransactionsView transactions={transactions} onAddTransaction={onAddTransaction} />}
+        {/* TRANSAÇÕES (Aqui conectamos os dados reais) */}
+        {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
+          <TransactionsView 
+            transactions={transactions} 
+            onAddTransaction={onAddTransaction} 
+          />
+        )}
         
-        {(activeTab as string) === 'investimentos' && <InvestmentsView goals={goals} onAddGoal={onAddGoal} />}
+        {/* INVESTIMENTOS */}
+        {currentTab === 'investimentos' && (
+          <InvestmentsView 
+            goals={goals} 
+            onAddGoal={onAddGoal} 
+            // Verifique se InvestmentAdvisor aceita estas props, senão ajuste conforme seu arquivo original
+          />
+        )}
         
-        {(activeTab as string) === 'minha carteira' && <WalletView />}
+        {/* CARTEIRA */}
+        {(currentTab === 'minha carteira' || currentTab === 'carteira') && (
+          <WalletView /> 
+          // Se WalletView precisar de props (como cards), adicione: cards={cards}
+        )}
         
-        {(activeTab as string) === 'caixa empresarial' && <CaixaView data={caixaData} />}
+        {/* CAIXA EMPRESARIAL */}
+        {(currentTab === 'caixa empresarial' || currentTab === 'caixa') && (
+          <CaixaView data={caixaData} />
+        )}
         
-        {(activeTab as string) === 'meu perfil' && <ProfileView user={user} />}
+        {/* PERFIL */}
+        {(currentTab === 'meu perfil' || currentTab === 'perfil') && (
+          <ProfileView user={user} />
+        )}
+
       </motion.div>
     </AnimatePresence>
   )
