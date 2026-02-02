@@ -1,7 +1,25 @@
 'use client'
 
-import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { Session } from '@supabase/auth-helpers-nextjs'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { 
+  LayoutDashboard, Calendar, PieChart, LogOut, 
+  TrendingUp, ShieldCheck, Zap, Menu, FileText, User, Bell, Settings 
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+
+// SE ESTES IMPORTS FICAREM VERMELHOS, RODE O PASSO 1 NO TERMINAL
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, 
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+import ViewContainer from './ViewContainer'
 import { ActiveTab } from '@/types'
 import { CreditCard, Goal, Transaction, ClientAppointment, CaixaData, UserProfile, NewGoal } from '@/types_db'
 import { MOCK_CARDS, MOCK_NOTIFICATIONS } from '@/lib/mockData' 

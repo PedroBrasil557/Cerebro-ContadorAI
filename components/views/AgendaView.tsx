@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { ClientAppointment } from '@/types_db'
 import { formatCurrency } from '@/lib/utils'
+import AddAppointmentModal from '@/components/AddAppointmentModal'
 
 // Componente simples para KPIs (interno)
 const KPICard = ({ label, value, subtext, icon: Icon, trend }: any) => (

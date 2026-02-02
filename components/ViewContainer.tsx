@@ -14,6 +14,9 @@ import WalletView from './views/WalletView'
 import CaixaView from './views/CaixaView'
 import ProfileView from './views/ProfileView'
 
+/* ───────────────────────────────
+   PROPS CONTRATO (100% COMPATÍVEL)
+──────────────────────────────── */
 interface ViewContainerProps {
   activeTab: ActiveTab
   handleRedirect: (tab: ActiveTab) => void
@@ -36,6 +39,7 @@ interface ViewContainerProps {
   cdiRate: number
   transactions: Transaction[]
   appointments: ClientAppointment[]
+
   caixaData: CaixaData
   healthScore: number
 
