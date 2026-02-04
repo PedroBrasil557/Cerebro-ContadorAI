@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link' // Importante para os links funcionarem
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, Sparkles, Lock, ShieldCheck, Mail, LogIn, User, ArrowRight } from 'lucide-react'
@@ -46,7 +47,6 @@ export default function AuthPage() {
         router.push('/')
       } else {
         // --- LÓGICA DE CADASTRO ---
-        // Aqui enviamos o 'full_name' nos metadados para o Trigger SQL criar o perfil automaticamente
         const { error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -204,16 +204,31 @@ export default function AuthPage() {
             )}
           </button>
 
-          <div className="mt-6 pt-4 border-t border-white/5 w-full">
-             <p className="text-xs text-gray-500">
-               {isLogin ? 'Não tem uma conta?' : 'Já tem uma conta?'}
-               <button 
-                 onClick={() => setIsLogin(!isLogin)} 
-                 className="ml-1.5 text-blue-400 hover:text-blue-300 font-bold transition-colors hover:underline"
-               >
-                 {isLogin ? 'Cadastre-se' : 'Fazer Login'}
-               </button>
-             </p>
+          {/* RODAPÉ DO CARD COM LINKS E TOGGLE */}
+          <div className="mt-6 pt-4 border-t border-white/5 w-full flex flex-col items-center gap-3">
+              
+              {/* Toggle Login/Cadastro */}
+              <p className="text-xs text-gray-500">
+                {isLogin ? 'Não tem uma conta?' : 'Já tem uma conta?'}
+                <button 
+                  onClick={() => setIsLogin(!isLogin)} 
+                  className="ml-1.5 text-blue-400 hover:text-blue-300 font-bold transition-colors hover:underline"
+                >
+                  {isLogin ? 'Cadastre-se' : 'Fazer Login'}
+                </button>
+              </p>
+
+              {/* Links Jurídicos (Novo e Estilizado) */}
+              <div className="flex items-center gap-3 text-[10px] text-gray-600 font-medium">
+                 <Link href="/politica-privacidade" className="hover:text-blue-400 transition-colors">
+                    Política de Privacidade
+                 </Link>
+                 <span className="h-1 w-1 rounded-full bg-gray-700"></span>
+                 <Link href="/termos-uso" className="hover:text-blue-400 transition-colors">
+                    Termos de Uso
+                 </Link>
+              </div>
+
           </div>
 
         </div>
