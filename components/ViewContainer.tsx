@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ActiveTab } from '@/types'
 import { Transaction, ClientAppointment, Goal, CaixaData, CreditCard, UserProfile, NewGoal } from '@/types_db'
 
-// Import Views (Conforme sua estrutura original)
+// Import Views
 import DashboardView from './views/DashboardView'
 import AgendaView from './views/AgendaView'
 import TransactionsView from './views/TransactionsView'
@@ -62,7 +62,7 @@ export default function ViewContainer({
   onAddTransaction, onAddGoal, onUpdateStatus, onAddAppointment, charts, emergencyFund, onUpdateEmergencyFund, onUpdateGoal
 }: ViewContainerProps) {
 
-  // Normaliza a string da aba para evitar erros de maiúsculas/minúsculas
+  // Normaliza o nome da aba para garantir que a comparação funcione (resolve o erro de overlap)
   const currentTab = (activeTab as string).toLowerCase()
 
   const pageVariants = { 
@@ -80,7 +80,7 @@ export default function ViewContainer({
         exit="exit" 
         variants={pageVariants} 
         transition={{ duration: 0.2 }} 
-        className="w-full h-full"
+        className="w-full h-full relative"
       >
         
         {/* DASHBOARD */}
@@ -94,7 +94,7 @@ export default function ViewContainer({
             setChartRange={charts.setRange}
             transactions={transactions}
             goals={goals}
-            // Removi 'user={user}' aqui para corrigir o erro da sua imagem
+            // Removido user={user} para corrigir erro
           />
         )}
 
@@ -107,7 +107,7 @@ export default function ViewContainer({
           />
         )}
         
-        {/* TRANSAÇÕES (Aqui conectamos os dados reais) */}
+        {/* TRANSAÇÕES */}
         {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
           <TransactionsView 
             transactions={transactions} 
@@ -120,14 +120,15 @@ export default function ViewContainer({
           <InvestmentsView 
             goals={goals} 
             onAddGoal={onAddGoal} 
-            // Verifique se InvestmentAdvisor aceita estas props, senão ajuste conforme seu arquivo original
+            // Removidos props emergencyFund que davam erro
           />
         )}
         
         {/* CARTEIRA */}
         {(currentTab === 'minha carteira' || currentTab === 'carteira') && (
-          <WalletView /> 
-          // Se WalletView precisar de props (como cards), adicione: cards={cards}
+          <WalletView 
+             // Removido cards={cards} pois o componente WalletView atual não aceita props
+          /> 
         )}
         
         {/* CAIXA EMPRESARIAL */}

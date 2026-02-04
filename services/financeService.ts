@@ -1,52 +1,47 @@
 import { createClient } from '@/lib/supabase/client'
 import { ClientAppointment, Transaction, Goal, UserProfile, CaixaData, NewGoal } from '@/types_db'
 
+// Cria uma instância única do cliente para reutilizar
 const supabase = createClient()
 
-// --- FUNÇÃO AUXILIAR DE SEGURANÇA (CRIA PERFIL SE NÃO EXISTIR) ---
-async function ensureProfileExists(user: any) {
-  // 1. Verifica se perfil existe
+// --- FUNÇÃO AUXILIAR DE SEGURANÇA (CRÍTICA) ---
+// Garante que o usuário tenha um perfil E uma linha na tabela de configurações
+async function ensureProfileAndSettings(user: any) {
+  if (!user) return
+
+  // 1. Verifica/Cria Perfil
   const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).single()
-
+  
   if (!profile) {
-    console.warn("Perfil não detectado. Criando perfil de recuperação...")
     const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário'
-
-    // 2. Cria o Perfil
-    const { error: pError } = await supabase.from('profiles').insert({
+    
+    const { error: profileError } = await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
       full_name: fullName,
       avatar_url: user.user_metadata?.avatar_url
     })
-
-    if (pError) {
-      console.error("Erro crítico ao criar perfil:", pError)
-      throw new Error("Falha ao criar perfil do usuário.")
-    }
-
-    // 3. Cria Configurações Iniciais (CORREÇÃO DE TYPESCRIPT AQUI: Sem .catch)
-    const { error: sError } = await supabase.from('business_settings').insert({ user_id: user.id })
     
-    // Ignora erro 23505 (chave duplicada), pois significa que já existe
-    if (sError && sError.code !== '23505') {
-        console.log("Nota: Configurações já existiam ou erro menor.", sError.message)
+    if (profileError) console.error("Erro ao criar perfil:", profileError)
+  }
+
+  // 2. Verifica/Cria Configurações (Onde o saldo do caixa é salvo)
+  const { data: settings } = await supabase.from('business_settings').select('user_id').eq('user_id', user.id).single()
+  
+  if (!settings) {
+    // Se não existir, cria com saldo zero. Se já existir (race condition), o catch/error ignora.
+    const { error: settingsError } = await supabase.from('business_settings').insert({ 
+        user_id: user.id,
+        current_balance: 0,
+        monthly_goal: 15000,
+        tax_rate: 6
+    })
+    
+    // Ignora erro de duplicidade (código 23505) caso tenha sido criado milissegundos antes
+    if (settingsError && settingsError.code !== '23505') {
+        console.warn("Erro ao criar configurações iniciais:", settingsError.message)
     }
   }
-}
-
-// --- GERENCIAMENTO DE TOKEN DO GOOGLE (LOCAL STORAGE) ---
-function saveToken(token: string | undefined | null) {
-  if (typeof window !== 'undefined' && token) {
-    localStorage.setItem('google_calendar_token', token)
-  }
-}
-
-function getToken() {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('google_calendar_token')
-  }
-  return null
 }
 
 export const financeService = {
@@ -64,7 +59,9 @@ export const financeService = {
   updateProfile: async (updates: Partial<UserProfile>) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não logado')
-    await ensureProfileExists(user)
+    
+    await ensureProfileAndSettings(user)
+    
     const { error } = await supabase.from('profiles').update(updates).eq('id', user.id)
     if (error) throw error
   },
@@ -82,15 +79,21 @@ export const financeService = {
   createTransaction: async (transaction: Partial<Transaction>) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
-    await ensureProfileExists(user)
+    
+    // Garante integridade do banco antes de inserir
+    await ensureProfileAndSettings(user)
 
     const payload = {
-        ...transaction,
         user_id: user.id,
+        description: transaction.description,
         amount: Number(transaction.amount),
+        type: transaction.type,
+        category: transaction.category,
         date: transaction.date || new Date().toISOString(),
-        status: transaction.status || 'concluido' 
+        status: transaction.status || 'concluido',
+        source: transaction.source || 'Manual'
     }
+
     const { data, error } = await supabase.from('transactions').insert(payload).select().single()
     if (error) throw error
     return data
@@ -106,83 +109,33 @@ export const financeService = {
     } catch { return [] }
   },
 
-  // --- CRIAÇÃO DE AGENDAMENTO (COM GOOGLE CALENDAR) ---
+  // --- CRIAÇÃO DE AGENDAMENTO (INTEGRADO COM API) ---
   createAppointment: async (appt: any) => {
-    // 1. Obter Sessão e Token Fresco
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
-
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
 
-    // Tenta salvar o token se ele veio na sessão atual (login recente)
-    if (session?.provider_token) {
-        saveToken(session.provider_token)
+    // Chama a API Route (Server-Side) para: Salvar no Banco + Enviar Email + Gerar iCal
+    const response = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            clientName: appt.client_name,
+            clientEmail: appt.client_email,
+            service: appt.service,
+            value: appt.value,
+            date: appt.date.split('T')[0],
+            time: appt.date.split('T')[1].substring(0, 5),
+            caixaPercentage: 20
+        })
+    })
+
+    if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao agendar via API')
     }
 
-    // 2. Garantir Perfil e Salvar no Banco (Prioridade Máxima)
-    await ensureProfileExists(user) 
-    
-    const payload = {
-        user_id: user.id,
-        client_name: appt.client_name,
-        client_email: appt.client_email || null, 
-        service: appt.service,
-        value: Number(appt.value), 
-        date: appt.date, 
-        status: 'agendado'
-    }
-
-    const { data, error } = await supabase.from('appointments').insert(payload).select().single()
-
-    if (error) {
-        console.error("Erro Supabase:", error)
-        throw error
-    }
-
-    // 3. Integração Google Calendar
-    // Busca o token do localStorage (onde salvamos no login) ou da sessão atual
-    const token = getToken() || session?.provider_token
-
-    if (token) {
-        try {
-            console.log("Token encontrado. Enviando para Google...")
-            const startTime = new Date(appt.date)
-            const endTime = new Date(startTime.getTime() + 60 * 60 * 1000) // Duração padrão 1h
-
-            const event = {
-                summary: `💰 ${appt.client_name} - ${appt.service}`,
-                description: `Cliente: ${appt.client_email || 'N/A'}\nValor: R$ ${appt.value}\n\nGerado pelo Cérebro Financial OS`,
-                start: { dateTime: startTime.toISOString() },
-                end: { dateTime: endTime.toISOString() }
-            }
-
-            const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-                method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${token}`, 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify(event)
-            })
-
-            if (!res.ok) {
-                console.error("Erro Google:", await res.json())
-                if (res.status === 401) {
-                    localStorage.removeItem('google_calendar_token')
-                    alert("Sessão Google expirou. O agendamento foi salvo no sistema, mas não na agenda Google.")
-                }
-            } else {
-                console.log("Sucesso Google Calendar!")
-            }
-        } catch (e) {
-            console.error("Erro de conexão Google:", e)
-        }
-    } else {
-        console.warn("Sem token do Google.")
-        alert("Agendamento salvo! Para sincronizar com a agenda, faça logout e login novamente clicando no botão Google.")
-    }
-
-    return data
+    const result = await response.json()
+    return result.data
   },
 
   updateAppointmentStatus: async (id: string, status: string) => {
@@ -204,7 +157,8 @@ export const financeService = {
   createGoal: async (goal: NewGoal) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
-    await ensureProfileExists(user) 
+    
+    await ensureProfileAndSettings(user)
 
     const payload = {
         user_id: user.id,
@@ -220,29 +174,58 @@ export const financeService = {
   },
 
   // --- CAIXA EMPRESARIAL ---
+  
+  // 1. Ler dados do Caixa
   getCaixaData: async (): Promise<CaixaData> => {
     try {
         const { data: { user } } = await supabase.auth.getUser()
+        // Default seguro
         const defaultData = { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] }
         if (!user) return defaultData
         
-        const { data: settings } = await supabase.from('business_settings').select('*').eq('user_id', user.id).single()
-        const { data: entries } = await supabase.from('transactions').select('*').eq('user_id', user.id).or('category.eq.Caixa Empresarial,type.eq.transferencia').order('date', { ascending: false })
+        // Garante que a tabela existe antes de ler
+        await ensureProfileAndSettings(user)
 
-        const currentBalance = entries?.reduce((acc, curr) => {
-          const val = Number(curr.amount)
-          if (curr.type === 'receita' || curr.type === 'transferencia') return acc + val
-          return acc - val
-        }, 0) || 0
+        // 1. Busca configurações (Onde o Saldo Consolidado está salvo)
+        const { data: settings } = await supabase.from('business_settings').select('*').eq('user_id', user.id).single()
+        
+        // 2. Busca histórico de movimentações para exibir na lista
+        const { data: entries } = await supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('category', 'Caixa Empresarial')
+            .order('date', { ascending: false })
 
         return {
-          currentBalance: currentBalance,
-          monthlyGoal: settings?.monthly_goal || 15000,
-          taxRate: settings?.tax_rate || 6,
+          currentBalance: Number(settings?.current_balance) || 0, // Garante que é número
+          monthlyGoal: Number(settings?.monthly_goal) || 15000,
+          taxRate: Number(settings?.tax_rate) || 6,
           entries: entries || []
         }
-    } catch {
+    } catch (e) {
+        console.error("Erro ao carregar caixa:", e)
         return { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] }
     }
+  },
+
+  // 2. Atualizar e Salvar Saldo do Caixa (A CORREÇÃO PRINCIPAL)
+  updateCaixaBalance: async (newBalance: number) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not found')
+
+    // Garante que a linha existe antes de tentar update
+    await ensureProfileAndSettings(user)
+
+    // Atualiza a tabela business_settings com o novo saldo
+    const { error } = await supabase
+        .from('business_settings')
+        .upsert({ 
+            user_id: user.id, 
+            current_balance: newBalance,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
+
+    if (error) throw error
   }
 }

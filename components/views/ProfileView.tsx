@@ -5,36 +5,10 @@ import { motion } from 'framer-motion'
 import { 
   User, Mail, Phone, MapPin, Globe, Lock, ShieldCheck, 
   Edit3, Camera, Upload, LogOut, Award, ChevronRight,
-  Settings, Key, AlertCircle
+  Settings, Key, CreditCard, Bell
 } from 'lucide-react'
 
-// --- 1. MOCKS E TIPAGEM ---
-
-interface UserProfile {
-  fullName: string
-  email: string
-  phone: string
-  location: string
-  bio: string
-  plan: 'free' | 'pro' | 'enterprise'
-  memberSince: string
-  avatarUrl?: string
-  twoFactorEnabled: boolean
-}
-
-// Simulando dados que viriam do Banco/Auth (Fallback)
-const MOCK_USER: UserProfile = {
-  fullName: 'Usuário',
-  email: 'usuario@email.com',
-  phone: '(00) 00000-0000',
-  location: 'Brasil',
-  bio: 'Bem-vindo ao Cérebro.AI. Complete seu perfil para aproveitar ao máximo.',
-  plan: 'free',
-  memberSince: 'Hoje',
-  twoFactorEnabled: false
-}
-
-// --- 2. COMPONENTES UI (ATOMIC DESIGN) ---
+// --- 1. COMPONENTES VISUAIS (Mantendo o Design Premium) ---
 
 const GlassCard = ({ children, className = "", onClick }: any) => (
   <motion.div 
@@ -48,24 +22,33 @@ const GlassCard = ({ children, className = "", onClick }: any) => (
   </motion.div>
 )
 
-const Badge = ({ type }: { type: string }) => {
-  const safeType = (type || 'free').toLowerCase()
-  
-  const config = {
-    pro: { color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', icon: Award, label: 'Membro PRO' },
-    free: { color: 'text-gray-400', bg: 'bg-gray-500/10', border: 'border-gray-500/20', icon: User, label: 'Plano Grátis' },
-    enterprise: { color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Globe, label: 'Enterprise' }
-  }[safeType] || { color: 'text-gray-400', bg: 'bg-gray-500/10', border: 'border-gray-500/20', icon: User, label: 'Membro' }
-  
-  const Icon = config.icon
-
+const Badge = ({ email }: { email: string }) => {
+  // Lógica simples: Se tiver email, é membro. Futuramente pode vir do banco (ex: user.subscription_tier)
   return (
-    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${config.bg} ${config.border} ${config.color}`}>
-      <Icon size={14} />
-      <span className="text-xs font-bold uppercase tracking-wider">{config.label}</span>
+    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 text-purple-400">
+      <Award size={14} />
+      <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider">Membro Ativo</span>
     </div>
   )
 }
+
+const MenuOption = ({ icon: Icon, label, value, color = "text-white", onClick }: any) => (
+    <button 
+        onClick={onClick}
+        className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition active:bg-white/10 group first:rounded-t-2xl last:rounded-b-2xl border-b border-white/5 last:border-0"
+    >
+        <div className="flex items-center gap-4">
+            <div className="p-2 bg-white/5 rounded-xl text-gray-400 group-hover:text-white transition-colors">
+                <Icon size={20} />
+            </div>
+            <span className={`font-medium text-sm md:text-base ${color}`}>{label}</span>
+        </div>
+        <div className="flex items-center gap-2">
+            {value && <span className="text-xs text-gray-500 font-medium">{value}</span>}
+            <ChevronRight size={16} className="text-gray-600" />
+        </div>
+    </button>
+)
 
 const InfoField = ({ label, value, icon: Icon, isEditable = false }: any) => (
   <div className="group relative">
@@ -73,9 +56,11 @@ const InfoField = ({ label, value, icon: Icon, isEditable = false }: any) => (
       <div className="p-2 rounded-xl bg-white/5 text-gray-400 group-hover:text-white transition-colors">
         <Icon size={18} />
       </div>
-      <div className="flex-1">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-sm text-white font-medium leading-relaxed truncate">{value || 'Não informado'}</p>
+      <div className="flex-1 overflow-hidden">
+        <p className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
+        <p className="text-sm md:text-base text-white font-medium leading-relaxed truncate" title={value}>
+            {value || 'Não informado'}
+        </p>
       </div>
       {isEditable && (
         <button className="opacity-0 group-hover:opacity-100 p-2 text-gray-500 hover:text-blue-400 transition-all">
@@ -91,219 +76,150 @@ const InfoField = ({ label, value, icon: Icon, isEditable = false }: any) => (
 export default function ProfileView({ user }: { user?: any }) {
   const [isEditing, setIsEditing] = useState(false)
 
-  // LÓGICA DE SEGURANÇA (NORMALIZAÇÃO DOS DADOS)
-  // Se o objeto 'user' vier incompleto, preenchemos com dados seguros ou do Mock
-  const safeUser: UserProfile = {
-    fullName: user?.fullName || user?.user_metadata?.full_name || user?.user_metadata?.name || MOCK_USER.fullName,
-    email: user?.email || MOCK_USER.email,
-    phone: user?.phone || user?.user_metadata?.phone || MOCK_USER.phone,
-    location: user?.location || MOCK_USER.location,
-    bio: user?.bio || MOCK_USER.bio,
-    plan: user?.plan || 'pro', // Default para PRO para ficar bonito no layout
-    memberSince: user?.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR', {month: 'short', year: 'numeric'}) : MOCK_USER.memberSince,
-    avatarUrl: user?.avatarUrl || user?.user_metadata?.avatar_url || user?.user_metadata?.picture,
-    twoFactorEnabled: user?.twoFactorEnabled || false
+  // Extração Segura dos Dados Reais do Supabase
+  // O objeto 'user' pode vir do 'session.user' ou da tabela 'user_profiles'
+  const realData = {
+    fullName: user?.full_name || user?.user_metadata?.full_name || 'Usuário',
+    email: user?.email || '',
+    phone: user?.phone || user?.user_metadata?.phone || '',
+    avatarUrl: user?.avatar_url || user?.user_metadata?.avatar_url,
+    createdAt: user?.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Recentemente',
+    location: user?.location || 'Brasil', // Se não tiver no banco, mantém um genérico ou vazio
+    bio: user?.bio || 'Configurações da sua conta.'
   }
 
-  // Pega a inicial de forma segura
-  const userInitial = safeUser.fullName && safeUser.fullName.length > 0 
-    ? safeUser.fullName.charAt(0).toUpperCase() 
-    : 'U';
+  // Inicial do nome para o avatar padrão
+  const userInitial = realData.fullName ? realData.fullName.charAt(0).toUpperCase() : 'U';
 
   return (
-    <div className="p-6 md:p-10 space-y-10 max-w-[1600px] mx-auto pb-32">
+    <div className="p-4 md:p-10 space-y-8 md:space-y-10 max-w-[1600px] mx-auto pb-32 animate-in fade-in duration-500">
       
-      {/* 1. CABEÇALHO */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-         <div>
-            <h1 className="text-4xl font-black text-white tracking-tight mb-2">Meu Perfil</h1>
-            <p className="text-gray-400 font-light max-w-lg">
-               Gerencie suas informações pessoais, segurança e preferências.
-            </p>
-         </div>
-         <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white font-bold text-sm rounded-xl border border-white/10 transition-all">
-               <Settings size={18} /> Preferências
-            </button>
-            <button 
-               onClick={() => setIsEditing(!isEditing)}
-               className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-900/20 transition-all"
-            >
-               {isEditing ? 'Salvar Alterações' : 'Editar Perfil'}
-            </button>
-         </div>
-      </header>
+      {/* 1. HEADER PERFIL */}
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
+          
+          {/* Avatar Grande */}
+          <div className="relative group">
+             <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 p-[3px] shadow-2xl shadow-blue-900/30">
+                <div className="w-full h-full rounded-full bg-[#0a0a0a] flex items-center justify-center overflow-hidden relative">
+                   {realData.avatarUrl ? (
+                      <img src={realData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                   ) : (
+                      <span className="text-3xl md:text-4xl font-black text-white">{userInitial}</span>
+                   )}
+                   
+                   {/* Overlay de Edição (Visual apenas por enquanto) */}
+                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm">
+                      <Camera className="text-white h-6 w-6 md:h-8 md:w-8" />
+                   </div>
+                </div>
+             </div>
+             <div className="absolute bottom-0 right-0 p-2 bg-blue-600 rounded-full text-white shadow-lg border-4 border-[#050505]">
+                <Upload size={14} />
+             </div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Infos Principais */}
+          <div className="flex-1 text-center md:text-left">
+             <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight mb-2">{realData.fullName}</h1>
+             <p className="text-sm md:text-base text-gray-400 mb-4 md:mb-6 max-w-lg mx-auto md:mx-0">{realData.email}</p>
+             
+             <div className="flex flex-wrap justify-center md:justify-start gap-3 w-full">
+                <Badge email={realData.email} />
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02] text-gray-400">
+                   <span className="text-[10px] font-bold uppercase tracking-wider">Membro desde {realData.createdAt}</span>
+                </div>
+             </div>
+          </div>
+
+          {/* Botões de Ação (Desktop) */}
+          <div className="hidden md:flex gap-3 self-start">
+             <button 
+                onClick={() => setIsEditing(!isEditing)}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-900/20 transition-all"
+             >
+                {isEditing ? 'Salvar Alterações' : 'Editar Perfil'}
+             </button>
+          </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 items-start">
          
-         {/* 2. COLUNA ESQUERDA (Identidade & Segurança) */}
-         <div className="lg:col-span-4 space-y-6">
+         {/* 2. COLUNA ESQUERDA (Menu de Configurações) */}
+         <div className="lg:col-span-4 space-y-6 order-2 lg:order-1">
             
-            {/* Card de Identidade */}
-            <GlassCard className="p-8 flex flex-col items-center text-center relative overflow-hidden">
-               {/* Background Gradient Sutil */}
-               <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-blue-900/20 to-transparent pointer-events-none" />
-               
-               <div className="relative group mb-6">
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 p-[3px] shadow-2xl shadow-blue-900/30">
-                     <div className="w-full h-full rounded-full bg-[#0a0a0a] flex items-center justify-center overflow-hidden relative">
-                        {safeUser.avatarUrl ? (
-                           <img src={safeUser.avatarUrl} alt={safeUser.fullName} className="w-full h-full object-cover" />
-                        ) : (
-                           // AQUI ESTAVA O ERRO: Agora usamos a variável segura 'userInitial'
-                           <span className="text-4xl font-black text-white">{userInitial}</span>
-                        )}
-                        {/* Overlay de Edição */}
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm">
-                           <Camera className="text-white h-8 w-8" />
-                        </div>
-                     </div>
-                  </div>
-                  <div className="absolute bottom-2 right-2 p-2 bg-blue-600 rounded-full text-white shadow-lg border-4 border-[#09090b]">
-                     <Upload size={14} />
-                  </div>
-               </div>
+            {/* Grupo: Conta */}
+            <div className="bg-[#09090b] border border-white/10 rounded-3xl overflow-hidden">
+                <p className="px-6 pt-6 pb-2 text-xs font-bold text-gray-500 uppercase tracking-widest">Geral</p>
+                <MenuOption icon={User} label="Dados Pessoais" />
+                <MenuOption icon={CreditCard} label="Assinatura" value="Basic" />
+                <MenuOption icon={Bell} label="Notificações" value="On" />
+            </div>
 
-               <h2 className="text-2xl font-bold text-white mb-2">{safeUser.fullName}</h2>
-               <p className="text-sm text-gray-400 mb-6 truncate max-w-[250px]">{safeUser.email}</p>
-               
-               <div className="flex flex-wrap justify-center gap-3 w-full">
-                  <Badge type={safeUser.plan} />
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02] text-gray-400">
-                     <span className="text-[10px] font-bold uppercase tracking-wider">Desde {safeUser.memberSince}</span>
-                  </div>
-               </div>
-            </GlassCard>
+            {/* Grupo: Segurança */}
+            <div className="bg-[#09090b] border border-white/10 rounded-3xl overflow-hidden">
+                <p className="px-6 pt-6 pb-2 text-xs font-bold text-gray-500 uppercase tracking-widest">Segurança</p>
+                <MenuOption icon={Lock} label="Alterar Senha" />
+                <MenuOption icon={ShieldCheck} label="Privacidade" />
+                <MenuOption icon={Settings} label="Preferências do App" />
+            </div>
 
-            {/* Card de Segurança */}
-            <GlassCard className="p-6">
-               <div className="flex items-center gap-3 mb-6 border-b border-white/5 pb-4">
-                  <ShieldCheck className="text-emerald-400" />
-                  <div>
-                     <h3 className="text-base font-bold text-white">Segurança</h3>
-                     <p className="text-xs text-gray-500">Proteção da conta</p>
-                  </div>
-               </div>
-
-               <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors cursor-pointer group">
-                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white/5 rounded-lg text-gray-400 group-hover:text-white transition-colors">
-                           <Lock size={16} />
-                        </div>
-                        <div>
-                           <p className="text-sm font-bold text-white">Senha</p>
-                           <p className="text-[10px] text-gray-500">********</p>
-                        </div>
-                     </div>
-                     <button className="text-xs font-bold text-blue-400 hover:text-blue-300">Alterar</button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors cursor-pointer group">
-                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white/5 rounded-lg text-gray-400 group-hover:text-white transition-colors">
-                           <Key size={16} />
-                        </div>
-                        <div>
-                           <p className="text-sm font-bold text-white">2FA Autenticação</p>
-                           <p className={`text-[10px] flex items-center gap-1 ${safeUser.twoFactorEnabled ? 'text-emerald-400' : 'text-gray-500'}`}>
-                              {safeUser.twoFactorEnabled ? <><CheckCircle2 size={10} /> Ativo</> : 'Desativado'}
-                           </p>
-                        </div>
-                     </div>
-                     <div className={`w-8 h-5 rounded-full flex items-center px-1 ${safeUser.twoFactorEnabled ? 'bg-emerald-500/20' : 'bg-white/10'}`}>
-                        <div className={`w-3 h-3 rounded-full shadow-sm ${safeUser.twoFactorEnabled ? 'bg-emerald-500 ml-auto' : 'bg-gray-500'}`} />
-                     </div>
-                  </div>
-               </div>
-            </GlassCard>
-
-            {/* Zona de Perigo */}
-            <button className="w-full p-4 rounded-2xl border border-red-500/10 bg-red-500/5 hover:bg-red-500/10 text-red-400 flex items-center justify-center gap-2 text-sm font-bold transition-all group">
-               <LogOut size={16} className="group-hover:-translate-x-1 transition-transform"/> Sair da Conta
+            {/* Logout */}
+            <button className="w-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 p-4 rounded-2xl flex items-center justify-center gap-2 text-rose-500 font-bold transition">
+                <LogOut size={18} /> Sair da Conta
             </button>
+            
+            <p className="text-center text-[10px] text-gray-600 uppercase pt-2">ID: {user?.id?.slice(0, 8) || '...'}</p>
          </div>
 
-         {/* 3. COLUNA DIREITA (Informações Pessoais) */}
-         <div className="lg:col-span-8 space-y-6">
+         {/* 3. COLUNA DIREITA (Detalhes Reais) */}
+         <div className="lg:col-span-8 space-y-6 order-1 lg:order-2">
             
-            {/* Banner de Bio */}
-            <GlassCard className="p-8 relative overflow-hidden">
-               <div className="flex items-start justify-between mb-6">
-                  <div>
-                     <h3 className="text-xl font-bold text-white mb-2">Sobre Mim</h3>
-                     <p className="text-sm text-gray-400 max-w-2xl leading-relaxed">
-                        {safeUser.bio}
-                     </p>
-                  </div>
-                  <div className="p-3 bg-white/5 rounded-full">
-                     <Edit3 size={18} className="text-gray-400 hover:text-white cursor-pointer transition-colors" />
-                  </div>
-               </div>
-               
-               <div className="flex gap-2">
-                  {['Investimentos', 'Tecnologia', 'SaaS', 'Design'].map(tag => (
-                     <span key={tag} className="px-3 py-1 rounded-lg bg-white/5 border border-white/5 text-[10px] font-bold text-gray-300 uppercase tracking-wider">
-                        {tag}
-                     </span>
-                  ))}
-               </div>
-            </GlassCard>
-
-            {/* Grid de Informações Detalhadas */}
-            <GlassCard className="p-8">
-               <div className="flex items-center gap-2 mb-8">
+            {/* Grid de Informações */}
+            <GlassCard className="p-6 md:p-8">
+               <div className="flex items-center gap-2 mb-6 md:mb-8">
                   <User className="text-blue-400" size={20} />
-                  <h3 className="text-lg font-bold text-white">Dados Pessoais</h3>
+                  <h3 className="text-lg font-bold text-white">Dados da Conta</h3>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InfoField label="Nome Completo" value={safeUser.fullName} icon={User} isEditable />
-                  <InfoField label="Telefone" value={safeUser.phone} icon={Phone} isEditable />
-                  <InfoField label="Email Principal" value={safeUser.email} icon={Mail} isEditable />
-                  <InfoField label="Localização" value={safeUser.location} icon={MapPin} isEditable />
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                  <InfoField label="Nome Completo" value={realData.fullName} icon={User} isEditable />
+                  <InfoField label="Email Principal" value={realData.email} icon={Mail} />
+                  <InfoField label="Telefone" value={realData.phone} icon={Phone} isEditable />
+                  <InfoField label="Localização" value={realData.location} icon={MapPin} isEditable />
                </div>
 
-               {/* Seção de Endereço (Extra) */}
-               <div className="mt-8 pt-8 border-t border-white/5">
-                  <div className="flex items-center justify-between mb-6">
-                     <h4 className="text-sm font-bold text-gray-300 uppercase tracking-widest">Endereço de Faturamento</h4>
-                     <button className="text-xs font-bold text-blue-400 hover:text-blue-300">Editar</button>
-                  </div>
-                  <div className="p-4 rounded-xl bg-white/[0.02] border border-dashed border-white/10 flex items-center gap-4 hover:border-blue-500/30 transition-colors cursor-pointer group">
-                     <div className="p-3 bg-blue-500/10 rounded-lg text-blue-400">
-                        <MapPin size={20} />
-                     </div>
-                     <div>
-                        <p className="text-sm font-bold text-white">Endereço Principal</p>
-                        <p className="text-xs text-gray-500">{safeUser.location}</p>
-                     </div>
-                     <ChevronRight className="ml-auto text-gray-600 group-hover:text-white transition-colors" size={18} />
-                  </div>
-               </div>
+               {/* Botão Salvar Mobile */}
+               {isEditing && (
+                   <button 
+                      onClick={() => setIsEditing(false)}
+                      className="md:hidden w-full mt-6 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg"
+                   >
+                      Salvar Alterações
+                   </button>
+               )}
+               {!isEditing && (
+                   <button 
+                      onClick={() => setIsEditing(true)}
+                      className="md:hidden w-full mt-6 py-4 bg-white/5 border border-white/10 text-white font-bold rounded-xl"
+                   >
+                      Editar Dados
+                   </button>
+               )}
             </GlassCard>
 
-            {/* Configurações de Notificação */}
-            <GlassCard className="p-6 flex items-center justify-between">
-               <div className="flex items-center gap-4">
-                  <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400">
-                     <AlertCircle size={20} />
-                  </div>
-                  <div>
-                     <h4 className="text-sm font-bold text-white">Alertas de Segurança</h4>
-                     <p className="text-xs text-gray-500">Receba avisos sobre acessos suspeitos.</p>
-                  </div>
-               </div>
-               <div className="w-12 h-6 bg-blue-600 rounded-full relative cursor-pointer">
-                  <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-md" />
-               </div>
-            </GlassCard>
+            {/* Banner de Status */}
+            <div className="bg-gradient-to-r from-emerald-900/20 to-blue-900/20 border border-emerald-500/20 p-6 rounded-3xl flex items-center gap-4">
+                <div className="p-3 bg-emerald-500/10 rounded-full text-emerald-400 shrink-0">
+                    <ShieldCheck size={24} />
+                </div>
+                <div>
+                    <h4 className="text-base font-bold text-white">Conta Verificada</h4>
+                    <p className="text-sm text-emerald-100/70">Seus dados estão sincronizados e seguros.</p>
+                </div>
+            </div>
 
          </div>
       </div>
     </div>
   )
 }
-
-// Ícones adicionais necessários
-import { CheckCircle2 } from 'lucide-react'
