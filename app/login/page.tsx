@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link' // Import essencial para navegação
+import Link from 'next/link' 
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, Sparkles, Lock, ShieldCheck, Mail, LogIn, User, ArrowRight } from 'lucide-react'
@@ -59,6 +59,8 @@ export default function AuthPage() {
         })
         if (error) throw error
         toast.success('Conta criada com sucesso! Você já pode entrar.')
+        
+        // Se o Supabase não exigir confirmação de email, redireciona direto:
         router.push('/') 
       }
     } catch (error: any) {
@@ -77,7 +79,7 @@ export default function AuthPage() {
         queryParams: { 
           access_type: 'offline', 
           prompt: 'consent', 
-          scope: 'openid profile email https://www.googleapis.com/auth/calendar'
+          scope: 'openid profile email https://www.googleapis.com/auth/calendar' // Escopo da Agenda
         }
       }
     })
@@ -202,7 +204,7 @@ export default function AuthPage() {
             )}
           </button>
 
-          {/* RODAPÉ DO CARD COM LINKS SEPARADOS E TARGET_BLANK */}
+          {/* RODAPÉ DO CARD */}
           <div className="mt-6 pt-4 border-t border-white/5 w-full flex flex-col items-center gap-3">
               
               <p className="text-xs text-gray-500">
@@ -216,7 +218,7 @@ export default function AuthPage() {
                 </button>
               </p>
 
-              {/* LINKS JURÍDICOS PARA O GOOGLE */}
+              {/* LINKS PARA O GOOGLE - ABRINDO EM NOVA ABA */}
               <div className="flex items-center gap-3 text-[10px] text-gray-600 font-medium">
                  <Link 
                     href="/politica-privacidade" 
