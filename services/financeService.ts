@@ -1,5 +1,14 @@
 import { createClient } from '@/lib/supabase/client'
-import { ClientAppointment, Transaction, Goal, UserProfile, CaixaData, NewGoal } from '@/types_db'
+import { 
+  ClientAppointment, 
+  Transaction, 
+  Goal, 
+  UserProfile, 
+  CaixaData, 
+  NewGoal, 
+  NotificationItem, 
+  CreditCard 
+} from '@/types_db'
 
 // Cria uma instância única do cliente para reutilizar
 const supabase = createClient()
@@ -47,7 +56,9 @@ async function ensureProfileAndSettings(user: any) {
 
 export const financeService = {
   
-  // --- PERFIL ---
+  // ===========================================================================
+  // 1. PERFIL
+  // ===========================================================================
   getProfile: async (): Promise<UserProfile | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -67,7 +78,9 @@ export const financeService = {
     if (error) throw error
   },
 
-  // --- TRANSAÇÕES ---
+  // ===========================================================================
+  // 2. TRANSAÇÕES
+  // ===========================================================================
   getTransactions: async (): Promise<Transaction[]> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -81,7 +94,6 @@ export const financeService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
     
-    // Garante integridade do banco antes de inserir
     await ensureProfileAndSettings(user)
 
     const payload = {
@@ -100,7 +112,76 @@ export const financeService = {
     return data
   },
 
-  // --- AGENDA (LEITURA) ---
+  // ===========================================================================
+  // 3. CARTÕES DE CRÉDITO (NOVO)
+  // ===========================================================================
+  getCards: async (): Promise<CreditCard[]> => {
+     try {
+         const { data: { user } } = await supabase.auth.getUser()
+         if (!user) return []
+         const { data } = await supabase.from('credit_cards').select('*').eq('user_id', user.id)
+         return data || []
+     } catch { return [] }
+  },
+
+  createCard: async (card: Partial<CreditCard>) => {
+     const { data: { user } } = await supabase.auth.getUser()
+     if (!user) throw new Error('User not found')
+     
+     await ensureProfileAndSettings(user)
+
+     const { data, error } = await supabase.from('credit_cards').insert({ 
+         ...card, 
+         user_id: user.id 
+     }).select().single()
+
+     if (error) throw error
+     
+     // Gera notificação de sucesso
+     await financeService.createNotification(
+         "Novo Cartão", 
+         `Cartão ${card.name} adicionado com sucesso.`, 
+         "success"
+     )
+
+     return data
+  },
+
+  // ===========================================================================
+  // 4. NOTIFICAÇÕES (NOVO)
+  // ===========================================================================
+  getNotifications: async (): Promise<NotificationItem[]> => {
+     try {
+         const { data: { user } } = await supabase.auth.getUser()
+         if (!user) return []
+         const { data } = await supabase.from('notifications')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20) // Pega as últimas 20
+         return data || []
+     } catch { return [] }
+  },
+
+  markNotificationAsRead: async (id: string) => {
+     await supabase.from('notifications').update({ read: true }).eq('id', id)
+  },
+
+  // Helper interno para criar notificações
+  createNotification: async (title: string, message: string, type: 'info' | 'success' | 'warning' | 'alert' = 'info') => {
+     const { data: { user } } = await supabase.auth.getUser()
+     if (!user) return
+     await supabase.from('notifications').insert({
+        user_id: user.id,
+        title,
+        message,
+        type
+     })
+  },
+
+  // ===========================================================================
+  // 5. AGENDA
+  // ===========================================================================
   getAppointments: async (): Promise<ClientAppointment[]> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -110,12 +191,11 @@ export const financeService = {
     } catch { return [] }
   },
 
-  // --- CRIAÇÃO DE AGENDAMENTO (INTEGRADO COM API) ---
   createAppointment: async (appt: any) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
 
-    // Chama a API Route (Server-Side) para: Salvar no Banco + Enviar Email + Gerar iCal
+    // 1. Chama API Route (Server-Side)
     const response = await fetch('/api/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,6 +216,14 @@ export const financeService = {
     }
 
     const result = await response.json()
+
+    // 2. Gera Notificação no Sistema
+    await financeService.createNotification(
+        "Novo Agendamento",
+        `Cliente ${appt.client_name} agendado para ${new Date(appt.date).toLocaleDateString('pt-BR')}.`,
+        "info"
+    )
+
     return result.data
   },
 
@@ -144,7 +232,9 @@ export const financeService = {
     if (error) throw error
   },
 
-  // --- METAS ---
+  // ===========================================================================
+  // 6. METAS
+  // ===========================================================================
   getGoals: async (): Promise<Goal[]> => {
     try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -171,26 +261,28 @@ export const financeService = {
     }
     const { data, error } = await supabase.from('goals').insert(payload).select().single()
     if (error) throw error
+    
+    // Notifica
+    await financeService.createNotification("Nova Meta", `Meta '${goal.title}' criada com foco!`, "success")
+
     return data
   },
 
-  // --- CAIXA EMPRESARIAL ---
-  
-  // 1. Ler dados do Caixa
+  // ===========================================================================
+  // 7. CAIXA EMPRESARIAL
+  // ===========================================================================
   getCaixaData: async (): Promise<CaixaData> => {
     try {
         const { data: { user } } = await supabase.auth.getUser()
-        // Default seguro
         const defaultData = { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] }
         if (!user) return defaultData
         
-        // Garante que a tabela existe antes de ler
         await ensureProfileAndSettings(user)
 
-        // 1. Busca configurações (Onde o Saldo Consolidado está salvo)
+        // 1. Busca configurações (Saldo)
         const { data: settings } = await supabase.from('business_settings').select('*').eq('user_id', user.id).single()
         
-        // 2. Busca histórico de movimentações para exibir na lista
+        // 2. Busca histórico
         const { data: entries } = await supabase
             .from('transactions')
             .select('*')
@@ -199,26 +291,22 @@ export const financeService = {
             .order('date', { ascending: false })
 
         return {
-          currentBalance: Number(settings?.current_balance) || 0, // Garante que é número
+          currentBalance: Number(settings?.current_balance) || 0,
           monthlyGoal: Number(settings?.monthly_goal) || 15000,
           taxRate: Number(settings?.tax_rate) || 6,
           entries: entries || []
         }
-    } catch (e) {
-        console.error("Erro ao carregar caixa:", e)
+    } catch {
         return { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] }
     }
   },
 
-  // 2. Atualizar e Salvar Saldo do Caixa (A CORREÇÃO PRINCIPAL)
   updateCaixaBalance: async (newBalance: number) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not found')
 
-    // Garante que a linha existe antes de tentar update
     await ensureProfileAndSettings(user)
 
-    // Atualiza a tabela business_settings com o novo saldo
     const { error } = await supabase
         .from('business_settings')
         .upsert({ 
