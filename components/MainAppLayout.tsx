@@ -6,11 +6,13 @@ import { Session } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
 import { 
-  CalendarClock, Search, Bell, Menu, LogOut, ChevronDown, 
-  Command, Sparkles, Loader2 
+  CalendarClock, Search, Bell, Menu, LogOut, ChevronDown 
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
+
+// Import da Nova Tela de Loading Premium
+import AppLoadingScreen from '@/components/ui/AppLoadingScreen'
 
 import { ActiveTab } from '@/types'
 import { 
@@ -23,7 +25,7 @@ import ViewContainer from './ViewContainer'
 import Navigation from './Navigation'
 import AIAssistant from '@/components/ai/AIAssistant'
 
-// --- TOPBAR ---
+// --- COMPONENTE TOPBAR (INTERNO) ---
 const TopBar = ({ title, user, profile, notifications, onToggleMenu, onNavigate, onLogout }: any) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -68,7 +70,7 @@ const TopBar = ({ title, user, profile, notifications, onToggleMenu, onNavigate,
       </div>
 
       <div className="flex items-center gap-3 md:gap-6">
-         {/* Search Bar - Hidden on Mobile */}
+         {/* Barra de Busca (Desktop) */}
          <div className="hidden md:flex relative items-center group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
@@ -78,11 +80,13 @@ const TopBar = ({ title, user, profile, notifications, onToggleMenu, onNavigate,
 
          <div className="h-6 w-px bg-white/10 hidden md:block" />
          
+         {/* Botão de Notificações */}
          <button className="relative p-2 md:p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-full border border-transparent hover:border-white/5 transition-all active:scale-95">
            <Bell className="h-5 w-5 md:h-6 md:w-6" />
            {notifications?.length > 0 && <span className="absolute top-2.5 right-3 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e] ring-2 ring-[#050505]" />}
          </button>
          
+         {/* Menu de Perfil */}
          <div className="relative" ref={menuRef}>
             <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-1 py-1 rounded-full hover:bg-white/5 transition-all group active:scale-95">
                <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 p-[2px] shadow-lg shadow-blue-900/20 group-hover:shadow-blue-500/20 transition-all">
@@ -122,17 +126,18 @@ const TopBar = ({ title, user, profile, notifications, onToggleMenu, onNavigate,
   )
 }
 
-// --- MAIN LAYOUT ---
+// --- COMPONENTE PRINCIPAL (MAIN LAYOUT) ---
 export default function MainAppLayout({ session }: { session: Session }) {
   const router = useRouter()
   const supabase = createClient()
   
+  // Estados de Interface
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [chartRange, setChartRange] = useState<'1M' | '3M' | '6M' | '1A'>('3M')
 
-  // Estados de Dados
+  // Estados de Dados (Banco de Dados)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [appointments, setAppointments] = useState<ClientAppointment[]>([])
@@ -146,12 +151,12 @@ export default function MainAppLayout({ session }: { session: Session }) {
     entries: []
   })
 
-  // 1. CARREGAMENTO INICIAL (PERSISTÊNCIA)
+  // 1. CARREGAMENTO INICIAL DE DADOS
   useEffect(() => {
     async function loadData() {
         if (!session?.user) return
         try {
-            // Carrega tudo em paralelo
+            // Promise.all para carregar tudo de uma vez (Performance)
             const [dbProfile, dbTrans, dbAppts, dbGoals, dbCaixaData] = await Promise.all([
                 financeService.getProfile(),
                 financeService.getTransactions(),
@@ -165,40 +170,40 @@ export default function MainAppLayout({ session }: { session: Session }) {
             if (dbAppts) setAppointments(dbAppts)
             if (dbGoals) setGoals(dbGoals)
             
-            // Se o caixa vier vazio, iniciamos com zero, mas garantimos que não seja null
+            // Tratamento do Caixa (se não existir, usa padrão zerado)
             if (dbCaixaData) {
                 setCaixa(dbCaixaData)
             } else {
-                // Se não existir, tenta criar ou usar padrão
                 setCaixa({ currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] })
             }
 
         } catch (error) {
-            console.error("Erro ao carregar dados:", error)
-            toast.error("Erro ao sincronizar dados.")
+            console.error("Erro crítico ao carregar dados:", error)
+            toast.error("Erro ao sincronizar com o servidor.")
         } finally {
+            // Finaliza o loading (Isso dispara a animação de saída da tela de boot)
             setIsLoading(false)
         }
     }
     loadData()
   }, [session])
 
-  // 2. CÁLCULOS FINANCEIROS CORRIGIDOS
+  // 2. CÁLCULOS FINANCEIROS (Memoizados)
   const financialSummary = useMemo(() => {
-    // Renda Bruta (Tudo que entrou como 'receita')
+    // Receitas
     const income = transactions
         .filter(t => t.type === 'receita')
         .reduce((acc, t) => acc + Number(t.amount), 0)
 
-    // Despesas Reais (Saídas, incluindo transferências para o caixa)
+    // Despesas (Inclui fixas, variáveis e transferências para o caixa)
     const expense = transactions
         .filter(t => t.type === 'despesa_fixa' || t.type === 'despesa_variavel' || t.type === 'transferencia')
         .reduce((acc, t) => acc + Number(t.amount), 0)
 
-    // Saldo Disponível (Na mão) = Receita - Tudo que saiu (incluindo os 20% do caixa)
+    // Saldo Líquido (Disponível para o usuário)
     const balance = income - expense
 
-    // Fundo de Emergência (Vem do banco de dados do Caixa)
+    // Saldo do Caixa Empresarial (Blindado)
     const emergencyTotal = caixa.currentBalance
 
     return { 
@@ -209,7 +214,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
     }
   }, [transactions, caixa])
 
-  // Lógica do Gráfico
+  // 3. Lógica do Gráfico de Histórico
   const historyChartData = useMemo(() => {
     if (transactions.length === 0) return []
     const now = new Date()
@@ -238,7 +243,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
             : date.toLocaleDateString('pt-BR', { month: 'short' })
 
         const val = Number(t.amount)
-        // Se for receita, soma. Se for despesa ou transferência, subtrai.
         const amount = t.type === 'receita' ? val : -val
         runningBalance += amount
         
@@ -248,31 +252,36 @@ export default function MainAppLayout({ session }: { session: Session }) {
     return Array.from(dataMap).map(([name, value]) => ({ name, value }))
   }, [transactions, chartRange])
 
+  // --- ACTIONS (Lógica de Negócio) ---
+
   const handleLogout = async () => {
       await supabase.auth.signOut()
       router.push('/login')
   }
 
-  // --- 3. LÓGICA DE ATUALIZAÇÃO DE STATUS (CORRIGIDA E ROBUSTA) ---
+  // Lógica principal: Atualizar Status do Agendamento + Financeiro
   const handleUpdateStatus = async (apptId: string, newStatus: string) => {
     const appt = appointments.find(a => a.id === apptId)
     if (!appt || appt.status === newStatus) return
 
-    // Atualização Otimista da UI (Muda na tela antes de ir pro banco pra parecer rápido)
+    // 1. Atualização Otimista (UI Updates Instantly)
     setAppointments(prev => prev.map(a => a.id === apptId ? { ...a, status: newStatus as any } : a))
 
     try {
-        // 1. Atualiza status no banco
+        // 2. Salva status no banco
         await financeService.updateAppointmentStatus(apptId, newStatus)
         
-        // 2. Se Concluído -> Gera Financeiro e Atualiza Caixa
+        // 3. Se CONCLUÍDO -> Gera Movimentação Financeira
         if (newStatus === 'concluido' && appt.status !== 'concluido') {
             const valorTotal = Number(appt.value)
-            const valorCaixa = valorTotal * 0.20 // 20%
             
-            // A. Cria Transação de Entrada (R$ 200)
+            // Pega porcentagem do caixa (padrao 20% se nao existir)
+            const percentual = Number(appt.caixa_percentage || 20) / 100
+            const valorCaixa = valorTotal * percentual
+            
+            // A. Cria Receita (Valor Total)
             const novaReceita: Transaction = { 
-                id: Math.random().toString(), // ID temporário pra UI
+                id: Math.random().toString(), 
                 description: `Recebimento: ${appt.service}`, 
                 amount: valorTotal, 
                 type: 'receita', 
@@ -282,13 +291,13 @@ export default function MainAppLayout({ session }: { session: Session }) {
                 source: 'Agenda' 
             }
             
-            // B. Cria Transação de Saída/Transferência (R$ 40) - Sai da conta principal
+            // B. Cria Transferência para Caixa (Valor da Porcentagem)
             const novaSaidaCaixa: Transaction = { 
                 id: Math.random().toString(), 
                 amount: valorCaixa, 
                 date: new Date().toISOString(), 
-                description: `Repasse 20% - Caixa Empresarial`, 
-                type: 'transferencia', // Isso faz subtrair do saldo disponível
+                description: `Repasse ${appt.caixa_percentage || 20}% - Caixa`, 
+                type: 'transferencia', 
                 category: 'Caixa Empresarial', 
                 user_id: session.user.id, 
                 source: 'Sistema' 
@@ -297,49 +306,47 @@ export default function MainAppLayout({ session }: { session: Session }) {
             // Atualiza UI de Transações
             setTransactions(prev => [novaReceita, novaSaidaCaixa, ...prev])
             
-            // C. Salva Transações no Banco (Persistência)
-            // IMPORTANTE: Aqui removemos o ID temporário antes de mandar pro banco
+            // C. Persiste Transações no Banco (Removendo ID temporário)
             const { id: _, ...receitaSemId } = novaReceita
             const { id: __, ...saidaSemId } = novaSaidaCaixa
             
             await financeService.createTransaction(receitaSemId as Transaction)
             await financeService.createTransaction(saidaSemId as Transaction)
 
-            // D. Atualiza e SALVA o saldo do Caixa
+            // D. ATUALIZA SALDO DO CAIXA NO BANCO (CRÍTICO)
             const novoSaldoCaixa = caixa.currentBalance + valorCaixa
+            await financeService.updateCaixaBalance(novoSaldoCaixa)
             
             // Atualiza UI do Caixa
             setCaixa(prev => ({ 
                 ...prev, 
                 currentBalance: novoSaldoCaixa,
-                // Adiciona histórico no visual do caixa também
                 entries: [novaSaidaCaixa, ...prev.entries] 
             }))
-
-            // Salva o novo saldo do Caixa no Banco (ISSO RESOLVE O PROBLEMA DE SUMIR)
-            await financeService.updateCaixaBalance(novoSaldoCaixa)
             
-            toast.success(`Faturamento registrado! R$ ${valorCaixa.toFixed(2)} enviados para o Caixa.`)
+            toast.success(`Faturamento de R$ ${valorTotal} confirmado!`)
+            toast.info(`R$ ${valorCaixa.toFixed(2)} destinados ao Caixa.`)
         } else if (['cancelado', 'faltou'].includes(newStatus)) {
-             toast.info(`Status atualizado para: ${newStatus.toUpperCase()}`)
+             toast.info(`Agendamento marcado como: ${newStatus.toUpperCase()}`)
         } else {
              toast.success("Status atualizado.")
         }
     } catch (error) { 
-        console.error(error)
+        console.error("Erro na transação:", error)
         // Reverte UI se der erro
         setAppointments(prev => prev.map(a => a.id === apptId ? { ...a, status: appt.status } : a))
-        toast.error("Erro ao salvar alterações no banco.") 
+        toast.error("Erro ao salvar. Verifique sua conexão.") 
     }
   }
 
+  // Wrappers simples para chamadas de serviço
   const handleAddAppointment = async (apptData: any) => { 
       try { 
           const newAppt = await financeService.createAppointment(apptData)
           setAppointments(prev => [...prev, newAppt])
-          toast.success("Agendamento criado!") 
+          toast.success("Agendamento criado com sucesso!") 
       } catch (error: any) { 
-          toast.error("Erro ao criar: " + (error.message || "Erro desconhecido")) 
+          toast.error("Erro: " + (error.message || "Falha ao criar agendamento")) 
       } 
   }
 
@@ -348,41 +355,58 @@ export default function MainAppLayout({ session }: { session: Session }) {
           const newT = await financeService.createTransaction(t)
           setTransactions(prev => [newT, ...prev])
           toast.success("Transação registrada") 
-      } catch (e) { toast.error("Erro ao salvar") } 
+      } catch (e) { toast.error("Erro ao salvar transação") } 
   }
 
   const handleAddGoal = async (g: NewGoal) => {
       try {
           const newGoal = await financeService.createGoal(g)
           setGoals(prev => [...prev, newGoal])
-          toast.success("Meta criada!")
+          toast.success("Meta definida!")
       } catch (e) { toast.error("Erro ao criar meta") }
   }
 
-  const handleUpdateGoal = (g: Goal) => setGoals(prev => prev.map(item => item.id === g.id ? g : item))
-  const handleAddCard = (c: any) => setCards(prev => [...prev, { ...c, id: Math.random().toString() }])
-  const handleDeleteCard = (id: string) => setCards(prev => prev.filter(c => c.id !== id))
-
-  if (isLoading) {
-      return (
-          <div className="fixed inset-0 bg-[#050505] flex items-center justify-center z-50 overflow-hidden">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-900/20 rounded-full blur-[120px] opacity-40 animate-pulse pointer-events-none" />
-              <div className="flex flex-col items-center">
-                  <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-4" />
-                  <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">Carregando...</p>
-              </div>
-          </div>
-      )
-  }
-
+  // --- RENDERIZAÇÃO ---
   return (
-    <div className="flex h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/30 selection:text-blue-200 overflow-hidden">
+    <div className="flex h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/30 selection:text-blue-200 overflow-hidden relative">
+      
+      {/* TELA DE BOOT / LOADING 
+         Fica sobreposta (fixed z-50) e desaparece suavemente quando isLoading vira false.
+      */}
+      <AppLoadingScreen isLoading={isLoading} />
+
+      {/* Sistema de Notificações Toast */}
       <Toaster position="top-right" theme="dark" richColors closeButton />
-      <Navigation activeTab={activeTab} onSelectTab={(tab) => { setActiveTab(tab); setIsMenuOpen(false) }} onLogout={handleLogout} isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} user={session.user} />
+      
+      {/* Sidebar de Navegação */}
+      <Navigation 
+        activeTab={activeTab} 
+        onSelectTab={(tab) => { setActiveTab(tab); setIsMenuOpen(false) }} 
+        onLogout={handleLogout} 
+        isOpen={isMenuOpen} 
+        onClose={() => setIsMenuOpen(false)} 
+        user={session.user} 
+      />
+      
+      {/* Área Principal de Conteúdo */}
       <main className="flex-1 flex flex-col transition-all duration-300 relative h-full">
-        <TopBar title={activeTab} user={session?.user} profile={userProfile} notifications={MOCK_NOTIFICATIONS} onToggleMenu={() => setIsMenuOpen(!isMenuOpen)} onNavigate={setActiveTab} onLogout={handleLogout} />
+        
+        {/* Barra Superior */}
+        <TopBar 
+            title={activeTab} 
+            user={session?.user} 
+            profile={userProfile} 
+            notifications={MOCK_NOTIFICATIONS} 
+            onToggleMenu={() => setIsMenuOpen(!isMenuOpen)} 
+            onNavigate={setActiveTab} 
+            onLogout={handleLogout} 
+        />
+        
+        {/* Container Scrollável */}
         <div className="flex-1 overflow-x-hidden overflow-y-auto bg-[url('/bg-grid.svg')] bg-fixed scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
            
+           {/* Renderiza as Views (Dashboard, Agenda, etc) */}
+           {/* Renderizamos mesmo carregando para evitar "pulo" visual quando o loading sair */}
            <ViewContainer
               activeTab={activeTab}
               handleRedirect={setActiveTab}
@@ -411,20 +435,23 @@ export default function MainAppLayout({ session }: { session: Session }) {
               caixaData={caixa}
               healthScore={250}
 
+              // Passando handlers
               onUpdateEmergencyFund={async () => {}}
               onAddGoal={handleAddGoal}
-              onUpdateGoal={handleUpdateGoal}
-              onAddCard={handleAddCard}
-              onDeleteCard={handleDeleteCard}
+              onUpdateGoal={(g) => setGoals(prev => prev.map(item => item.id === g.id ? g : item))}
+              onAddCard={(c) => setCards(prev => [...prev, { ...c, id: Math.random().toString() }])}
+              onDeleteCard={(id) => setCards(prev => prev.filter(c => c.id !== id))}
               onAddTransaction={handleAddTransaction}
               setAppointments={setAppointments} 
               onUpdateStatus={handleUpdateStatus}
               onAddAppointment={handleAddAppointment} 
             />
            
+           {/* Espaço extra no final para scroll */}
            <div className="h-24" /> 
         </div>
 
+        {/* Assistente de IA Flutuante */}
         <AIAssistant context={{ summary: financialSummary, goals: goals, transactions: transactions }} />
       </main>
     </div>

@@ -15,6 +15,7 @@ async function ensureProfileAndSettings(user: any) {
   if (!profile) {
     const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário'
     
+    // Tenta criar o perfil (Upsert evita erro se criar ao mesmo tempo)
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: user.id,
       email: user.email,
@@ -29,7 +30,7 @@ async function ensureProfileAndSettings(user: any) {
   const { data: settings } = await supabase.from('business_settings').select('user_id').eq('user_id', user.id).single()
   
   if (!settings) {
-    // Se não existir, cria com saldo zero. Se já existir (race condition), o catch/error ignora.
+    // Tenta criar configurações iniciais
     const { error: settingsError } = await supabase.from('business_settings').insert({ 
         user_id: user.id,
         current_balance: 0,
