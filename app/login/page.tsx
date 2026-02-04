@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link' // Importante para os links funcionarem
+import Link from 'next/link' // Import essencial para navegação
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, Sparkles, Lock, ShieldCheck, Mail, LogIn, User, ArrowRight } from 'lucide-react'
@@ -59,8 +59,6 @@ export default function AuthPage() {
         })
         if (error) throw error
         toast.success('Conta criada com sucesso! Você já pode entrar.')
-        
-        // Se o Supabase não exigir confirmação de email, redireciona direto:
         router.push('/') 
       }
     } catch (error: any) {
@@ -78,8 +76,8 @@ export default function AuthPage() {
         redirectTo: `${location.origin}/auth/callback`,
         queryParams: { 
           access_type: 'offline', 
-          prompt: 'consent', // Força o Google a pedir permissão da agenda novamente
-          scope: 'openid profile email https://www.googleapis.com/auth/calendar' // Escopo da Agenda
+          prompt: 'consent', 
+          scope: 'openid profile email https://www.googleapis.com/auth/calendar'
         }
       }
     })
@@ -204,13 +202,13 @@ export default function AuthPage() {
             )}
           </button>
 
-          {/* RODAPÉ DO CARD COM LINKS E TOGGLE */}
+          {/* RODAPÉ DO CARD COM LINKS SEPARADOS E TARGET_BLANK */}
           <div className="mt-6 pt-4 border-t border-white/5 w-full flex flex-col items-center gap-3">
               
-              {/* Toggle Login/Cadastro */}
               <p className="text-xs text-gray-500">
                 {isLogin ? 'Não tem uma conta?' : 'Já tem uma conta?'}
                 <button 
+                  type="button" 
                   onClick={() => setIsLogin(!isLogin)} 
                   className="ml-1.5 text-blue-400 hover:text-blue-300 font-bold transition-colors hover:underline"
                 >
@@ -218,13 +216,23 @@ export default function AuthPage() {
                 </button>
               </p>
 
-              {/* Links Jurídicos (Novo e Estilizado) */}
+              {/* LINKS JURÍDICOS PARA O GOOGLE */}
               <div className="flex items-center gap-3 text-[10px] text-gray-600 font-medium">
-                 <Link href="/politica-privacidade" className="hover:text-blue-400 transition-colors">
+                 <Link 
+                    href="/politica-privacidade" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-400 transition-colors cursor-pointer"
+                 >
                     Política de Privacidade
                  </Link>
                  <span className="h-1 w-1 rounded-full bg-gray-700"></span>
-                 <Link href="/termos-uso" className="hover:text-blue-400 transition-colors">
+                 <Link 
+                    href="/termos-uso" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-400 transition-colors cursor-pointer"
+                 >
                     Termos de Uso
                  </Link>
               </div>
