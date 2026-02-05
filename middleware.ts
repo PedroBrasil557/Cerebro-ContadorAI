@@ -33,13 +33,24 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Se NÃO estiver logado e tentar acessar página protegida -> Login
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/auth')) {
+  const path = request.nextUrl.pathname
+
+  // --- DEFINIÇÃO DE ROTAS PÚBLICAS ---
+  // Aqui listamos tudo que NÃO precisa de login para ser acessado
+  const isPublicRoute = 
+    path.startsWith('/login') || 
+    path.startsWith('/auth') || 
+    path.startsWith('/politica-privacidade') || // LIBERADO
+    path.startsWith('/termos-uso') ||           // LIBERADO
+    path.startsWith('/api')                     // Geralmente APIs públicas (webhooks) devem ser liberadas
+
+  // 1. Se NÃO estiver logado e a rota NÃO for pública -> Redireciona para Login
+  if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Se JÁ estiver logado e tentar acessar Login -> Dashboard
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  // 2. Se JÁ estiver logado e tentar acessar Login -> Redireciona para Dashboard
+  if (user && path.startsWith('/login')) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
