@@ -15,9 +15,11 @@ import {
 const supabase = createClient()
 
 // --- FUNÇÃO AUXILIAR DE SEGURANÇA ---
+// Garante que o perfil e as configurações de caixa existam antes de qualquer operação crítica
 async function ensureProfileAndSettings(user: any) {
   if (!user) return
 
+  // 1. Verifica/Cria Perfil
   const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).single()
   
   if (!profile) {
@@ -30,6 +32,7 @@ async function ensureProfileAndSettings(user: any) {
     })
   }
 
+  // 2. Verifica/Cria Configurações de Caixa
   const { data: settings } = await supabase.from('business_settings').select('user_id').eq('user_id', user.id).single()
   
   if (!settings) {
@@ -37,14 +40,17 @@ async function ensureProfileAndSettings(user: any) {
         user_id: user.id,
         current_balance: 0,
         monthly_goal: 15000,
-        tax_rate: 6
+        tax_rate: 6,
+        reserve_rate: 20
     })
   }
 }
 
 export const financeService = {
   
-  // --- PERFIL ---
+  // ============================================================================
+  // PERFIL DO USUÁRIO
+  // ============================================================================
   getProfile: async (): Promise<UserProfile | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -62,7 +68,9 @@ export const financeService = {
     if (error) throw error
   },
 
-  // --- TRANSAÇÕES ---
+  // ============================================================================
+  // TRANSAÇÕES
+  // ============================================================================
   getTransactions: async (): Promise<Transaction[]> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -96,7 +104,9 @@ export const financeService = {
     return data
   },
 
-  // --- CARTÕES ---
+  // ============================================================================
+  // CARTÕES DE CRÉDITO
+  // ============================================================================
   getCards: async (): Promise<CreditCard[]> => {
      try {
          const { data: { user } } = await supabase.auth.getUser()
@@ -129,7 +139,9 @@ export const financeService = {
      return data
   },
 
-  // --- NOTIFICAÇÕES ---
+  // ============================================================================
+  // NOTIFICAÇÕES
+  // ============================================================================
   getNotifications: async (): Promise<NotificationItem[]> => {
      try {
          const { data: { user } } = await supabase.auth.getUser()
@@ -149,7 +161,9 @@ export const financeService = {
      await supabase.from('notifications').insert({ user_id: user.id, title, message, type })
   },
 
-  // --- AGENDA ---
+  // ============================================================================
+  // AGENDA SMART (Integração Google Calendar)
+  // ============================================================================
   getAppointments: async (): Promise<ClientAppointment[]> => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -160,28 +174,46 @@ export const financeService = {
   },
 
   createAppointment: async (appt: any) => {
+    // 1. Obtém a sessão atual para pegar o Token do Google
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
+    
     if (!user) throw new Error('Usuário não autenticado')
 
-    // Tenta usar API para integrações
-    const response = await fetch('/api/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            clientName: appt.client_name,
-            clientEmail: appt.client_email,
-            service: appt.service,
-            value: appt.value,
-            date: appt.date.split('T')[0],
-            time: appt.date.split('T')[1].substring(0, 5),
-            caixaPercentage: 20
-        })
-    })
+    // PEGA O TOKEN DO GOOGLE DA SESSÃO ATUAL (CRUCIAL PARA O CALENDAR)
+    const googleToken = session?.provider_token
 
-    if (!response.ok) {
-        // Fallback para inserção direta
-        const { error } = await supabase.from('appointments').insert({
+    // 2. Chama a API interna enviando o Token junto
+    try {
+        const response = await fetch('/api/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                // Dados do agendamento
+                clientName: appt.client_name,
+                clientEmail: appt.client_email,
+                service: appt.service,
+                value: appt.value,
+                date: appt.date.split('T')[0], // YYYY-MM-DD
+                time: appt.date.split('T')[1].substring(0, 5), // HH:MM
+                caixaPercentage: 20,
+                // O TOKEN VAI AQUI
+                providerToken: googleToken 
+            })
+        })
+
+        if (!response.ok) {
+            console.warn("API de agendamento falhou, salvando localmente como fallback...")
+            throw new Error("API Error")
+        }
+
+        const result = await response.json()
+        return result.data
+
+    } catch (error) {
+        // 3. Fallback: Se a API falhar (ou token inválido), salva direto no Supabase
+        // para não perder o agendamento no sistema local.
+        const { data, error: dbError } = await supabase.from('appointments').insert({
             user_id: user.id,
             client_name: appt.client_name,
             client_email: appt.client_email,
@@ -190,22 +222,29 @@ export const financeService = {
             date: appt.date.split('T')[0],
             time: appt.date.split('T')[1].substring(0, 5),
             status: 'agendado'
-        })
-        if (error) throw error
+        }).select().single()
+
+        if (dbError) throw dbError
+
+        // Avisa o usuário que salvou local mas pode ter falhado no Google
+        await financeService.createNotification(
+            "Aviso de Agenda", 
+            "Agendamento salvo no sistema, mas houve um erro ao sincronizar com o Google.", 
+            "warning"
+        )
+        
         return { success: true }
     }
-
-    const result = await response.json()
-    return result.data
   },
 
-  // CORREÇÃO: Função recolocada
   updateAppointmentStatus: async (id: string, status: string) => {
     const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
     if (error) throw error
   },
 
-  // --- METAS ---
+  // ============================================================================
+  // METAS
+  // ============================================================================
   getGoals: async (): Promise<Goal[]> => {
     try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -235,7 +274,9 @@ export const financeService = {
     return data
   },
 
-  // --- DÍVIDAS ---
+  // ============================================================================
+  // DÍVIDAS
+  // ============================================================================
   getDebts: async (): Promise<Debt[]> => {
     try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -245,7 +286,9 @@ export const financeService = {
     } catch { return [] }
   },
 
-  // --- CAIXA ---
+  // ============================================================================
+  // FLUXO DE CAIXA
+  // ============================================================================
   getCaixaData: async (): Promise<CaixaData> => {
     try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -262,11 +305,16 @@ export const financeService = {
           entries: (entries as Transaction[]) || []
         }
     } catch {
-        return { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, reserveRate: 20, entries: [] }
+        return { 
+            currentBalance: 0, 
+            monthlyGoal: 15000, 
+            taxRate: 6, 
+            reserveRate: 20, 
+            entries: [] 
+        }
     }
   },
 
-  // CORREÇÃO: Função recolocada
   updateCaixaBalance: async (newBalance: number) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not found')
