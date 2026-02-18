@@ -5,7 +5,7 @@
 // 1. Definição dos Tipos de Transação
 export type TransactionType = 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia';
 
-// 2. Transação (Banco de Dados + UI)
+// 2. Transação (Dados vindos do Banco)
 export interface Transaction {
   id: string
   user_id: string
@@ -14,14 +14,23 @@ export interface Transaction {
   type: TransactionType 
   category: string
   payment_method?: string
+  card_id?: string
   date: string        // ISO String vinda do banco
   status?: string     // 'concluido', 'pendente'
   source?: string     // 'Agenda', 'Manual', 'Sistema'
+  
+  // CAMPOS NATIVOS
+  is_paid: boolean    
+  is_fixed: boolean
+  due_date?: string
+  edit_note?: string
+  
   location?: string
   created_at?: string
+  updated_at?: string
 }
 
-// Interface simplificada para criar nova transação (Forms)
+// Interface para formulários de criação (NewTransaction)
 export interface NewTransaction {
   description: string
   amount: number
@@ -29,9 +38,28 @@ export interface NewTransaction {
   category: string
   date: string
   payment_method?: string
+  card_id?: string
+  is_paid: boolean
+  is_fixed: boolean
 }
 
-// 3. Notificações (CRÍTICO: Adicionado para remover MockData)
+// 3. Cartão de Crédito
+export interface CreditCard {
+  id: string
+  user_id: string
+  name: string
+  brand: string 
+  last_4_digits: string 
+  limit_amount: number 
+  current_invoice: number
+  due_day: number      // Dia do vencimento (integer)
+  closing_day: number  // Dia do fechamento (integer)
+  color_start?: string
+  color_end?: string
+  created_at?: string
+}
+
+// 4. Notificações
 export interface NotificationItem {
   id: string
   user_id: string
@@ -42,7 +70,7 @@ export interface NotificationItem {
   created_at: string
 }
 
-// 4. Perfil do Usuário
+// 5. Perfil do Usuário
 export interface UserProfile {
   id: string
   full_name?: string
@@ -53,9 +81,10 @@ export interface UserProfile {
   location?: string
   bio?: string
   created_at?: string
+  updated_at?: string
 }
 
-// 5. Agendamento (Agenda)
+// 6. Agendamento (Agenda Smart)
 export interface ClientAppointment {
   id: string
   user_id: string
@@ -66,15 +95,12 @@ export interface ClientAppointment {
   time?: string       // HH:mm:ss
   value: number
   status: 'agendado' | 'concluido' | 'cancelado' | 'faltou' | 'pendente' | 'remarcar'
-  
-  // Campo para cálculo de comissão/caixa
   caixa_percentage?: number 
-  
-  created_at?: string
   invite_sent?: boolean
+  created_at?: string
 }
 
-// 6. Metas
+// 7. Metas (Goals)
 export interface Goal {
   id: string
   user_id: string
@@ -83,44 +109,84 @@ export interface Goal {
   current_amount: number
   deadline?: string
   color?: string
-  color_start?: string
-  color_end?: string
-  icon?: string
   created_at?: string
 }
 
+// Interface auxiliar para formulários
 export interface NewGoal {
   title: string
-  target_amount: number | string // Aceita string temporariamente do input
+  target_amount: number | string 
   deadline?: string
   color?: string
   icon?: string
-  color_start?: string
-  color_end?: string
 }
 
-// 7. Cartão de Crédito (Sincronizado com SQL)
-export interface CreditCard {
+// 8. Dívidas (Debts)
+export interface Debt {
   id: string
   user_id: string
   name: string
-  brand: string // 'mastercard', 'visa', 'amex', etc.
-  
-  // Campos alinhados com o SQL (limit_amount em vez de limit)
-  limit_amount: number 
-  current_invoice: number
-  
-  due_day: number      // Dia do vencimento (integer)
-  closing_day: number  // Dia do fechamento (integer)
-  
-  color_start?: string
-  color_end?: string
-  
-  // Campo calculado no frontend (opcional)
-  used?: number 
+  total_amount: number
+  remaining_amount: number
+  interest_rate: number
+  due_day?: number
+  category?: string
+  priority: 'baixa' | 'media' | 'alta'
+  status: 'aberto' | 'negociacao' | 'pago'
+  created_at: string
 }
 
-// 8. Dados Agregados (Dashboard Helpers)
+// 9. Investimentos
+export interface Investment {
+  id: string
+  user_id: string
+  name: string
+  ticker?: string 
+  type: 'renda_fixa' | 'acoes' | 'fii' | 'cripto' | 'fundos' | 'exterior' | 'reserva' | 'outros'
+  
+  // Dados Numéricos
+  quantity: number        
+  average_price: number   
+  current_price: number   
+  
+  // Campos Calculados/Opcionais
+  amount_invested?: number 
+  current_value?: number   
+  yield_rate?: string
+  institution?: string
+  
+  created_at?: string
+  updated_at?: string
+}
+
+// 10. Histórico Patrimonial
+export interface PatrimonyHistory {
+  id: string
+  user_id: string
+  total_balance: number
+  record_date: string
+  created_at?: string
+}
+
+// 11. Dados do Caixa e Configurações
+export interface BusinessSettings {
+  user_id: string
+  current_balance: number
+  monthly_goal: number
+  tax_rate: number
+  reserve_rate: number
+  updated_at?: string
+}
+
+export interface CaixaData {
+  currentBalance: number
+  monthlyGoal: number
+  taxRate: number
+  reserveRate?: number
+  entries: Transaction[]
+}
+
+// --- CORREÇÃO: ADICIONADA A INTERFACE EMERGENCYFUND ---
 export interface EmergencyFund {
   current_amount: number
   monthly_expenses: number
@@ -129,14 +195,7 @@ export interface EmergencyFund {
   status: 'safe' | 'warning' | 'danger'
 }
 
-export interface CaixaData {
-  currentBalance: number
-  monthlyGoal: number
-  taxRate: number
-  entries: Transaction[]
-}
-
-// 9. Tipo Auxiliar para Navegação
+// 12. Navegação
 export type ActiveTab = 
   | 'dashboard' 
   | 'agenda' 
@@ -145,3 +204,4 @@ export type ActiveTab =
   | 'carteira' 
   | 'caixa' 
   | 'meu perfil'
+  | 'central_dividas';

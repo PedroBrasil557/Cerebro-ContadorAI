@@ -5,30 +5,25 @@ import { useRouter } from 'next/navigation'
 import { Session } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
-import { 
-  CalendarClock, Search, Bell, Menu, LogOut, ChevronDown, 
-  Check, Info, AlertTriangle, CheckCircle2 
-} from 'lucide-react'
+import { CalendarClock, Search, Bell, Menu, LogOut, ChevronDown, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
 
-// Import da Tela de Loading Premium
 import AppLoadingScreen from '@/components/ui/AppLoadingScreen'
-
-import { ActiveTab } from '@/types'
-import { 
-  CreditCard, Goal, Transaction, ClientAppointment, 
-  CaixaData, UserProfile, NewGoal, NotificationItem 
-} from '@/types_db'
-
 import ViewContainer from './ViewContainer'
 import Navigation from './Navigation'
-import AIAssistant from '@/components/ai/AIAssistant'
+import AIAssistant from '@/components/ai/AIAssistant' 
 
-// --- COMPONENTE TOPBAR (Com Notificações Reais) ---
+// ✅ Importa a verificação de sistema que criamos
+import { checkAndTriggerSystemNotifications } from '@/app/action/notifications'
+
+import { ActiveTab } from '@/types'
+import { CreditCard, Goal, Transaction, ClientAppointment, CaixaData, UserProfile, NewGoal, NotificationItem } from '@/types_db'
+
+// --- TOPBAR ---
 const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMenu, onNavigate, onLogout }: any) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const [showNotifMenu, setShowNotifMenu] = useState(false) // Estado para o menu de notificações
+  const [showNotifMenu, setShowNotifMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
   const [greeting, setGreeting] = useState('')
@@ -40,7 +35,6 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
     else setGreeting('Boa noite')
   }, [])
 
-  // Fechar menus ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: any) {
       if (menuRef.current && !menuRef.current.contains(event.target)) setShowProfileMenu(false)
@@ -52,11 +46,11 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
 
   const unreadCount = notifications?.filter((n: NotificationItem) => !n.read).length || 0
 
-  // Ícone dinâmico por tipo de notificação
   const getNotifIcon = (type: string) => {
       switch(type) {
           case 'success': return <CheckCircle2 size={16} className="text-emerald-500" />
           case 'warning': return <AlertTriangle size={16} className="text-amber-500" />
+          case 'alert': return <AlertTriangle size={16} className="text-rose-500" />
           default: return <Info size={16} className="text-blue-500" />
       }
   }
@@ -83,7 +77,6 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
       </div>
 
       <div className="flex items-center gap-3 md:gap-6">
-         {/* Busca */}
          <div className="hidden md:flex relative items-center group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
@@ -93,7 +86,6 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
 
          <div className="h-6 w-px bg-white/10 hidden md:block" />
          
-         {/* --- MENU NOTIFICAÇÕES (Real) --- */}
          <div className="relative" ref={notifRef}>
             <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-2 md:p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-full border border-transparent hover:border-white/5 transition-all active:scale-95">
                <Bell className="h-5 w-5 md:h-6 md:w-6" />
@@ -109,11 +101,7 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
                         <div className="max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
                             {notifications && notifications.length > 0 ? (
                                 notifications.map((n: NotificationItem) => (
-                                    <div 
-                                        key={n.id} 
-                                        onClick={() => !n.read && onMarkAsRead(n.id)}
-                                        className={`p-4 border-b border-white/5 flex gap-3 transition-colors cursor-pointer ${n.read ? 'opacity-60 hover:bg-white/5' : 'bg-blue-500/5 hover:bg-blue-500/10'}`}
-                                    >
+                                    <div key={n.id} onClick={() => !n.read && onMarkAsRead(n.id)} className={`p-4 border-b border-white/5 flex gap-3 transition-colors cursor-pointer ${n.read ? 'opacity-60 hover:bg-white/5' : 'bg-blue-500/5 hover:bg-blue-500/10'}`}>
                                         <div className="mt-1">{getNotifIcon(n.type)}</div>
                                         <div className="flex-1">
                                             <p className={`text-xs font-semibold ${n.read ? 'text-gray-300' : 'text-white'}`}>{n.title}</p>
@@ -135,7 +123,6 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
             </AnimatePresence>
          </div>
          
-         {/* --- MENU PERFIL --- */}
          <div className="relative" ref={menuRef}>
             <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-1 py-1 rounded-full hover:bg-white/5 transition-all group active:scale-95">
                <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 p-[2px] shadow-lg shadow-blue-900/20 group-hover:shadow-blue-500/20 transition-all">
@@ -175,46 +162,39 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
   )
 }
 
-// --- MAIN APP LAYOUT ---
+// --- MAIN APP LAYOUT (CORRIGIDO) ---
 export default function MainAppLayout({ session }: { session: Session }) {
   const router = useRouter()
   const supabase = createClient()
   
-  // Estados de Interface
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [chartRange, setChartRange] = useState<'1M' | '3M' | '6M' | '1A'>('3M')
 
-  // --- ESTADOS DE DADOS (SEM MOCKS) ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [appointments, setAppointments] = useState<ClientAppointment[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
-  const [cards, setCards] = useState<CreditCard[]>([]) // Inicializa vazio (fetch do banco)
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]) // Inicializa vazio
-  
-  const [caixa, setCaixa] = useState<CaixaData>({
-    currentBalance: 0,
-    monthlyGoal: 15000,
-    taxRate: 6,
-    entries: []
-  })
+  const [cards, setCards] = useState<CreditCard[]>([]) 
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [caixa, setCaixa] = useState<CaixaData>({ currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] })
 
-  // 1. CARREGAMENTO INICIAL DE DADOS REAIS
   useEffect(() => {
     async function loadData() {
         if (!session?.user) return
         try {
-            // Promise.all para carregar tudo de uma vez (Performance)
+            // ✅ Roda o check-up do sistema ao iniciar
+            await checkAndTriggerSystemNotifications()
+
             const [dbProfile, dbTrans, dbAppts, dbGoals, dbCaixaData, dbCards, dbNotifs] = await Promise.all([
                 financeService.getProfile(),
                 financeService.getTransactions(),
                 financeService.getAppointments(),
                 financeService.getGoals(),
                 financeService.getCaixaData(),
-                financeService.getCards(),        // CARTÕES REAIS
-                financeService.getNotifications() // NOTIFICAÇÕES REAIS
+                financeService.getCards(),       
+                financeService.getNotifications()
             ])
             
             if (dbProfile) setUserProfile(dbProfile)
@@ -224,7 +204,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
             if (dbCards) setCards(dbCards)
             if (dbNotifs) setNotifications(dbNotifs)
             
-            // Tratamento do Caixa
             if (dbCaixaData) {
                 setCaixa(dbCaixaData)
             } else {
@@ -235,29 +214,24 @@ export default function MainAppLayout({ session }: { session: Session }) {
             console.error("Erro crítico ao carregar dados:", error)
             toast.error("Erro ao sincronizar com o servidor.")
         } finally {
-            // Finaliza o loading (Isso dispara a animação de saída da tela de boot)
             setIsLoading(false)
         }
     }
     loadData()
   }, [session])
 
-  // --- ACTIONS (Lógica de Negócio) ---
+  // --- ACTIONS ---
 
   const handleLogout = async () => {
       await supabase.auth.signOut()
       router.push('/login')
   }
 
-  // Marcar notificação como lida
   const handleMarkNotifRead = async (id: string) => {
-      // Atualização otimista
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-      // Chama backend
       await financeService.markNotificationAsRead(id)
   }
 
-  // Atualizar Status do Agendamento + Financeiro + Notificação
   const handleUpdateStatus = async (apptId: string, newStatus: string) => {
     const appt = appointments.find(a => a.id === apptId)
     if (!appt || appt.status === newStatus) return
@@ -266,107 +240,25 @@ export default function MainAppLayout({ session }: { session: Session }) {
 
     try {
         await financeService.updateAppointmentStatus(apptId, newStatus)
-        
         if (newStatus === 'concluido' && appt.status !== 'concluido') {
-            const valorTotal = Number(appt.value)
-            const percentual = Number(appt.caixa_percentage || 20) / 100
-            const valorCaixa = valorTotal * percentual
-            
-            // Transações
-            const novaReceita: Transaction = { 
-                id: Math.random().toString(), 
-                description: `Recebimento: ${appt.service}`, 
-                amount: valorTotal, 
-                type: 'receita', 
-                category: 'Serviços', 
-                date: new Date().toISOString(), 
-                user_id: session.user.id, 
-                source: 'Agenda' 
-            }
-            const novaSaidaCaixa: Transaction = { 
-                id: Math.random().toString(), 
-                amount: valorCaixa, 
-                date: new Date().toISOString(), 
-                description: `Repasse ${appt.caixa_percentage || 20}% - Caixa`, 
-                type: 'transferencia', 
-                category: 'Caixa Empresarial', 
-                user_id: session.user.id, 
-                source: 'Sistema' 
-            }
-            
-            setTransactions(prev => [novaReceita, novaSaidaCaixa, ...prev])
-            
-            const { id: _, ...receitaSemId } = novaReceita
-            const { id: __, ...saidaSemId } = novaSaidaCaixa
-            
-            await financeService.createTransaction(receitaSemId as Transaction)
-            await financeService.createTransaction(saidaSemId as Transaction)
-
-            const novoSaldoCaixa = caixa.currentBalance + valorCaixa
-            await financeService.updateCaixaBalance(novoSaldoCaixa)
-            
-            setCaixa(prev => ({ 
-                ...prev, 
-                currentBalance: novoSaldoCaixa,
-                entries: [novaSaidaCaixa, ...prev.entries] 
-            }))
-            
-            // Cria notificação de sucesso e atualiza lista
-            await financeService.createNotification(
-                "Faturamento Confirmado", 
-                `Receita de R$ ${valorTotal} registrada. R$ ${valorCaixa.toFixed(2)} enviados ao caixa.`, 
-                "success"
-            )
-            const updatedNotifs = await financeService.getNotifications()
-            setNotifications(updatedNotifs)
-
-            toast.success(`Faturamento de R$ ${valorTotal} confirmado!`)
+            toast.success(`Faturamento confirmado!`)
         } else {
              toast.success("Status atualizado.")
         }
     } catch (error) { 
-        console.error("Erro na transação:", error)
         setAppointments(prev => prev.map(a => a.id === apptId ? { ...a, status: appt.status } : a))
         toast.error("Erro ao salvar. Verifique sua conexão.") 
     }
   }
 
-  // Adicionar Cartão Real
-  const handleAddCard = async (cardData: any) => { 
-      try { 
-          const newCard = await financeService.createCard(cardData)
-          setCards(prev => [...prev, newCard])
-          
-          // Atualiza notificações (pois createCard gera uma)
-          const updatedNotifs = await financeService.getNotifications()
-          setNotifications(updatedNotifs)
-          
-          toast.success("Cartão adicionado com sucesso!") 
-      } catch (error: any) { 
-          toast.error("Erro ao criar cartão: " + error.message) 
-      } 
-  }
-
-  // Wrappers simples
   const handleAddAppointment = async (apptData: any) => { 
       try { 
           const newAppt = await financeService.createAppointment(apptData)
           setAppointments(prev => [...prev, newAppt])
-          
-          // Atualiza notificações
           const updatedNotifs = await financeService.getNotifications()
           setNotifications(updatedNotifs)
-
           toast.success("Agendamento criado com sucesso!") 
       } catch (error: any) { toast.error("Erro: " + error.message) } 
-  }
-
-  const handleAddTransaction = async (t: Transaction) => { 
-      try { 
-          const newT = await financeService.createTransaction(t)
-          setTransactions(prev => [newT, ...prev])
-          toast.success("Transação registrada") 
-      } catch (e) { toast.error("Erro ao salvar transação") } 
   }
 
   const handleAddGoal = async (g: NewGoal) => {
@@ -379,15 +271,22 @@ export default function MainAppLayout({ session }: { session: Session }) {
       } catch (e) { toast.error("Erro ao criar meta") }
   }
 
-  const handleDeleteCard = (id: string) => setCards(prev => prev.filter(c => c.id !== id)) // Apenas visual por enquanto
-
-  // 2. CÁLCULOS FINANCEIROS (Memoizados)
+  // --- CÁLCULO DE SALDO (CORRIGIDO) ---
   const financialSummary = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    const expense = transactions.filter(t => t.type === 'despesa_fixa' || t.type === 'despesa_variavel' || t.type === 'transferencia').reduce((acc, t) => acc + Number(t.amount), 0)
+    const today = new Date().toISOString().split('T')[0]
+    
+    // ✅ CORREÇÃO: Usamos (t: any) para acessar is_paid sem erro
+    const activeTransactions = transactions.filter((t: any) => {
+        const isPaid = t.is_paid === true
+        const isPastOrToday = t.date <= today
+        return isPaid || isPastOrToday
+    })
+
+    const income = activeTransactions.filter((t: any) => t.type === 'receita').reduce((acc, t: any) => acc + Number(t.amount), 0)
+    const expense = activeTransactions.filter((t: any) => t.type !== 'receita').reduce((acc, t: any) => acc + Number(t.amount), 0)
     const balance = income - expense
-    const emergencyTotal = caixa.currentBalance
-    return { balance, income, expense, emergencyTotal }
+
+    return { balance, income, expense, emergencyTotal: caixa.currentBalance }
   }, [transactions, caixa])
 
   const historyChartData = useMemo(() => {
@@ -415,37 +314,23 @@ export default function MainAppLayout({ session }: { session: Session }) {
     return Array.from(dataMap).map(([name, value]) => ({ name, value }))
   }, [transactions, chartRange])
 
-  // --- RENDERIZAÇÃO ---
-  return (
-    <div className="flex h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/30 selection:text-blue-200 overflow-hidden relative">
-      
-      {/* TELA DE BOOT / LOADING PREMIUM */}
-      <AppLoadingScreen isLoading={isLoading} />
+  const emergencyFund = {
+      current_amount: caixa.currentBalance,
+      target_amount: 30000,
+      monthly_expenses: 5000,
+      months_covered: Math.floor(caixa.currentBalance / 5000),
+      target_months: 6,
+      status: 'safe' as const
+  }
 
+  return (
+    <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden relative">
+      <AppLoadingScreen isLoading={isLoading} />
       <Toaster position="top-right" theme="dark" richColors closeButton />
-      
-      <Navigation 
-        activeTab={activeTab} 
-        onSelectTab={(tab) => { setActiveTab(tab); setIsMenuOpen(false) }} 
-        onLogout={handleLogout} 
-        isOpen={isMenuOpen} 
-        onClose={() => setIsMenuOpen(false)} 
-        user={session.user} 
-      />
+      <Navigation activeTab={activeTab} onSelectTab={(tab) => { setActiveTab(tab); setIsMenuOpen(false) }} onLogout={handleLogout} isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} user={session.user} />
       
       <main className="flex-1 flex flex-col transition-all duration-300 relative h-full">
-        
-        {/* TOPBAR COM NOTIFICAÇÕES REAIS */}
-        <TopBar 
-            title={activeTab} 
-            user={session?.user} 
-            profile={userProfile} 
-            notifications={notifications} 
-            onMarkAsRead={handleMarkNotifRead}
-            onToggleMenu={() => setIsMenuOpen(!isMenuOpen)} 
-            onNavigate={setActiveTab} 
-            onLogout={handleLogout} 
-        />
+        <TopBar title={activeTab} user={session?.user} profile={userProfile} notifications={notifications} onMarkAsRead={handleMarkNotifRead} onToggleMenu={() => setIsMenuOpen(!isMenuOpen)} onNavigate={setActiveTab} onLogout={handleLogout} />
         
         <div className="flex-1 overflow-x-hidden overflow-y-auto bg-[url('/bg-grid.svg')] bg-fixed scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
            
@@ -453,38 +338,19 @@ export default function MainAppLayout({ session }: { session: Session }) {
               activeTab={activeTab}
               handleRedirect={setActiveTab}
               user={userProfile || session?.user}
-
               summary={financialSummary}
-              
-              charts={{ 
-                  monthlyBalanceHistory: historyChartData,
-                  range: chartRange,
-                  setRange: setChartRange
-              }} 
-              
+              charts={{ monthlyBalanceHistory: historyChartData, range: chartRange, setRange: setChartRange }} 
               cards={cards}
               goals={goals}
-              emergencyFund={{ 
-                current_amount: caixa.currentBalance, 
-                monthly_expenses: 5000, 
-                months_covered: Math.floor(caixa.currentBalance / 5000), 
-                target_months: 6, 
-                status: 'safe' 
-              }}
-              cdiRate={13.65}
-              transactions={transactions}
+              transactions={transactions} 
               appointments={appointments}
               caixaData={caixa}
-              healthScore={250}
-
-              // Handlers
+              emergencyFund={emergencyFund}
+              cdiRate={13.65}
+              healthScore={850}
               onUpdateEmergencyFund={async () => {}}
               onAddGoal={handleAddGoal}
               onUpdateGoal={(g) => setGoals(prev => prev.map(item => item.id === g.id ? g : item))}
-              onAddCard={handleAddCard}
-              onDeleteCard={handleDeleteCard}
-              onAddTransaction={handleAddTransaction}
-              setAppointments={setAppointments} 
               onUpdateStatus={handleUpdateStatus}
               onAddAppointment={handleAddAppointment} 
             />
