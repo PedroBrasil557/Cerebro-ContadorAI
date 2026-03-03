@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client' // <--- Importação nova
-import MainAppLayout from '@/components/MainAppLayout'
+import MainAppLayout from '@/core/layouts/MainAppLayout'
 import { Loader2 } from 'lucide-react'
 
 export default function App() {

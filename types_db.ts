@@ -49,7 +49,9 @@ export interface CreditCard {
   user_id: string
   name: string
   brand: string 
-  last_4_digits: string 
+  // ✅ CORREÇÃO: last_digits é o nome oficial na sua tabela do Supabase
+  last_digits: string 
+  last_4_digits?: string // Mantido apenas para compatibilidade de leitura antiga
   limit_amount: number 
   current_invoice: number
   due_day: number      // Dia do vencimento (integer)
@@ -112,7 +114,7 @@ export interface Goal {
   created_at?: string
 }
 
-// Interface auxiliar para formulários
+// Interface auxiliar para formulários de metas
 export interface NewGoal {
   title: string
   target_amount: number | string 
@@ -136,25 +138,18 @@ export interface Debt {
   created_at: string
 }
 
-// 9. Investimentos
+// 9. Investimentos (Sincronizado com as colunas reais do seu banco)
+// ✅ CORREÇÃO DEFINITIVA: Nomes que o seu banco aceitou
 export interface Investment {
   id: string
   user_id: string
-  name: string
-  ticker?: string 
-  type: 'renda_fixa' | 'acoes' | 'fii' | 'cripto' | 'fundos' | 'exterior' | 'reserva' | 'outros'
-  
-  // Dados Numéricos
-  quantity: number        
-  average_price: number   
-  current_price: number   
-  
-  // Campos Calculados/Opcionais
-  amount_invested?: number 
-  current_value?: number   
-  yield_rate?: string
-  institution?: string
-  
+  name: string          // Nome do Ativo
+  ticker: string        // Código (Ex: PETR4)
+  type: string          // Tipo (Ex: Ações)
+  quantity: number      
+  average_price: number // Preço Médio (Nome no DB)
+  current_price: number // Preço Atual (Nome no DB)
+  amount_invested: number // Valor Total (Nome no DB)
   created_at?: string
   updated_at?: string
 }
@@ -168,7 +163,7 @@ export interface PatrimonyHistory {
   created_at?: string
 }
 
-// 11. Dados do Caixa e Configurações
+// 11. Dados do Caixa e Configurações de Negócio
 export interface BusinessSettings {
   user_id: string
   current_balance: number
@@ -186,7 +181,7 @@ export interface CaixaData {
   entries: Transaction[]
 }
 
-// --- CORREÇÃO: ADICIONADA A INTERFACE EMERGENCYFUND ---
+// 12. Fundo de Emergência
 export interface EmergencyFund {
   current_amount: number
   monthly_expenses: number
@@ -195,7 +190,7 @@ export interface EmergencyFund {
   status: 'safe' | 'warning' | 'danger'
 }
 
-// 12. Navegação
+// 13. Controle de Navegação
 export type ActiveTab = 
   | 'dashboard' 
   | 'agenda' 
@@ -205,3 +200,25 @@ export type ActiveTab =
   | 'caixa' 
   | 'meu perfil'
   | 'central_dividas';
+  export interface NailService {
+  id: string;
+  name: string;
+  category: 'Alongamento' | 'Manutenção' | 'Esmaltação' | 'Extras';
+  price: number;
+  duration: number; // em minutos
+}
+
+export interface NailProfessional {
+  id: string;
+  name: string;
+  specialty: string;
+  active: boolean;
+}
+
+export interface NailAppointment extends ClientAppointment {
+  service_id: string;
+  professional_id: string;
+  payment_method: string;
+  payment_status: 'pago' | 'pendente';
+  extra_services?: string[];
+}
