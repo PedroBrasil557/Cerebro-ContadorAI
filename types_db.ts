@@ -1,129 +1,79 @@
 // ============================================================================
-// TIPOS GLOBAIS DO SISTEMA FINANCEIRO (Sincronizado com Supabase)
+// types_db.ts - CÉREBRO.OS Global Type Definitions
 // ============================================================================
 
-// 1. Definição dos Tipos de Transação
-export type TransactionType = 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia';
+export type SystemRole = 'user' | 'admin' | 'founder'
+export type AccountMode = 'personal' | 'professional'
+export type PlanTier = 'free' | 'basic' | 'pro' | 'premium' | 'professional_full'
+export type TransactionType = 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia'
 
-// 2. Transação (Dados vindos do Banco)
+// --- 1. PERFIL E CONFIGURAÇÕES ---
+export interface UserProfile {
+  id: string
+  email: string
+  full_name: string
+  avatar_url?: string
+  system_role: SystemRole
+  account_mode: AccountMode
+  plan_tier: PlanTier
+  base_currency: string
+  timezone: string
+  phone?: string
+  location?: string
+  bio?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Business {
+  id: string
+  owner_id: string
+  name: string
+  tax_regime: string
+  default_tax_rate: number
+  created_at: string
+}
+
+// --- 2. FINANCEIRO CORE ---
 export interface Transaction {
   id: string
   user_id: string
+  business_id?: string
   description: string
-  amount: number
-  type: TransactionType 
+  amount: number | string
+  type: TransactionType
   category: string
   payment_method?: string
   card_id?: string
-  date: string        // ISO String vinda do banco
-  status?: string     // 'concluido', 'pendente'
-  source?: string     // 'Agenda', 'Manual', 'Sistema'
-  
-  // CAMPOS NATIVOS
-  is_paid: boolean    
+  date: string
+  status: string
   is_fixed: boolean
+  is_paid: boolean
   due_date?: string
   edit_note?: string
-  
-  location?: string
+  source?: string
   created_at?: string
   updated_at?: string
 }
 
-// Interface para formulários de criação (NewTransaction)
-export interface NewTransaction {
-  description: string
-  amount: number
-  type: TransactionType
-  category: string
-  date: string
-  payment_method?: string
-  card_id?: string
-  is_paid: boolean
-  is_fixed: boolean
-}
+export type NewTransaction = Omit<Transaction, 'id' | 'created_at' | 'updated_at'>
 
-// 3. Cartão de Crédito
 export interface CreditCard {
   id: string
   user_id: string
   name: string
-  brand: string 
-  // ✅ CORREÇÃO: last_digits é o nome oficial na sua tabela do Supabase
-  last_digits: string 
-  last_4_digits?: string // Mantido apenas para compatibilidade de leitura antiga
-  limit_amount: number 
-  current_invoice: number
-  due_day: number      // Dia do vencimento (integer)
-  closing_day: number  // Dia do fechamento (integer)
+  brand: string
+  last_digits: string
+  last_4_digits?: string
+  limit_amount: number | string
+  current_invoice?: number | string
+  due_day: number
+  closing_day: number
   color_start?: string
   color_end?: string
   created_at?: string
 }
 
-// 4. Notificações
-export interface NotificationItem {
-  id: string
-  user_id: string
-  title: string
-  message: string
-  type: 'info' | 'success' | 'warning' | 'alert'
-  read: boolean
-  created_at: string
-}
-
-// 5. Perfil do Usuário
-export interface UserProfile {
-  id: string
-  full_name?: string
-  avatar_url?: string
-  email?: string
-  plan?: 'free' | 'pro' | 'enterprise'
-  phone?: string
-  location?: string
-  bio?: string
-  created_at?: string
-  updated_at?: string
-}
-
-// 6. Agendamento (Agenda Smart)
-export interface ClientAppointment {
-  id: string
-  user_id: string
-  client_name: string
-  client_email?: string
-  service: string
-  date: string        // ISO String (YYYY-MM-DD)
-  time?: string       // HH:mm:ss
-  value: number
-  status: 'agendado' | 'concluido' | 'cancelado' | 'faltou' | 'pendente' | 'remarcar'
-  caixa_percentage?: number 
-  invite_sent?: boolean
-  created_at?: string
-}
-
-// 7. Metas (Goals)
-export interface Goal {
-  id: string
-  user_id: string
-  title: string
-  target_amount: number
-  current_amount: number
-  deadline?: string
-  color?: string
-  created_at?: string
-}
-
-// Interface auxiliar para formulários de metas
-export interface NewGoal {
-  title: string
-  target_amount: number | string 
-  deadline?: string
-  color?: string
-  icon?: string
-}
-
-// 8. Dívidas (Debts)
 export interface Debt {
   id: string
   user_id: string
@@ -131,76 +81,94 @@ export interface Debt {
   total_amount: number
   remaining_amount: number
   interest_rate: number
-  due_day?: number
+  due_day: number
   category?: string
-  priority: 'baixa' | 'media' | 'alta'
-  status: 'aberto' | 'negociacao' | 'pago'
+  priority: 'baixa' | 'media' | 'alta' | 'urgente'
+  status: string
   created_at: string
 }
 
-// 9. Investimentos (Sincronizado com as colunas reais do seu banco)
-// ✅ CORREÇÃO DEFINITIVA: Nomes que o seu banco aceitou
+export interface Goal {
+  id: string
+  user_id: string
+  title: string
+  target_amount: number
+  current_amount: number
+  deadline: string
+  color?: string
+  icon?: string
+  created_at?: string
+}
+
+export type NewGoal = Pick<Goal, 'title' | 'target_amount' | 'deadline' | 'color' | 'icon'>
+
 export interface Investment {
   id: string
   user_id: string
-  name: string          // Nome do Ativo
-  ticker: string        // Código (Ex: PETR4)
-  type: string          // Tipo (Ex: Ações)
-  quantity: number      
-  average_price: number // Preço Médio (Nome no DB)
-  current_price: number // Preço Atual (Nome no DB)
-  amount_invested: number // Valor Total (Nome no DB)
+  name: string
+  ticker: string
+  type: string
+  quantity: number
+  average_price: number
+  current_price: number
+  amount_invested: number
+  current_value?: number
+  institution?: string
   created_at?: string
   updated_at?: string
 }
 
-// 10. Histórico Patrimonial
-export interface PatrimonyHistory {
+// --- 3. SMART SHOPPING & OCR ---
+export interface MonthlyShoppingSession {
   id: string
   user_id: string
-  total_balance: number
-  record_date: string
+  month: string
+  estimated_total: number
+  actual_total: number
+  status: string
+  currency_code?: string
+}
+
+export interface ShoppingItem {
+  id: string
+  session_id: string
+  name: string
+  category: string
+  estimated_price: number
+  actual_price: number | null
+  quantity: number
+  is_essential: boolean
+  is_purchased: boolean
+  price_variation_pct: number
+}
+
+export interface ShoppingReceipt {
+  id: string
+  session_id: string
+  image_url: string
+  extracted_total: number
+  extracted_date: string
+  processing_status: string
+  created_at: string
+}
+
+// --- 4. AGENDA & EMPRESA (NAIL DESIGN INCLUÍDO) ---
+export interface ClientAppointment {
+  id: string
+  user_id: string
+  client_name: string
+  client_email?: string
+  service: string
+  value: number
+  date: string
+  time?: string
+  status: string
+  caixa_percentage?: number 
+  invite_sent?: boolean
   created_at?: string
 }
 
-// 11. Dados do Caixa e Configurações de Negócio
-export interface BusinessSettings {
-  user_id: string
-  current_balance: number
-  monthly_goal: number
-  tax_rate: number
-  reserve_rate: number
-  updated_at?: string
-}
-
-export interface CaixaData {
-  currentBalance: number
-  monthlyGoal: number
-  taxRate: number
-  reserveRate?: number
-  entries: Transaction[]
-}
-
-// 12. Fundo de Emergência
-export interface EmergencyFund {
-  current_amount: number
-  monthly_expenses: number
-  months_covered: number
-  target_months: number 
-  status: 'safe' | 'warning' | 'danger'
-}
-
-// 13. Controle de Navegação
-export type ActiveTab = 
-  | 'dashboard' 
-  | 'agenda' 
-  | 'transacoes' 
-  | 'investimentos' 
-  | 'carteira' 
-  | 'caixa' 
-  | 'meu perfil'
-  | 'central_dividas';
-  export interface NailService {
+export interface NailService {
   id: string;
   name: string;
   category: 'Alongamento' | 'Manutenção' | 'Esmaltação' | 'Extras';
@@ -221,4 +189,94 @@ export interface NailAppointment extends ClientAppointment {
   payment_method: string;
   payment_status: 'pago' | 'pendente';
   extra_services?: string[];
+}
+
+export interface BusinessSettings {
+  user_id: string
+  current_balance: number
+  monthly_goal: number
+  tax_rate: number
+  reserve_rate: number
+  updated_at?: string
+}
+
+export interface CaixaData {
+  currentBalance: number
+  monthlyGoal: number
+  taxRate: number
+  reserveRate?: number
+  entries: Transaction[]
+}
+
+// --- 5. SISTEMA & OUTROS ---
+export interface NotificationItem {
+  id: string
+  user_id: string
+  title: string
+  message: string
+  type: 'info' | 'success' | 'warning' | 'alert'
+  read: boolean
+  created_at: string
+}
+
+export interface PatrimonyHistory {
+  id: string
+  user_id: string
+  total_balance: number
+  record_date: string
+  created_at?: string
+}
+
+export interface EmergencyFund {
+  current_amount: number
+  monthly_expenses: number
+  months_covered: number
+  target_months: number 
+  status: 'safe' | 'warning' | 'danger'
+}
+
+export type ActiveTab = 
+  | 'dashboard' 
+  | 'agenda' 
+  | 'transacoes' 
+  | 'investimentos' 
+  | 'carteira' 
+  | 'caixa' 
+  | 'meu perfil'
+  | 'central_dividas';
+  // --- ENGENHARIA DE CUSTOS ---
+export interface NailProduct {
+  id: string;
+  user_id: string;
+  name: string; // Ex: Gel Vòlia Classic Blank
+  category: 'gel' | 'fibra' | 'prep' | 'esmalte' | 'descartavel';
+  purchase_price: number;
+  quantity_ml_g: number;
+  estimated_yield: number; // Quantas clientes atende (ex: 30)
+  cost_per_application: number; // Calculado: purchase_price / estimated_yield
+  status: 'estoque_bom' | 'acabando' | 'critico';
+}
+
+export interface NailServiceEngineering {
+  id: string;
+  service_id: string; // Vincula ao serviço (Ex: Alongamento Fio a Fio)
+  products_used: Array<{ product_id: string; usage_multiplier: number }>;
+  time_cost_per_minute: number; // Baseado no custo fixo do estúdio
+  total_material_cost: number;
+  suggested_price: number;
+  current_price: number;
+  profit_margin_pct: number;
+}
+
+// --- INTELIGÊNCIA DE NEGÓCIO ---
+export interface BusinessHealthSnapshot {
+  id: string;
+  month: string;
+  gross_revenue: number;
+  net_profit: number;
+  total_material_costs: number;
+  average_ticket: number;
+  safe_pro_labore: number; // O que ela pode sacar sem quebrar a empresa
+  stability_index: number; // 0-100 (A Jóia da Coroa)
+  ai_diagnostic_summary: string;
 }

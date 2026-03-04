@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Session } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
-import { CalendarClock, Search, Bell, Menu, LogOut, ChevronDown, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
+import { CalendarClock, Search, Bell, Menu, LogOut, ChevronDown, CheckCircle2, AlertTriangle, Info, Briefcase, User as UserIcon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
 
@@ -16,10 +16,12 @@ import AIAssistant from '@/core/components/ai/AIAssistant'
 
 import { checkAndTriggerSystemNotifications } from '@/core/action/notifications'
 import { ActiveTab } from '@/types'
-import { CreditCard, Goal, Transaction, ClientAppointment, CaixaData, UserProfile, NewGoal, NotificationItem, Investment } from '@/types_db'
+import { CreditCard, Goal, Transaction, ClientAppointment, CaixaData, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
 
-// --- TOPBAR ---
-const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMenu, onNavigate, onLogout }: any) => {
+// ============================================================================
+// COMPONENTE: TOPBAR (CÉREBRO.OS GLOBAL HEADER)
+// ============================================================================
+const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMenu, onNavigate, onLogout, accountMode, setAccountMode }: any) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifMenu, setShowNotifMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -54,18 +56,20 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-20 md:h-24 items-center justify-between px-4 md:px-8 transition-all duration-300 bg-[#050505]/90 backdrop-blur-xl border-b border-white/[0.06]">
+    <header className="sticky top-0 z-30 flex h-20 md:h-24 items-center justify-between px-4 md:px-8 bg-[#050505]/70 backdrop-blur-2xl border-b border-white/5 transition-all duration-500">
+      
+      {/* BLOCO ESQUERDO: Saudação e Menu Mobile */}
       <div className="flex items-center gap-3 md:gap-4">
         <button onClick={onToggleMenu} className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all active:scale-95">
             <Menu className="h-6 w-6" />
         </button>
         <div className="flex flex-col justify-center">
-            <div className="hidden md:flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">
+            <div className="hidden md:flex items-center gap-2 text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">
                <CalendarClock size={12} />
                <span>{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </div>
-            <h1 className="text-lg md:text-2xl font-bold text-white tracking-tight flex items-center gap-1 md:gap-2">
-               <span className="opacity-80 font-normal">{greeting},</span> 
+            <h1 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-1 md:gap-2">
+               <span className="opacity-80 font-medium">{greeting},</span> 
                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
                  {profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Usuário'}
                </span>
@@ -74,47 +78,60 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
         </div>
       </div>
 
+      {/* BLOCO DIREITO: Ações, Switcher e Perfil */}
       <div className="flex items-center gap-3 md:gap-6">
-         <div className="hidden md:flex relative items-center group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
-            </div>
-            <input type="text" placeholder="Buscar (Cmd + K)" className="h-11 w-72 bg-white/[0.03] border border-white/[0.05] focus:border-blue-500/30 rounded-full pl-11 pr-4 text-sm text-white placeholder-gray-600 outline-none transition-all"/>
+         
+         {/* GLOBAL SWITCHER: Pessoa Física / Jurídica (Exclusivo Cérebro.OS) */}
+         <div className="hidden lg:flex items-center bg-[#09090b] border border-white/5 p-1 rounded-full shadow-inner">
+            <button 
+              onClick={() => setAccountMode('personal')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${accountMode === 'personal' ? 'bg-indigo-500/10 text-indigo-400 shadow-sm' : 'text-gray-500 hover:text-white'}`}
+            >
+              <UserIcon size={14} /> Pessoal
+            </button>
+            <button 
+              onClick={() => setAccountMode('professional')}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${accountMode === 'professional' ? 'bg-blue-500/10 text-blue-400 shadow-sm' : 'text-gray-500 hover:text-white'}`}
+            >
+              <Briefcase size={14} /> Empresa
+            </button>
          </div>
 
          <div className="h-6 w-px bg-white/10 hidden md:block" />
          
+         {/* NOTIFICAÇÕES */}
          <div className="relative" ref={notifRef}>
-            <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-2 md:p-3 text-gray-400 hover:text-white rounded-full transition-all">
-               <Bell className="h-5 w-5 md:h-6 md:w-6" />
-               {unreadCount > 0 && <span className="absolute top-2.5 right-3 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e] ring-2 ring-[#050505]" />}
+            <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-2 md:p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all">
+               <Bell className="h-5 w-5" />
+               {unreadCount > 0 && <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e] ring-2 ring-[#050505]" />}
             </button>
             <AnimatePresence>
                 {showNotifMenu && (
-                    <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} className="absolute right-0 mt-4 w-80 md:w-96 rounded-2xl bg-[#0f0f0f] border border-white/10 shadow-2xl overflow-hidden z-50 backdrop-blur-3xl">
+                    <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} className="absolute right-0 mt-4 w-80 md:w-96 rounded-3xl bg-[#0a0a0c] border border-white/10 shadow-2xl overflow-hidden z-50">
                         <div className="p-4 border-b border-white/5 flex justify-between bg-white/[0.02]">
-                            <span className="text-sm font-bold text-white">Notificações</span>
-                            <span className="text-[10px] uppercase text-blue-400 font-bold">{unreadCount} Novas</span>
+                            <span className="text-xs font-bold text-white uppercase tracking-widest">Avisos do Sistema</span>
+                            <span className="text-[10px] uppercase text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md">{unreadCount} Novas</span>
                         </div>
-                        <div className="max-h-[400px] overflow-y-auto">
+                        <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
                             {notifications.length > 0 ? notifications.map((n: NotificationItem) => (
-                                <div key={n.id} onClick={() => !n.read && onMarkAsRead(n.id)} className={`p-4 border-b border-white/5 flex gap-3 cursor-pointer ${n.read ? 'opacity-60' : 'bg-blue-500/5'}`}>
+                                <div key={n.id} onClick={() => !n.read && onMarkAsRead(n.id)} className={`p-4 border-b border-white/5 flex gap-3 cursor-pointer transition-colors ${n.read ? 'opacity-50 hover:opacity-100 hover:bg-white/[0.02]' : 'bg-indigo-500/5 hover:bg-indigo-500/10'}`}>
                                     <div className="mt-1">{getNotifIcon(n.type)}</div>
                                     <div className="flex-1">
-                                        <p className="text-xs font-semibold text-white">{n.title}</p>
-                                        <p className="text-[11px] text-gray-400 mt-0.5">{n.message}</p>
+                                        <p className="text-xs font-bold text-white mb-0.5">{n.title}</p>
+                                        <p className="text-[11px] text-gray-400 leading-relaxed">{n.message}</p>
                                     </div>
                                 </div>
-                            )) : <div className="p-8 text-center text-gray-500 text-xs">Nenhuma notificação.</div>}
+                            )) : <div className="p-8 text-center text-gray-500 text-xs italic">Tudo silencioso por aqui.</div>}
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
          </div>
          
+         {/* PERFIL (USER MENU) */}
          <div className="relative" ref={menuRef}>
-            <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-1 py-1 rounded-full hover:bg-white/5 transition-all group">
-               <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 p-[2px]">
+            <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-white/5 transition-all group border border-transparent hover:border-white/10">
+               <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 p-[2px] shadow-lg">
                   <div className="h-full w-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                       {profile?.avatar_url ? (
                           <img src={profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
@@ -127,15 +144,16 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
             </button>
             <AnimatePresence>
                 {showProfileMenu && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-64 rounded-3xl bg-[#0f0f0f] border border-white/10 shadow-2xl overflow-hidden z-50">
-                        <div className="p-5 border-b border-white/5">
-                            <p className="text-sm font-bold text-white">Minha Conta</p>
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-64 rounded-3xl bg-[#0a0a0c] border border-white/10 shadow-2xl overflow-hidden z-50">
+                        <div className="p-5 border-b border-white/5 bg-white/[0.02]">
+                            <p className="text-sm font-bold text-white mb-1">Cérebro.OS Conta</p>
                             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                         </div>
                         <div className="p-2">
-                            <button onClick={() => { onNavigate('meu perfil'); setShowProfileMenu(false); }} className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition">Configurações</button>
-                            <button onClick={onLogout} className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 rounded-xl transition font-bold flex items-center gap-2">
-                                <LogOut size={16} /> Sair do Sistema
+                            <button onClick={() => { onNavigate('meu perfil'); setShowProfileMenu(false); }} className="w-full text-left px-4 py-3 text-xs font-bold tracking-wide text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">Configurações</button>
+                            <div className="h-px bg-white/5 my-1 mx-2" />
+                            <button onClick={onLogout} className="w-full text-left px-4 py-3 text-xs text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors font-bold flex items-center gap-2">
+                                <LogOut size={14} /> Sair do Sistema
                             </button>
                         </div>
                     </motion.div>
@@ -147,12 +165,15 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
   )
 }
 
-// --- MAIN APP LAYOUT ---
+// ============================================================================
+// MAIN LAYOUT ESTRUTURAL
+// ============================================================================
 export default function MainAppLayout({ session }: { session: Session }) {
   const router = useRouter()
   const supabase = createClient()
   
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
+  const [accountMode, setAccountMode] = useState<AccountMode>('personal') // NOVO: Controle de Modo
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [chartRange, setChartRange] = useState<'1M' | '3M' | '6M' | '1A'>('3M')
@@ -183,19 +204,21 @@ export default function MainAppLayout({ session }: { session: Session }) {
                 financeService.getInvestments()
             ])
             
-            if (dbProfile) setUserProfile(dbProfile)
+            if (dbProfile) {
+               setUserProfile(dbProfile)
+               if (dbProfile.account_mode) setAccountMode(dbProfile.account_mode)
+            }
             if (dbTrans) setTransactions(dbTrans)
             if (dbAppts) setAppointments(dbAppts)
             if (dbGoals) setGoals(dbGoals)
             if (dbCards) setCards(dbCards)
             if (dbNotifs) setNotifications(dbNotifs)
             if (dbInvests) setInvestments(dbInvests)
-            
             if (dbCaixaData) setCaixa(dbCaixaData)
 
         } catch (error) {
             console.error("Erro crítico de sincronização:", error)
-            toast.error("Erro ao sincronizar dados com o servidor.")
+            toast.error("Conexão instável. Usando dados cacheados.")
         } finally {
             setIsLoading(false)
         }
@@ -214,18 +237,19 @@ export default function MainAppLayout({ session }: { session: Session }) {
     setAppointments(prev => prev.map(a => a.id === apptId ? { ...a, status: newStatus as any } : a))
     try {
         await financeService.updateAppointmentStatus(apptId, newStatus)
-        toast.success("Status atualizado com sucesso.")
-    } catch (error) { 
+        toast.success("Status atualizado.")
+    } catch { 
         setAppointments(prev => prev.map(a => a.id === apptId ? { ...a, status: appt.status } : a))
         toast.error("Erro ao salvar alteração.") 
     }
   }
 
   const financialSummary = useMemo(() => {
+    // No futuro, isso filtrará com base no accountMode selecionado
     const income = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
     const expense = transactions.filter(t => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
     return { balance: income - expense, income, expense, emergencyTotal: caixa.currentBalance }
-  }, [transactions, caixa])
+  }, [transactions, caixa, accountMode])
 
   const historyChartData = useMemo(() => {
     if (transactions.length === 0) return []
@@ -239,7 +263,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
   }, [transactions])
 
   return (
-    <div className="flex h-screen bg-[#050505] text-white overflow-hidden relative font-sans">
+    <div className="flex h-screen bg-[#050505] text-white overflow-hidden relative font-sans selection:bg-indigo-500/30">
       <AppLoadingScreen isLoading={isLoading} />
       <Toaster position="top-right" theme="dark" richColors closeButton />
       
@@ -261,10 +285,13 @@ export default function MainAppLayout({ session }: { session: Session }) {
           onMarkAsRead={(id: string) => financeService.markNotificationAsRead(id).then(() => setNotifications(prev => prev.map(n => n.id === id ? {...n, read: true} : n)))} 
           onToggleMenu={() => setIsMenuOpen(!isMenuOpen)} 
           onNavigate={setActiveTab} 
-          onLogout={handleLogout} 
+          onLogout={handleLogout}
+          accountMode={accountMode}
+          setAccountMode={setAccountMode} 
         />
         
-        <div className="flex-1 overflow-x-hidden overflow-y-auto bg-[url('/bg-grid.svg')] bg-fixed scrollbar-thin scrollbar-thumb-white/10">
+        {/* VIEW CONTAINER GLOBAL (O fundo tem um efeito sutil de grade) */}
+        <div className="flex-1 overflow-x-hidden overflow-y-auto bg-[url('/bg-grid.svg')] bg-fixed scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
            <ViewContainer
               activeTab={activeTab}
               handleRedirect={setActiveTab}
@@ -285,7 +312,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
               onUpdateGoal={(g) => setGoals(prev => prev.map(item => item.id === g.id ? g : item))}
               onUpdateStatus={handleUpdateStatus}
               onAddAppointment={(appt: any) => financeService.createAppointment(appt).then(res => setAppointments(prev => [...prev, res]))} 
-            />
+           />
            <div className="h-24" /> 
         </div>
 

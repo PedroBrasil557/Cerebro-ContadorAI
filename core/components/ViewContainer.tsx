@@ -9,7 +9,7 @@ import {
 } from '@/types_db'
 
 // ==========================================
-// 📦 CAMADA 2: MÓDULOS PESSOAIS (Importações do novo diretório)
+// 📦 CAMADA 2: MÓDULOS PESSOAIS
 // ==========================================
 import DashboardView from '@/modules/personal/views/DashboardView'
 import TransactionsView from '@/modules/personal/views/TransactionsView'
@@ -17,13 +17,14 @@ import InvestmentsView from '@/modules/personal/views/InvestmentsView'
 import WalletView from '@/modules/personal/views/WalletView'
 import DebtCenterView from '@/modules/personal/views/DebtCenterView'
 import ProfileView from '@/modules/personal/views/ProfileView'
-import SmartShoppingView from '@/modules/personal/views/SmartShoppingView' // ✅ IMPORTAÇÃO DA NOVA TELA
+import SmartShoppingView from '@/modules/personal/views/SmartShoppingView'
 
 // ==========================================
 // 💼 CAMADA 3: MÓDULOS PROFISSIONAIS (B2B)
 // ==========================================
 import CaixaView from '@/modules/professional/views/CaixaView'
 import NailDesignView from '@/modules/professional/views/NailDesignView'
+import FinancialCommandCenter from '@/modules/professional/components/FinancialCommandCenter' // ✅ IMPORTAÇÃO DO NOVO CFO VIRTUAL
 
 interface ViewContainerProps {
   activeTab: string
@@ -115,7 +116,7 @@ export default function ViewContainer({
         exit="exit" 
         variants={pageVariants} 
         transition={{ duration: 0.3, ease: "easeInOut" }} 
-        className="w-full h-full relative"
+        className="w-full h-full relative p-4 md:p-8" // ✅ Padding adicionado para a tela respirar corretamente
       >
         
         {/* ========================================== */}
@@ -138,7 +139,6 @@ export default function ViewContainer({
               />
             )}
 
-            {/* ✅ RENDERIZAÇÃO DA NOVA TELA DE COMPRAS */}
             {(currentTab === 'compras inteligentes' || currentTab === 'compras') && (
               <SmartShoppingView /> 
             )}
@@ -169,7 +169,13 @@ export default function ViewContainer({
         {/* ========================================== */}
         {accountMode === 'professional' && (
           <>
-            {(currentTab === 'nail design' || currentTab === 'agenda smart' || currentTab === 'agenda' || currentTab === 'dashboard') && (
+            {/* ✅ O NOVO CORAÇÃO FINANCEIRO (Assume a aba principal "Nail Design") */}
+            {(currentTab === 'nail design' || currentTab === 'dashboard') && (
+              <FinancialCommandCenter />
+            )}
+
+            {/* ✅ A AGENDA CLÁSSICA (Movida para a aba "Agenda Smart") */}
+            {(currentTab === 'agenda smart' || currentTab === 'agenda') && (
               <NailDesignView />
             )}
 
