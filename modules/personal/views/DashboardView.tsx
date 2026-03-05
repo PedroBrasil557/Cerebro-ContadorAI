@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   TrendingUp, Wallet, Target, ShieldAlert, Activity, 
@@ -10,9 +10,10 @@ import {
 } from 'lucide-react'
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, LineChart as RechartsLineChart, Line
+  BarChart, Bar
 } from 'recharts'
 import { Transaction, Goal, CreditCard, Investment } from '@/types_db'
+import { getDashboardSummary, getTransactions } from '@/core/action/transactions' // 🔥 IMPORTAMOS O MOTOR DE BUSCA AQUI
 
 // --- COMPONENTES VISUAIS AUXILIARES ---
 const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-blue-500/10" }: any) => (
@@ -74,25 +75,59 @@ interface DashboardViewProps {
 }
 
 export default function DashboardView({ 
-  summary, onNavigate, transactions = [], recentTransactions = [], investments = []
+  summary: initialSummary, onNavigate, transactions: initialTransactions = [], recentTransactions: initialRecent = [], investments = []
 }: DashboardViewProps) {
   
   const [chartType, setChartType] = useState<'area' | 'bar' | 'line'>('area')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [isYearMenuOpen, setIsYearMenuOpen] = useState(false)
 
-  const safeTransactions = transactions || []
-  const safeSummary = summary || { balance: 0, income: 0, expense: 0, emergencyTotal: 0 }
+  // 🔥 ESTADOS LOCAIS PARA FORÇAR A ATUALIZAÇÃO INDEPENDENTE DO CACHE DO PAI
+  const [liveTransactions, setLiveTransactions] = useState<Transaction[]>(initialTransactions)
+  const [liveRecent, setLiveRecent] = useState<Transaction[]>(initialRecent)
+  const [liveSummary, setLiveSummary] = useState(initialSummary || { balance: 0, income: 0, expense: 0, emergencyTotal: 0 })
+
+  // 🔥 EFEITO PARA BUSCAR OS DADOS FRESQUINHOS QUANDO O COMPONENTE CARREGA
+  useEffect(() => {
+    const fetchFreshData = async () => {
+      try {
+        const freshTransactions = await getTransactions()
+        const freshSummary = await getDashboardSummary()
+        
+        setLiveTransactions(freshTransactions)
+        setLiveRecent(freshTransactions.slice(0, 10))
+        setLiveSummary({
+          balance: freshSummary.balance,
+          income: freshSummary.income,
+          expense: freshSummary.expense,
+          emergencyTotal: initialSummary?.emergencyTotal || 0
+        })
+      } catch (error) {
+        console.error("Erro ao buscar dados frescos:", error)
+      }
+    }
+    
+    fetchFreshData()
+    
+    // Configura um pequeno "espião" que atualiza os dados se a página focar novamente
+    const onFocus = () => fetchFreshData()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [initialSummary?.emergencyTotal])
+
+  // Usa os dados "Live" em vez dos iniciais passados por props
+  const safeTransactions = liveTransactions || []
+  const safeSummary = liveSummary
 
   // ============================================================================
   // 🧠 1. MOTOR COGNITIVO EMBUTIDO (IMPOSSÍVEL FALHAR)
   // ============================================================================
   const engineData = useMemo(() => {
     // 1. Somatórias de todo o histórico da conta
-    const totalIncome = safeTransactions.filter(t => t?.type === 'receita').reduce((acc, t) => acc + Number(t?.amount || 0), 0)
-    const totalFixed = safeTransactions.filter(t => t?.type !== 'receita' && t?.is_fixed).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
-    const totalDebt = safeTransactions.filter(t => t?.type !== 'receita' && (t?.category === 'Dívidas' || t?.category === 'Cartão de Crédito')).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
-    const totalExpense = safeTransactions.filter(t => t?.type !== 'receita').reduce((acc, t) => acc + Number(t?.amount || 0), 0)
+    const totalIncome = safeTransactions.filter(t => t?.type?.toLowerCase() === 'receita').reduce((acc, t) => acc + Number(t?.amount || 0), 0)
+    const totalFixed = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && t?.is_fixed).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
+    const totalDebt = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && (t?.category === 'Dívidas' || t?.category === 'Cartão de Crédito')).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
+    const totalExpense = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita').reduce((acc, t) => acc + Number(t?.amount || 0), 0)
     
     const monthlySavedAmount = safeSummary.balance > 0 ? safeSummary.balance : 0
     const emergencyFund = safeSummary.emergencyTotal || 0
@@ -132,8 +167,8 @@ export default function DashboardView({
     else if (finalScore < 80) health = 'Estável'
 
     // 6. CÁLCULO DO PERFIL COMPORTAMENTAL DA IA
-    const microExpensesTotal = safeTransactions.filter(t => t?.type !== 'receita' && Number(t.amount) < 50).reduce((acc, t) => acc + Number(t.amount), 0)
-    const impulseTotal = safeTransactions.filter(t => t?.type !== 'receita' && ['Lazer', 'Restaurante', 'Compras', 'Outros'].includes(t.category || '')).reduce((acc, t) => acc + Number(t.amount), 0)
+    const microExpensesTotal = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && Number(t.amount) < 50).reduce((acc, t) => acc + Number(t.amount), 0)
+    const impulseTotal = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && ['Lazer', 'Restaurante', 'Compras', 'Outros'].includes(t.category || '')).reduce((acc, t) => acc + Number(t.amount), 0)
     
     const impulseRatio = totalExpense > 0 ? (impulseTotal / totalExpense) : 0
     let profile = 'Estável'
@@ -183,7 +218,7 @@ export default function DashboardView({
   }, [safeSummary.balance, investments])
 
   const nailDesignIncome = useMemo(() => {
-    return safeTransactions.filter(t => t?.type === 'receita' && (t?.category === 'Nail Design' || t?.category === 'Serviços')).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
+    return safeTransactions.filter(t => t?.type?.toLowerCase() === 'receita' && (t?.category === 'Nail Design' || t?.category === 'Serviços')).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
   }, [safeTransactions])
 
   const flowData = useMemo(() => {
@@ -194,7 +229,7 @@ export default function DashboardView({
       if (!t || !t.date) return
       const tDate = new Date(t.date)
       if (tDate.getFullYear() === selectedYear) {
-        if (t.type === 'receita') months[tDate.getMonth()].receita += Number(t.amount)
+        if (t.type?.toLowerCase() === 'receita') months[tDate.getMonth()].receita += Number(t.amount)
         else months[tDate.getMonth()].despesa += Number(t.amount)
       }
     })
@@ -359,13 +394,13 @@ export default function DashboardView({
                     <button onClick={() => onNavigate('transações')} className="text-[10px] text-gray-500 font-bold uppercase">Ver Todas</button>
                 </div>
                 <div className="overflow-y-auto flex-1 p-2 space-y-1 custom-scrollbar">
-                    {recentTransactions.length > 0 ? recentTransactions.slice(0, 4).map((t) => (
+                    {liveRecent.length > 0 ? liveRecent.slice(0, 4).map((t) => (
                         <div key={t.id} className="flex justify-between items-center p-3 hover:bg-white/5 rounded-xl cursor-pointer">
                             <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${t.type === 'receita' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>{t.type === 'receita' ? <ArrowUpRight size={14}/> : <ArrowDownRight size={14}/>}</div>
+                                <div className={`p-2 rounded-lg ${t.type?.toLowerCase() === 'receita' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>{t.type?.toLowerCase() === 'receita' ? <ArrowUpRight size={14}/> : <ArrowDownRight size={14}/>}</div>
                                 <div><p className="text-sm font-bold text-white truncate max-w-[120px]">{t.description}</p><p className="text-[10px] text-gray-500">{new Date(t.date).toLocaleDateString('pt-BR')}</p></div>
                             </div>
-                            <span className={`text-sm font-black ${t.type === 'receita' ? 'text-emerald-400' : 'text-white'}`}>{t.type === 'receita' ? '+' : '-'}{formatCurrency(Number(t.amount))}</span>
+                            <span className={`text-sm font-black ${t.type?.toLowerCase() === 'receita' ? 'text-emerald-400' : 'text-white'}`}>{t.type?.toLowerCase() === 'receita' ? '+' : '-'}{formatCurrency(Number(t.amount))}</span>
                         </div>
                     )) : <div className="text-center text-gray-500 py-6 text-xs">Sem transações.</div>}
                 </div>

@@ -2,23 +2,24 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { createNotification } from './notifications' // ✅ IMPORTADO
+import { createNotification } from './notifications'
 
-// Definição Completa
+// 🛡️ Definição Completa (Corrigida: 100% compatível com o types_db)
 export interface Transaction {
   id: string
+  user_id: string 
+  created_at: string 
   description: string
   amount: number
   type: 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia'
   category: string
   date: string
-  is_fixed?: boolean
-  is_paid?: boolean
+  is_fixed: boolean // 🔥 Removida a interrogação (?)
+  is_paid: boolean  // 🔥 Removida a interrogação (?)
   due_date?: string
-  payment_date?: string | null
   payment_method?: string
   edit_note?: string
-  status?: string
+  status: string 
 }
 
 // 1. BUSCAR
@@ -38,7 +39,7 @@ export async function getTransactions() {
   return data as Transaction[]
 }
 
-// 2. RESUMO
+// 2. RESUMO (BLINDADO CONTRA ERRO DE CACHE E LETRAS MAIÚSCULAS)
 export async function getDashboardSummary() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -59,28 +60,31 @@ export async function getDashboardSummary() {
      return isPaid || isPastOrToday
   })
 
+  // toLowerCase() garante que some mesmo se no banco estiver 'Receita' ou 'receita'
   const income = activeTransactions
-    .filter((t: any) => t.type === 'receita')
+    .filter((t: any) => t.type?.toLowerCase() === 'receita')
     .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
 
   const expense = activeTransactions
-    .filter((t: any) => t.type !== 'receita')
+    .filter((t: any) => t.type?.toLowerCase() !== 'receita')
     .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
 
   return { balance: income - expense, income, expense }
 }
 
-// 3. CRIAR (COM NOTIFICAÇÃO)
+// 3. CRIAR (COM NOTIFICAÇÃO E CORREÇÃO DE COLUNAS)
 export async function createTransaction(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Auth required' }
 
   const amount = parseFloat(formData.get('amount') as string)
-  const isFixed = formData.get('is_fixed') === 'on'
+  const isFixedVal = formData.get('is_fixed')
+  const isFixed = isFixedVal === 'true' || isFixedVal === 'on' 
+  
   const date = formData.get('date') as string
   const type = formData.get('type') as string
-  const description = formData.get('description') as string // Captura descrição
+  const description = formData.get('description') as string
   const paymentMethod = formData.get('payment_method') as string
   const today = new Date().toISOString().split('T')[0]
 
@@ -92,20 +96,20 @@ export async function createTransaction(formData: FormData) {
     description: description,
     amount: isNaN(amount) ? 0 : amount,
     type: type,
-    category: formData.get('category'),
+    category: formData.get('category') as string,
     date: date,
     is_fixed: isFixed,
     is_paid: isPaid,
     payment_method: paymentMethod,
     due_date: isFixed ? date : null,
-    status: isPaid ? 'concluido' : 'pendente',
-    payment_date: isPaid ? date : null,
-    source: 'Manual'
+    status: isPaid ? 'concluido' : 'pendente'
   })
 
-  if (error) return { error: 'Erro ao salvar.' }
+  if (error) {
+    console.error("ERRO SUPABASE ACTION:", error.message)
+    return { error: error.message }
+  }
 
-  // ✅ DISPARO DE NOTIFICAÇÕES INTELIGENTES
   if (type === 'receita') {
       await createNotification(
           'Dinheiro em Caixa! 🤑', 
@@ -113,7 +117,6 @@ export async function createTransaction(formData: FormData) {
           'success'
       )
   } else {
-      // Se for despesa PAGA agora
       if (isPaid) {
           await createNotification(
               'Gasto Realizado', 
@@ -121,7 +124,6 @@ export async function createTransaction(formData: FormData) {
               'info'
           )
       } else {
-          // Se for despesa agendada (futura)
           await createNotification(
               'Conta Agendada', 
               `Agendado: ${description} valor R$ ${amount.toFixed(2)} para ${new Date(date).toLocaleDateString('pt-BR')}.`, 
@@ -130,7 +132,7 @@ export async function createTransaction(formData: FormData) {
       }
   }
 
-  revalidatePath('/')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -145,31 +147,29 @@ export async function updateTransaction(data: Transaction, reason: string) {
     }).eq('id', data.id)
 
   if (error) return { error: 'Erro ao atualizar.' }
-  revalidatePath('/')
+  
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
-// 5. TOGGLE
+// 5. TOGGLE (MARCAR COMO PAGO)
 export async function toggleBillPayment(id: string, isPaid: boolean) {
     const supabase = await createClient()
-    const today = new Date().toISOString().split('T')[0]
     
     const { error } = await supabase.from('transactions')
         .update({ 
             is_paid: isPaid, 
-            status: isPaid ? 'concluido' : 'pendente',
-            payment_date: isPaid ? today : null 
+            status: isPaid ? 'concluido' : 'pendente'
         })
         .eq('id', id)
         
     if (error) return { error: 'Erro ao atualizar.' }
     
-    // ✅ Notificação ao marcar como pago
     if (isPaid) {
         await createNotification('Conta Paga ✅', 'Baixa manual realizada com sucesso.', 'success')
     }
 
-    revalidatePath('/')
+    revalidatePath('/', 'layout')
     return { success: true }
 }
 
@@ -178,11 +178,12 @@ export async function deleteTransaction(id: string) {
   const supabase = await createClient()
   const { error } = await supabase.from('transactions').delete().eq('id', id)
   if (error) return { error: 'Erro ao excluir.' }
-  revalidatePath('/')
+  
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
-// 7. COPIAR
+// 7. COPIAR RECORRÊNCIAS
 export async function copyFixedTransactionsToMonth(targetDateStr: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -203,12 +204,13 @@ export async function copyFixedTransactionsToMonth(targetDateStr: string) {
     return {
       user_id: user.id, description: t.description, amount: t.amount, type: t.type, category: t.category, is_fixed: true,
       is_paid: false, status: 'pendente', date: newTxDate.toISOString().split('T')[0], due_date: newTxDate.toISOString().split('T')[0], 
-      payment_method: t.payment_method, source: 'Recorrência'
+      payment_method: t.payment_method
     }
   })
 
   const { error } = await supabase.from('transactions').insert(newTransactions)
   if (error) return { error: 'Erro ao copiar.' }
-  revalidatePath('/')
+  
+  revalidatePath('/', 'layout')
   return { success: true, count: newTransactions.length }
 }
