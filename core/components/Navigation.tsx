@@ -17,10 +17,12 @@ import {
   ShieldAlert,
   RefreshCw,
   Scissors,
-  ShoppingCart
+  ShoppingCart,
+  Lock
 } from 'lucide-react'
 import { ActiveTab } from '@/types'
 import { toast } from 'sonner'
+import UpgradeModal from '@/core/components/UpgradeModal'
 
 interface NavigationProps {
   activeTab: ActiveTab
@@ -31,7 +33,7 @@ interface NavigationProps {
   user: any
 }
 
-// 🎨 DICIONÁRIO DE TEMAS (Garante que o Tailwind compile as cores corretamente)
+// 🎨 DICIONÁRIO DE TEMAS
 const THEMES = {
   personal: {
     bg: 'bg-indigo-500/10',
@@ -56,25 +58,35 @@ const THEMES = {
 export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, onClose, user }: NavigationProps) {
   const supabase = createClient()
   const [isSwitching, setIsSwitching] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   
-  // 🛡️ LÊ O MODO DA MEMÓRIA DE AUTENTICAÇÃO
+  // 🛡️ Lógica de Plano e Permissões
   const accountMode = user?.user_metadata?.account_mode || user?.account_mode || 'personal'
+  const userPlan = user?.user_metadata?.plan_tier || 'free'
+  
+  // Verifica se o usuário é Free
+  const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
+  const hasProfessionalAddon = userPlan === 'premium'
+
   const theme = accountMode === 'personal' ? THEMES.personal : THEMES.professional
 
+  // 🔥 CONFIGURAÇÃO DE BLOQUEIO: IA e Dívidas agora são PRO
+  const proFeatures = ['central de dividas', 'investimentos']
+
   // =======================================================================
-  // 1. DEFINIÇÃO DOS MENUS POR CAMADA
+  // 1. DEFINIÇÃO DOS MENUS
   // =======================================================================
   const personalMenuItems = [
     { id: 'dashboard', label: 'Painel Central', icon: LayoutDashboard },
-    { id: 'compras inteligentes', label: 'Smart Shopping', icon: ShoppingCart },
+    { id: 'compras inteligentes', label: 'Smart Shopping', icon: ShoppingCart }, // Grátis
     { id: 'transações', label: 'Transações', icon: ArrowLeftRight },
-    { id: 'investimentos', label: 'Patrimônio', icon: PieChart },
+    { id: 'investimentos', label: 'Patrimônio', icon: PieChart, isPro: true },
     { id: 'minha carteira', label: 'Carteira de Cartões', icon: Wallet },
-    { id: 'central de dividas', label: 'Central de Dívidas', icon: ShieldAlert },
+    { id: 'central de dividas', label: 'Central de Dívidas', icon: ShieldAlert, isPro: true }, // Pago
   ]
 
   const professionalMenuItems = [
-    { id: 'nail design', label: 'Nail Design', icon: Scissors },
+    { id: 'nail design', label: 'Gestão de Serviços', icon: Scissors },
     { id: 'caixa empresarial', label: 'Caixa Empresarial', icon: Briefcase },
     { id: 'agenda smart', label: 'Agenda Smart', icon: Calendar },
   ]
@@ -82,7 +94,20 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
   const activeMenu = accountMode === 'personal' ? personalMenuItems : professionalMenuItems
 
   // =======================================================================
-  // 2. FUNÇÃO DE ALTERAÇÃO DE PERFIL (SWITCHER)
+  // 2. FUNÇÃO DE INTERCEPTAÇÃO DE CLIQUE
+  // =======================================================================
+  const handleTabClick = (tabId: string) => {
+    if (isFreePlan && proFeatures.includes(tabId)) {
+        setShowUpgradeModal(true)
+        if (isMobile) onClose()
+        return
+    }
+    onSelectTab(tabId as any)
+    if (isMobile) onClose()
+  }
+
+  // =======================================================================
+  // 3. ALTERAÇÃO DE PERFIL
   // =======================================================================
   const toggleAccountMode = async () => {
     setIsSwitching(true)
@@ -95,16 +120,16 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
 
       if (error) throw error
 
-      toast.success(`Modo ${newMode === 'personal' ? 'Pessoal' : 'Profissional'} ativado!`, {
-        description: 'Recarregando o seu ambiente cognitivo...'
+      toast.success(`Modo ${newMode === 'personal' ? 'Pessoal' : 'Empresarial'} ativado!`, {
+        description: 'Recarregando o ambiente cognitivo...'
       })
       
       const nextTab = (newMode === 'personal' ? 'dashboard' : 'nail design') as any
       onSelectTab(nextTab)
       
-      setTimeout(() => window.location.reload(), 800) // Tempo suave para ver o Toast
+      setTimeout(() => window.location.reload(), 800) 
     } catch (error) {
-      toast.error('Erro ao alternar perfil. Tente novamente.')
+      toast.error('Erro ao alternar perfil.')
       setIsSwitching(false)
     }
   }
@@ -133,7 +158,6 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
         variants={sidebarVariants}
         className="fixed md:sticky top-0 left-0 h-screen w-[280px] bg-[#050505] border-r border-white/5 z-50 flex flex-col py-8 px-5 shadow-2xl"
       >
-        {/* LOGO PREMIUM */}
         <div className="flex items-center justify-between mb-8 px-2">
            <div className="flex items-center gap-3">
               <div className={`h-10 w-10 bg-gradient-to-br ${theme.logo} rounded-xl flex items-center justify-center shadow-lg ring-1 ring-white/10`}>
@@ -149,35 +173,35 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
            <button onClick={onClose} className="md:hidden p-2 text-gray-500 hover:text-white transition-colors"><X size={20}/></button>
         </div>
 
-        {/* SWITCHER DE MODO (INTERATIVO) */}
-        <div className="mb-8 px-2">
-          <button 
-            onClick={toggleAccountMode}
-            disabled={isSwitching}
-            className="relative w-full flex items-center justify-between p-3 rounded-2xl border border-white/5 bg-[#09090b] hover:bg-white/5 transition-all group overflow-hidden"
-          >
-            {isSwitching && (
-                <motion.div 
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
-                    className="absolute inset-0 bg-white/5 animate-pulse" 
-                />
-            )}
-            <div className="flex items-center gap-3 relative z-10">
-              <div className={`p-2 rounded-xl transition-colors ${accountMode === 'personal' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                {accountMode === 'personal' ? <User size={16} /> : <Briefcase size={16} />}
-              </div>
-              <div className="text-left">
-                <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.15em] leading-none mb-1">Cenário Ativo</p>
-                <p className="text-xs font-black text-white leading-none tracking-wide">
-                  {accountMode === 'personal' ? 'PESSOAL' : 'PROFISSIONAL'}
-                </p>
-              </div>
+        {hasProfessionalAddon && (
+            <div className="mb-8 px-2">
+              <button 
+                onClick={toggleAccountMode}
+                disabled={isSwitching}
+                className="relative w-full flex items-center justify-between p-3 rounded-2xl border border-white/5 bg-[#09090b] hover:bg-white/5 transition-all group overflow-hidden"
+              >
+                {isSwitching && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
+                        className="absolute inset-0 bg-white/5 animate-pulse" 
+                    />
+                )}
+                <div className="flex items-center gap-3 relative z-10">
+                  <div className={`p-2 rounded-xl transition-colors ${accountMode === 'personal' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                    {accountMode === 'personal' ? <User size={16} /> : <Briefcase size={16} />}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.15em] mb-1">Cenário Ativo</p>
+                    <p className="text-xs font-black text-white leading-none tracking-wide">
+                      {accountMode === 'personal' ? 'PESSOAL' : 'EMPRESARIAL'}
+                    </p>
+                  </div>
+                </div>
+                <RefreshCw size={14} className={`relative z-10 text-gray-600 group-hover:text-white transition-all ${isSwitching ? 'animate-spin' : ''}`} />
+              </button>
             </div>
-            <RefreshCw size={14} className={`relative z-10 text-gray-600 group-hover:text-white transition-all ${isSwitching ? 'animate-spin text-white' : ''}`} />
-          </button>
-        </div>
+        )}
 
-        {/* NAVEGAÇÃO PRINCIPAL */}
         <nav className="flex-1 space-y-1.5 overflow-y-auto pr-2 custom-scrollbar">
            <p className="text-[10px] text-gray-600 font-black uppercase tracking-widest ml-4 mb-3">Módulos</p>
            {activeMenu.map((item) => {
@@ -186,11 +210,8 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
              return (
                <button
                  key={item.id}
-                 onClick={() => {
-                    onSelectTab(item.id as any)
-                    if (isMobile) onClose()
-                 }}
-                 className={`relative w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group ${isActive ? 'text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.03]'}`}
+                 onClick={() => handleTabClick(item.id)}
+                 className={`relative w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 group ${isActive ? 'text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/[0.03]'}`}
                >
                  {isActive && (
                    <motion.div 
@@ -201,19 +222,23 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
                    />
                  )}
 
-                 <div className={`relative z-10 p-1.5 rounded-lg transition-all duration-300 ${isActive ? `${theme.iconBgActive} ${theme.iconTextActive} shadow-lg ${theme.shadow}` : 'bg-white/5 text-gray-400 group-hover:bg-white/10 group-hover:text-white group-hover:scale-110'}`}>
-                    <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
+                 <div className="flex items-center gap-3 relative z-10">
+                    <div className={`p-1.5 rounded-lg transition-all duration-300 ${isActive ? `${theme.iconBgActive} ${theme.iconTextActive} shadow-lg ${theme.shadow}` : 'bg-white/5 text-gray-400 group-hover:bg-white/10 group-hover:text-white group-hover:scale-110'}`}>
+                        <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
+                    </div>
+                    <span className={`text-xs font-bold tracking-wide transition-all ${isActive ? 'text-white translate-x-1' : ''}`}>
+                        {item.label}
+                    </span>
                  </div>
                  
-                 <span className={`relative z-10 text-xs font-bold tracking-wide transition-all ${isActive ? 'text-white translate-x-1' : ''}`}>
-                    {item.label}
-                 </span>
+                 {isFreePlan && (item as any).isPro && (
+                     <Lock size={12} className="relative z-10 text-indigo-500/50 group-hover:text-indigo-400 transition-colors" />
+                 )}
                </button>
              )
            })}
         </nav>
 
-        {/* RODAPÉ (MEU PERFIL & LOGOUT) */}
         <div className="mt-6 pt-6 border-t border-white/5 space-y-1">
           <button
             onClick={() => onSelectTab('meu perfil' as any)}
@@ -238,6 +263,11 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
           </button>
         </div>
       </motion.aside>
+
+      <UpgradeModal 
+        isOpen={showUpgradeModal} 
+        onClose={() => setShowUpgradeModal(false)} 
+      />
     </>
   )
 }

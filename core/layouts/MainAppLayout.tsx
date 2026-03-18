@@ -81,22 +81,6 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
       {/* BLOCO DIREITO: Ações, Switcher e Perfil */}
       <div className="flex items-center gap-3 md:gap-6">
          
-         {/* GLOBAL SWITCHER: Pessoa Física / Jurídica (Exclusivo Cérebro.OS) */}
-         <div className="hidden lg:flex items-center bg-[#09090b] border border-white/5 p-1 rounded-full shadow-inner">
-            <button 
-              onClick={() => setAccountMode('personal')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${accountMode === 'personal' ? 'bg-indigo-500/10 text-indigo-400 shadow-sm' : 'text-gray-500 hover:text-white'}`}
-            >
-              <UserIcon size={14} /> Pessoal
-            </button>
-            <button 
-              onClick={() => setAccountMode('professional')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${accountMode === 'professional' ? 'bg-blue-500/10 text-blue-400 shadow-sm' : 'text-gray-500 hover:text-white'}`}
-            >
-              <Briefcase size={14} /> Empresa
-            </button>
-         </div>
-
          <div className="h-6 w-px bg-white/10 hidden md:block" />
          
          {/* NOTIFICAÇÕES */}
@@ -173,7 +157,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
   const supabase = createClient()
   
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
-  const [accountMode, setAccountMode] = useState<AccountMode>('personal') // NOVO: Controle de Modo
+  const [accountMode, setAccountMode] = useState<AccountMode>('personal')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [chartRange, setChartRange] = useState<'1M' | '3M' | '6M' | '1A'>('3M')
@@ -245,7 +229,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
   }
 
   const financialSummary = useMemo(() => {
-    // No futuro, isso filtrará com base no accountMode selecionado
     const income = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
     const expense = transactions.filter(t => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
     return { balance: income - expense, income, expense, emergencyTotal: caixa.currentBalance }
@@ -290,7 +273,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
           setAccountMode={setAccountMode} 
         />
         
-        {/* VIEW CONTAINER GLOBAL (O fundo tem um efeito sutil de grade) */}
         <div className="flex-1 overflow-x-hidden overflow-y-auto bg-[url('/bg-grid.svg')] bg-fixed scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
            <ViewContainer
               activeTab={activeTab}
@@ -316,7 +298,8 @@ export default function MainAppLayout({ session }: { session: Session }) {
            <div className="h-24" /> 
         </div>
 
-        <AIAssistant />
+        {/* CORREÇÃO: Passando a prop user para o Assistente de IA */}
+        <AIAssistant user={session?.user} />
       </main>
     </div>
   )

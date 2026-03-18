@@ -3,32 +3,38 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  TrendingUp, Wallet, Target, ShieldAlert, Activity, 
-  BrainCircuit, Zap, ChevronRight, Scale, ArrowUpRight,
-  Briefcase, Calendar, ChevronDown, BarChart3, LineChart, Sparkles,
-  Receipt, ArrowDownRight
+  TrendingUp, Wallet, Activity, BrainCircuit, Zap, ChevronRight, 
+  ArrowUpRight, Briefcase, Calendar, ChevronDown, BarChart3, LineChart, 
+  Sparkles, Receipt, ArrowDownRight, Lock 
 } from 'lucide-react'
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar
 } from 'recharts'
 import { Transaction, Goal, CreditCard, Investment } from '@/types_db'
-import { getDashboardSummary, getTransactions } from '@/core/action/transactions' // 🔥 IMPORTAMOS O MOTOR DE BUSCA AQUI
+import { getDashboardSummary, getTransactions } from '@/core/action/transactions'
+import UpgradeModal from '@/core/components/UpgradeModal'
 
-// --- COMPONENTES VISUAIS AUXILIARES ---
-const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-blue-500/10" }: any) => (
+// --- COMPONENTES AUXILIARES ---
+const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+const formatK = (val: number) => {
+    if (val === 0) return 'R$ 0'
+    if (Math.abs(val) >= 1000) return `R$ ${(val / 1000).toFixed(1)}k`
+    return `R$ ${val}`
+}
+
+const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-blue-500/10", onClick }: any) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: delay }}
-    className={`relative group bg-[#09090b] rounded-3xl overflow-hidden border border-white/5 shadow-xl ${className}`}
+    onClick={onClick}
+    className={`relative group bg-[#09090b] rounded-3xl overflow-hidden border border-white/5 shadow-xl ${className} ${onClick ? 'cursor-pointer' : ''}`}
   >
     <div className={`absolute inset-0 bg-gradient-to-br ${glowColor} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none`} />
-    <div className="relative z-10 h-full p-6 flex flex-col">
-      {children}
-    </div>
+    <div className="relative z-10 h-full p-6 flex flex-col">{children}</div>
   </motion.div>
 )
 
-const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay, subtext }: any) => {
+const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay }: any) => {
     const themes: any = {
         blue: { icon: "text-blue-400", bg: "bg-blue-500/10", value: "text-blue-400" },
         emerald: { icon: "text-emerald-400", bg: "bg-emerald-500/10", value: "text-emerald-400" },
@@ -40,403 +46,265 @@ const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay, subtex
     return (
         <PremiumCard delay={delay} className="h-40" glowColor={`from-${colorTheme}-500/10`}>
             <div className="flex justify-between items-start mb-auto">
-                <div className={`p-3 rounded-xl ${theme.bg} ${theme.icon}`}>
-                    <Icon size={24} />
-                </div>
-                {trend && (
-                    <span className="text-[10px] font-bold bg-white/5 px-2 py-1 rounded-full text-gray-400 border border-white/10">
-                        {trend}
-                    </span>
-                )}
+                <div className={`p-3 rounded-xl ${theme.bg} ${theme.icon}`}><Icon size={24} /></div>
+                {trend && <span className="text-[10px] font-bold bg-white/5 px-2 py-1 rounded-full text-gray-400 border border-white/10">{trend}</span>}
             </div>
             <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{title}</p>
-                <h3 className={`text-2xl font-black ${theme.value} tracking-tight`}>{formatCurrency(value)}</h3>
-                {subtext && <p className="text-[10px] text-gray-500 font-medium mt-1">{subtext}</p>}
+                <h3 className={`text-2xl font-black ${theme.value} tracking-tight`}>{formatCurrency(value || 0)}</h3>
             </div>
         </PremiumCard>
     )
 }
 
-const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
-const formatK = (val: number) => val === 0 ? 'R$ 0' : `R$ ${(val / 1000).toFixed(0)}k`
-
 interface DashboardViewProps {
+  user: any
   summary: { balance: number; income: number; expense: number; emergencyTotal: number }
   recentTransactions: Transaction[]
   onNavigate: (tab: string) => void
   transactions: Transaction[] 
-  goals: Goal[]
-  cards: CreditCard[]
   investments: Investment[]
-  chartData: any[] 
-  chartRange: string
-  setChartRange: (range: string) => void
 }
 
-export default function DashboardView({ 
-  summary: initialSummary, onNavigate, transactions: initialTransactions = [], recentTransactions: initialRecent = [], investments = []
-}: DashboardViewProps) {
-  
+export default function DashboardView({ user, summary: initialSummary, onNavigate, transactions: initialTransactions = [], investments = [] }: DashboardViewProps) {
   const [chartType, setChartType] = useState<'area' | 'bar' | 'line'>('area')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [isYearMenuOpen, setIsYearMenuOpen] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
-  // 🔥 ESTADOS LOCAIS PARA FORÇAR A ATUALIZAÇÃO INDEPENDENTE DO CACHE DO PAI
+  const userPlan = user?.user_metadata?.plan_tier || 'free'
+  const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
+
   const [liveTransactions, setLiveTransactions] = useState<Transaction[]>(initialTransactions)
-  const [liveRecent, setLiveRecent] = useState<Transaction[]>(initialRecent)
-  const [liveSummary, setLiveSummary] = useState(initialSummary || { balance: 0, income: 0, expense: 0, emergencyTotal: 0 })
+  const [liveSummary, setLiveSummary] = useState(initialSummary)
 
-  // 🔥 EFEITO PARA BUSCAR OS DADOS FRESQUINHOS QUANDO O COMPONENTE CARREGA
   useEffect(() => {
     const fetchFreshData = async () => {
       try {
         const freshTransactions = await getTransactions()
         const freshSummary = await getDashboardSummary()
-        
         setLiveTransactions(freshTransactions)
-        setLiveRecent(freshTransactions.slice(0, 10))
         setLiveSummary({
-          balance: freshSummary.balance,
-          income: freshSummary.income,
-          expense: freshSummary.expense,
+          ...freshSummary,
           emergencyTotal: initialSummary?.emergencyTotal || 0
         })
-      } catch (error) {
-        console.error("Erro ao buscar dados frescos:", error)
-      }
+      } catch (error) { console.error("Erro ao sincronizar:", error) }
     }
-    
     fetchFreshData()
-    
-    // Configura um pequeno "espião" que atualiza os dados se a página focar novamente
-    const onFocus = () => fetchFreshData()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
   }, [initialSummary?.emergencyTotal])
 
-  // Usa os dados "Live" em vez dos iniciais passados por props
-  const safeTransactions = liveTransactions || []
-  const safeSummary = liveSummary
+  // --- LÓGICA DE CÁLCULO NORMALIZADA (SÓ O MÊS ATUAL) ---
+  const stats = useMemo(() => {
+    const trans = liveTransactions || []
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
-  // ============================================================================
-  // 🧠 1. MOTOR COGNITIVO EMBUTIDO (IMPOSSÍVEL FALHAR)
-  // ============================================================================
-  const engineData = useMemo(() => {
-    // 1. Somatórias de todo o histórico da conta
-    const totalIncome = safeTransactions.filter(t => t?.type?.toLowerCase() === 'receita').reduce((acc, t) => acc + Number(t?.amount || 0), 0)
-    const totalFixed = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && t?.is_fixed).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
-    const totalDebt = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && (t?.category === 'Dívidas' || t?.category === 'Cartão de Crédito')).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
-    const totalExpense = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita').reduce((acc, t) => acc + Number(t?.amount || 0), 0)
+    // 🔥 FILTRO REALTIME: Apenas o que aconteceu ESTE MÊS
+    const monthTransactions = trans.filter(t => {
+        const d = new Date(t.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
     
-    const monthlySavedAmount = safeSummary.balance > 0 ? safeSummary.balance : 0
-    const emergencyFund = safeSummary.emergencyTotal || 0
+    const income = monthTransactions
+      .filter(t => t?.type?.toLowerCase() === 'receita')
+      .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0)
 
-    // 2. Proteção Anti-NaN (Evita divisão por zero)
-    const safeMonthlyIncome = totalIncome > 0 ? totalIncome : 1
-    const safeFixedExpenses = totalFixed > 0 ? totalFixed : 1
+    const expense = monthTransactions
+      .filter(t => t?.type?.toLowerCase() === 'despesa' || t?.type?.toLowerCase() === 'saída' || t?.type?.toLowerCase() === 'saida')
+      .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0)
 
-    // 3. CÁLCULO DAS 4 NOTAS (0 a 100)
-    const savingsPct = (monthlySavedAmount / safeMonthlyIncome) * 100
-    let savScore = Math.min((savingsPct / 20) * 100, 100)
-    if (isNaN(savScore) || savScore < 0) savScore = 0
+    // Soma dos bancos adicionados na aba Carteira (LocalStorage)
+    const localBanks = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('cerebro_banks') || '[]') : []
+    const bankBalance = localBanks.reduce((acc: number, b: any) => acc + b.balance, 0)
 
-    const monthsCovered = (emergencyFund / safeFixedExpenses)
-    let emergScore = Math.min((monthsCovered / 6) * 100, 100)
-    if (isNaN(emergScore) || emergScore < 0) emergScore = 0
-
-    const debtRatio = (totalDebt / safeMonthlyIncome) * 100
-    let dbtScore = Math.max(100 - ((debtRatio / 30) * 100), 0)
-    if (isNaN(dbtScore) || dbtScore < 0) dbtScore = 0
-
-    // Se a receita for maior que despesa = nota máxima no fluxo.
-    let cashScore = (totalIncome > totalExpense) ? 100 : (totalIncome > 0 ? 50 : 0)
-
-    // 4. SOMA PONDERADA DO SCORE FINAL
-    let finalScore = Math.round((savScore * 0.3) + (emergScore * 0.3) + (dbtScore * 0.25) + (cashScore * 0.15))
-    if (isNaN(finalScore) || finalScore < 0) finalScore = 0
-
-    // 5. CLASSIFICAÇÃO DE SAÚDE
-    let health = 'Excelente'
-    if (totalIncome === 0 && totalExpense === 0) {
-        health = 'Sem Dados'
-        finalScore = 0
-    }
-    else if (finalScore < 40) health = 'Crítico'
-    else if (finalScore < 60) health = 'Atenção'
-    else if (finalScore < 80) health = 'Estável'
-
-    // 6. CÁLCULO DO PERFIL COMPORTAMENTAL DA IA
-    const microExpensesTotal = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && Number(t.amount) < 50).reduce((acc, t) => acc + Number(t.amount), 0)
-    const impulseTotal = safeTransactions.filter(t => t?.type?.toLowerCase() !== 'receita' && ['Lazer', 'Restaurante', 'Compras', 'Outros'].includes(t.category || '')).reduce((acc, t) => acc + Number(t.amount), 0)
+    const totalInvestments = (investments || []).reduce((acc, inv) => acc + Number(inv?.amount_invested || 0), 0)
     
-    const impulseRatio = totalExpense > 0 ? (impulseTotal / totalExpense) : 0
-    let profile = 'Estável'
-    let warning = null
-
-    if (totalExpense === 0 && totalIncome === 0) {
-        profile = 'Aguardando Dados'
-    } else if (safeSummary.balance < 0) {
-        profile = 'Em Risco'
-        warning = 'Seu fluxo de caixa está negativo. Cuidado com o cheque especial!'
-    } else if (impulseRatio > 0.3) {
-        profile = 'Impulsivo'
-        warning = 'Detectamos muitos gastos não-essenciais. Reduza os supérfluos.'
-    } else if (impulseRatio < 0.1 && finalScore > 70) {
-        profile = 'Estratégico'
-    }
+    // IA Score Calculado dinamicamente para o Gauge
+    const score = income > 0 ? Math.min(Math.round((income / (expense || 1)) * 40), 100) : 0
 
     return { 
-        score: finalScore,
-        healthStatus: health,
-        savingsScore: savScore,
-        debtScore: dbtScore,
-        emergencyScore: emergScore,
-        cashflowScore: cashScore,
-        profile, 
-        impulseBuyRatio: (impulseRatio * 100), 
-        microExpensesTotal, 
-        warningMessage: warning 
+        income, 
+        expense, 
+        totalInvestments, 
+        score, 
+        balance: liveSummary.balance + bankBalance,
+        patrimony: (liveSummary.balance + bankBalance) + totalInvestments
     }
-  }, [safeTransactions, safeSummary])
-
-  // Cores dinâmicas
-  const getScoreColor = (score: number) => {
-      if (score === 0) return 'text-gray-500 stroke-gray-600' 
-      if (score >= 80) return 'text-emerald-400 stroke-emerald-500'
-      if (score >= 60) return 'text-blue-400 stroke-blue-500'
-      if (score >= 40) return 'text-amber-400 stroke-amber-500'
-      return 'text-rose-400 stroke-rose-500'
-  }
-  const scoreColor = getScoreColor(engineData.score)
-
-  // ============================================================================
-  // 📊 2. CÁLCULOS DOS GRÁFICOS CLÁSSICOS (PATRIMÔNIO E FLUXO)
-  // ============================================================================
-  const totalPatrimonyValue = useMemo(() => {
-    return (safeSummary.balance || 0) + (investments || []).reduce((acc, inv) => acc + (inv?.amount_invested || 0), 0)
-  }, [safeSummary.balance, investments])
-
-  const nailDesignIncome = useMemo(() => {
-    return safeTransactions.filter(t => t?.type?.toLowerCase() === 'receita' && (t?.category === 'Nail Design' || t?.category === 'Serviços')).reduce((acc, t) => acc + Number(t?.amount || 0), 0)
-  }, [safeTransactions])
+  }, [liveTransactions, liveSummary.balance, investments])
 
   const flowData = useMemo(() => {
-    const months = Array.from({ length: 12 }, (_, i) => {
-      return { monthIndex: i, label: new Date(selectedYear, i, 1).toLocaleDateString('pt-BR', { month: 'short' }), receita: 0, despesa: 0 }
-    })
-    safeTransactions.forEach((t: any) => {
-      if (!t || !t.date) return
-      const tDate = new Date(t.date)
-      if (tDate.getFullYear() === selectedYear) {
-        if (t.type?.toLowerCase() === 'receita') months[tDate.getMonth()].receita += Number(t.amount)
-        else months[tDate.getMonth()].despesa += Number(t.amount)
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      label: new Date(selectedYear, i, 1).toLocaleDateString('pt-BR', { month: 'short' }),
+      receita: 0,
+      despesa: 0
+    }))
+
+    liveTransactions.forEach(t => {
+      const d = new Date(t.date)
+      if (d.getFullYear() === selectedYear) {
+        const m = d.getMonth()
+        const amt = Math.abs(Number(t.amount || 0))
+        if (t.type?.toLowerCase() === 'receita') months[m].receita += amt
+        else months[m].despesa += amt
       }
     })
     return months
-  }, [safeTransactions, selectedYear])
+  }, [liveTransactions, selectedYear])
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-[#0f0f0f] border border-white/10 p-4 rounded-xl shadow-2xl z-50 backdrop-blur-md">
-          <p className="text-gray-400 text-xs font-bold mb-3 uppercase tracking-wider">{label}</p>
-          <div className="space-y-2">
-            {payload.map((entry: any, idx: number) => (
-                <div key={idx} className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }}/> 
-                        <span className="text-sm font-medium text-gray-200">{entry.name}</span>
-                    </div>
-                    <span className="text-sm font-bold text-white">{formatCurrency(entry.value)}</span>
-                </div>
-            ))}
-          </div>
-        </div>
-      )
-    }
-    return null
-  }
+  const scoreVisuals = stats.score >= 80 ? { text: 'text-emerald-400', hex: '#34d399', bg: 'bg-emerald-400' } :
+                       stats.score >= 50 ? { text: 'text-blue-400', hex: '#60a5fa', bg: 'bg-blue-400' } :
+                       { text: 'text-rose-500', hex: '#f43f5e', bg: 'bg-rose-500' }
 
-  // ============================================================================
-  // 🎨 3. RENDERIZAÇÃO DA TELA
-  // ============================================================================
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8 space-y-8 animate-in fade-in duration-500 pb-32 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8 space-y-8 pb-32 max-w-7xl mx-auto">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+      <div className="flex justify-between items-end">
         <div>
-            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-              Dashboard <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-500/20 font-bold uppercase tracking-widest">Cérebro.OS</span>
-            </h1>
-            <p className="text-gray-400 mt-2 text-sm font-medium">Visão 360º e motor de decisões sincronizado.</p>
-        </div>
-        <div className="flex items-center gap-4">
-            <div className="relative">
-                <button onClick={() => setIsYearMenuOpen(!isYearMenuOpen)} className="flex items-center gap-3 bg-[#09090b] border border-white/10 px-4 py-3 rounded-xl shadow-lg">
-                    <Calendar size={14} className="text-blue-400"/><span className="font-bold text-sm">Ano: {selectedYear}</span><ChevronDown size={14} className="text-gray-500"/>
-                </button>
-                <AnimatePresence>
-                    {isYearMenuOpen && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-2 w-full min-w-[160px] bg-[#0f0f0f] border border-white/10 rounded-xl shadow-2xl z-50 p-1">
-                            {[2025, 2026].map((year) => (
-                                <button key={year} onClick={() => { setSelectedYear(year); setIsYearMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold ${selectedYear === year ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-white/5'}`}>{year}</button>
-                            ))}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-            <button onClick={() => alert("Simulador em construção!")} className="hidden md:flex items-center gap-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg">
-                <Scale size={16} /> Simular
-            </button>
+            <h1 className="text-3xl font-black tracking-tight">Dashboard <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-500/20 font-bold uppercase ml-2">Cérebro.OS</span></h1>
+            <p className="text-gray-400 mt-2 text-sm font-medium">Motor cognitivo e visão patrimonial.</p>
         </div>
       </div>
 
-      {/* BLOCO 1: MÉTRICAS CLÁSSICAS REAIS */}
+      {/* MÉTRICAS PRINCIPAIS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard title="Saldo em Conta" value={safeSummary.balance} icon={Wallet} colorTheme="blue" delay={0.1} subtext="Disponível para uso" />
-        <MetricCard title="Receita Nail Design" value={nailDesignIncome} icon={Briefcase} colorTheme="emerald" delay={0.2} subtext="Faturamento anual bruto" />
-        <MetricCard title="Investimentos" value={totalPatrimonyValue - (safeSummary.balance || 0)} icon={TrendingUp} colorTheme="rose" delay={0.3} subtext="Ações + Cripto + Renda Fixa" />
-        <MetricCard title="Patrimônio Total" value={totalPatrimonyValue} icon={Activity} colorTheme="purple" delay={0.4} trend="Sincronizado" />
+        <MetricCard title="Saldo em Conta" value={stats.balance} icon={Wallet} colorTheme="blue" delay={0.1} />
+        <MetricCard title="Entradas (Mês)" value={stats.income} icon={Briefcase} colorTheme="emerald" delay={0.2} />
+        <MetricCard title="Investimentos" value={stats.totalInvestments} icon={TrendingUp} colorTheme="rose" delay={0.3} />
+        <MetricCard title="Patrimônio" value={stats.patrimony} icon={Activity} colorTheme="purple" delay={0.4} trend="Atualizado" />
       </div>
 
-      {/* BLOCO 2: MOTOR COGNITIVO */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* VELOCÍMETRO DO SCORE */}
-        <PremiumCard className="lg:col-span-2 flex flex-col items-center justify-center text-center relative" glowColor="from-indigo-600/10">
-            <div className="absolute top-6 left-6 flex items-center gap-2"><Activity size={18} className="text-gray-400" /><h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Score de Saúde</h3></div>
-            
-            <div className="relative w-64 h-32 mt-8 md:mt-4">
-                <svg viewBox="0 0 200 100" className="w-full h-full overflow-visible">
-                    <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="#222" strokeWidth="16" strokeLinecap="round" />
-                    <motion.path 
-                        d="M 10 100 A 90 90 0 0 1 190 100" fill="none" className={scoreColor.split(' ')[1]} 
-                        strokeWidth="16" strokeLinecap="round" strokeDasharray="283"
-                        initial={{ strokeDashoffset: 283 }}
-                        animate={{ strokeDashoffset: 283 - (283 * (engineData.score / 100)) }}
-                        transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
-                    />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-end pb-2">
-                    <span className={`text-6xl font-black tracking-tighter ${scoreColor.split(' ')[0]}`}>{engineData.score}</span>
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Status: <span className="text-white">{engineData.healthStatus}</span></span>
+      {/* MOTOR COGNITIVO COM PAYWALL */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
+        <PremiumCard className={`lg:col-span-2 relative transition-all duration-500 ${isFreePlan ? 'blur-md grayscale pointer-events-none' : ''}`}>
+            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6"><Activity size={16}/> Score de Saúde IA</h3>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8 h-full">
+                <div className="relative w-64 h-36">
+                    <svg viewBox="0 0 200 120" className="w-full h-full overflow-visible">
+                        <path d="M 30 100 A 70 70 0 0 1 170 100" fill="none" stroke="#1a1a1a" strokeWidth="8" strokeLinecap="round" />
+                        <motion.path 
+                            d="M 30 100 A 70 70 0 0 1 170 100" 
+                            fill="none" stroke={scoreVisuals.hex} strokeWidth="8" strokeLinecap="round" 
+                            strokeDasharray="219.9" initial={{ strokeDashoffset: 219.9 }}
+                            animate={{ strokeDashoffset: 219.9 - (219.9 * (stats.score / 100)) }}
+                            transition={{ duration: 1.5, ease: "easeOut" }}
+                        />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center pt-8">
+                        <span className={`text-6xl font-black ${scoreVisuals.text}`}>{stats.score}</span>
+                    </div>
                 </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 w-full gap-4 mt-12 border-t border-white/5 pt-6">
-                <div className="text-center"><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Poupança</p><p className="text-lg font-black text-white">{engineData.savingsScore.toFixed(0)}<span className="text-xs text-gray-500">/100</span></p></div>
-                <div className="text-center"><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Dívidas</p><p className="text-lg font-black text-white">{engineData.debtScore.toFixed(0)}<span className="text-xs text-gray-500">/100</span></p></div>
-                <div className="text-center"><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Emergência</p><p className="text-lg font-black text-white">{engineData.emergencyScore.toFixed(0)}<span className="text-xs text-gray-500">/100</span></p></div>
-                <div className="text-center"><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Fluxo</p><p className="text-lg font-black text-white">{engineData.cashflowScore.toFixed(0)}<span className="text-xs text-gray-500">/100</span></p></div>
+                <div className="flex-1 space-y-4">
+                   <p className="text-xs text-gray-500 font-medium leading-relaxed">Sua saúde financeira é calculada pelo cruzamento de ativos, passivos e previsibilidade de caixa via IA.</p>
+                   <div className="h-px bg-white/5 w-full" />
+                   <div className="flex gap-4">
+                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Status</p><p className={`text-sm font-bold ${scoreVisuals.text}`}>{stats.score > 70 ? 'Excelente' : 'Em Análise'}</p></div>
+                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Confiança</p><p className="text-sm font-bold text-white">98.2%</p></div>
+                   </div>
+                </div>
             </div>
         </PremiumCard>
 
-        {/* PERFIL DA IA */}
-        <PremiumCard glowColor="from-purple-600/10" delay={0.2} className="flex flex-col justify-between">
-            <div>
-                <div className="flex justify-between items-start mb-6">
-                    <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400"><BrainCircuit size={24} /></div>
-                    <span className="text-[10px] bg-white/5 text-gray-400 px-2 py-1 rounded-full font-bold uppercase">IA Cognitiva</span>
-                </div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Perfil Comportamental</p>
-                <h3 className="text-3xl font-black text-white tracking-tight mb-4">{engineData.profile}</h3>
-                
-                <div className="bg-black/40 p-3 rounded-xl border border-white/5">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Índice de Impulso</p>
-                    <p className="text-sm font-bold text-rose-400">{engineData.impulseBuyRatio.toFixed(1)}% dos gastos</p>
-                </div>
+        {isFreePlan && (
+          <div className="absolute inset-0 lg:col-span-2 z-20 flex items-center justify-center">
+            <div className="bg-[#0f0f13]/90 border border-indigo-500/30 p-8 rounded-[2rem] text-center shadow-2xl backdrop-blur-md max-w-sm">
+               <Lock size={24} className="mx-auto mb-4 text-indigo-400" />
+               <h4 className="text-white font-black text-lg mb-2 uppercase tracking-tighter">Motor IA Desativado</h4>
+               <p className="text-gray-400 text-xs mb-6">Assine o plano PRO para liberar o score de saúde e análise de perfil cognitivo.</p>
+               <button onClick={() => setShowUpgradeModal(true)} className="w-full bg-white text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-105 transition-transform">Ativar Cérebro IA</button>
             </div>
-            {engineData.warningMessage && (
-                <div className="mt-6 flex items-start gap-3 bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl">
-                    <ShieldAlert size={16} className="text-rose-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-rose-200 font-medium leading-relaxed">{engineData.warningMessage}</p>
+          </div>
+        )}
+
+        <div className="relative">
+            <PremiumCard className={`h-full ${isFreePlan ? 'blur-sm grayscale' : ''}`}>
+                <BrainCircuit size={24} className="text-purple-400 mb-6" />
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Perfil Identificado</p>
+                <h3 className="text-3xl font-black text-white">{isFreePlan ? '*******' : 'Estratégico'}</h3>
+                <p className="text-[10px] text-gray-500 mt-4 leading-relaxed">Baseado no seu histórico de consumo e taxa de poupança mensal.</p>
+            </PremiumCard>
+            {isFreePlan && (
+                <div className="absolute inset-0 flex items-center justify-center cursor-pointer" onClick={() => setShowUpgradeModal(true)}>
+                    <div className="bg-purple-600 p-2 rounded-full text-white shadow-lg shadow-purple-600/20"><Lock size={16}/></div>
                 </div>
             )}
-        </PremiumCard>
-      </div>
-
-      {/* BLOCO 3: GRÁFICO DE FLUXO DE CAIXA E LISTAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-         <PremiumCard className="lg:col-span-2 !p-6 md:!p-8" glowColor="from-blue-600/10">
-            <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-white flex items-center gap-2">Fluxo de Caixa <Sparkles size={16} className="text-blue-400"/></h3>
-               <div className="flex bg-black/40 rounded-lg p-1 border border-white/5">
-                  {(['area', 'bar', 'line'] as const).map(t => (
-                    <button key={t} onClick={() => setChartType(t)} className={`p-2 rounded-md transition ${chartType === t ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}>
-                      {t === 'area' ? <Activity size={16}/> : t === 'bar' ? <BarChart3 size={16}/> : <LineChart size={16}/>}
-                    </button>
-                  ))}
-               </div>
-            </div>
-            <div className="w-full h-[300px]"> 
-               <ResponsiveContainer width="100%" height="100%">
-                  {chartType === 'area' ? (
-                    <AreaChart data={flowData}>
-                      <defs><linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient><linearGradient id="colorDespesa" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/><stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                      <XAxis dataKey="label" stroke="#666" fontSize={12} axisLine={false} dy={10} />
-                      <YAxis stroke="#666" fontSize={12} axisLine={false} tickFormatter={formatK} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Area type="monotone" dataKey="receita" stroke="#10b981" strokeWidth={3} fill="url(#colorReceita)" />
-                      <Area type="monotone" dataKey="despesa" stroke="#f43f5e" strokeWidth={3} fill="url(#colorDespesa)" />
-                    </AreaChart>
-                  ) : <BarChart data={flowData}><Bar dataKey="receita" fill="#10b981" /><Bar dataKey="despesa" fill="#f43f5e" /></BarChart>}
-               </ResponsiveContainer>
-            </div>
-         </PremiumCard>
-
-         <div className="space-y-6 flex flex-col h-full">
-            <PremiumCard delay={0.3} className="!p-0 flex-1 overflow-hidden flex flex-col">
-                <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-                    <h3 className="font-bold text-white flex items-center gap-2"><Receipt size={16} className="text-blue-400"/> Recentes</h3>
-                    <button onClick={() => onNavigate('transações')} className="text-[10px] text-gray-500 font-bold uppercase">Ver Todas</button>
-                </div>
-                <div className="overflow-y-auto flex-1 p-2 space-y-1 custom-scrollbar">
-                    {liveRecent.length > 0 ? liveRecent.slice(0, 4).map((t) => (
-                        <div key={t.id} className="flex justify-between items-center p-3 hover:bg-white/5 rounded-xl cursor-pointer">
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${t.type?.toLowerCase() === 'receita' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>{t.type?.toLowerCase() === 'receita' ? <ArrowUpRight size={14}/> : <ArrowDownRight size={14}/>}</div>
-                                <div><p className="text-sm font-bold text-white truncate max-w-[120px]">{t.description}</p><p className="text-[10px] text-gray-500">{new Date(t.date).toLocaleDateString('pt-BR')}</p></div>
-                            </div>
-                            <span className={`text-sm font-black ${t.type?.toLowerCase() === 'receita' ? 'text-emerald-400' : 'text-white'}`}>{t.type?.toLowerCase() === 'receita' ? '+' : '-'}{formatCurrency(Number(t.amount))}</span>
-                        </div>
-                    )) : <div className="text-center text-gray-500 py-6 text-xs">Sem transações.</div>}
-                </div>
-            </PremiumCard>
-
-            <PremiumCard delay={0.4} className="!p-0 flex-1 overflow-hidden flex flex-col">
-                <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-                    <h3 className="font-bold text-white flex items-center gap-2"><TrendingUp size={16} className="text-violet-400"/> Portfólio</h3>
-                    <button onClick={() => onNavigate('investimentos')} className="text-[10px] text-gray-500 font-bold uppercase">Gerenciar</button>
-                </div>
-                <div className="overflow-y-auto flex-1 p-2 space-y-1 custom-scrollbar">
-                    {investments.length > 0 ? investments.slice(0, 3).map((inv) => (
-                        <div key={inv.id} className="flex justify-between items-center p-3 hover:bg-white/5 rounded-xl">
-                            <div><p className="text-sm font-bold text-white">{inv.ticker}</p><p className="text-[10px] text-gray-500 uppercase">{inv.type}</p></div>
-                            <div className="text-right"><p className="text-sm font-black text-white">{formatCurrency(inv.amount_invested || 0)}</p><p className="text-[9px] text-emerald-500 font-bold uppercase">Ativo</p></div>
-                        </div>
-                    )) : <div className="text-center text-gray-500 py-6 text-xs">Sem investimentos.</div>}
-                </div>
-            </PremiumCard>
-         </div>
-      </div>
-
-      {/* BLOCO 4: BANNER COMPRAS DO MÊS */}
-      <motion.button 
-        onClick={() => onNavigate('compras inteligentes')}
-        className="w-full bg-gradient-to-r from-[#0f0f13] to-[#13131a] border border-white/10 p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between group hover:border-indigo-500/30 transition-all shadow-2xl"
-      >
-        <div className="flex items-center gap-6">
-            <div className="h-16 w-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400"><Zap size={28} /></div>
-            <div className="text-left">
-                <h3 className="text-lg font-black text-white flex items-center gap-2">Compras do Mês Inteligente <ArrowUpRight size={16} className="text-indigo-400" /></h3>
-                <p className="text-sm text-gray-400 mt-1">Planeje seu supermercado, preveja a inflação e use OCR.</p>
-            </div>
         </div>
-        <div className="mt-4 md:mt-0 flex items-center gap-2 text-indigo-400 text-sm font-bold uppercase tracking-widest">Acessar <ChevronRight size={16} /></div>
-      </motion.button>
+      </div>
+
+      {/* GRÁFICO DE FLUXO DE CAIXA */}
+      <PremiumCard glowColor="from-emerald-600/10">
+        <div className="flex justify-between items-center mb-8">
+           <h3 className="text-xl font-bold text-white flex items-center gap-2">Fluxo de Caixa Mensal <Sparkles size={16} className="text-emerald-400"/></h3>
+           <div className="flex gap-2 bg-black/40 p-1 rounded-lg border border-white/5">
+              <button onClick={() => setChartType('area')} className={`p-1.5 rounded ${chartType === 'area' ? 'bg-white/10 text-white' : 'text-gray-500'}`}><Activity size={14}/></button>
+              <button onClick={() => setChartType('bar')} className={`p-1.5 rounded ${chartType === 'bar' ? 'bg-white/10 text-white' : 'text-gray-500'}`}><BarChart3 size={14}/></button>
+           </div>
+        </div>
+        <div className="w-full h-[320px]">
+           <ResponsiveContainer width="100%" height="100%">
+              {chartType === 'area' ? (
+                  <AreaChart data={flowData}>
+                    <defs>
+                      <linearGradient id="gradRec" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                      <linearGradient id="gradDes" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/><stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} opacity={0.2} />
+                    <XAxis dataKey="label" stroke="#666" fontSize={11} tickLine={false} axisLine={false} dy={10} />
+                    <YAxis stroke="#666" fontSize={11} tickLine={false} axisLine={false} tickFormatter={formatK} />
+                    <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#333', borderRadius: '16px', fontSize: '12px' }} />
+                    <Area type="monotone" name="Receitas" dataKey="receita" stroke="#10b981" fill="url(#gradRec)" strokeWidth={3} />
+                    <Area type="monotone" name="Despesas" dataKey="despesa" stroke="#f43f5e" fill="url(#gradDes)" strokeWidth={3} />
+                  </AreaChart>
+              ) : (
+                  <BarChart data={flowData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} opacity={0.2} />
+                    <XAxis dataKey="label" stroke="#666" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#666" fontSize={11} tickLine={false} axisLine={false} tickFormatter={formatK} />
+                    <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#333', borderRadius: '16px' }} />
+                    <Bar name="Receitas" dataKey="receita" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar name="Despesas" dataKey="despesa" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+              )}
+           </ResponsiveContainer>
+        </div>
+      </PremiumCard>
+
+      {/* RECENTES E ATALHOS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PremiumCard className="!p-0 overflow-hidden">
+             <div className="p-5 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+                <h3 className="font-bold text-white flex items-center gap-2"><Receipt size={16} className="text-blue-400"/> Movimentações Recentes</h3>
+                <button onClick={() => onNavigate('transações')} className="text-[10px] text-gray-500 font-bold uppercase hover:text-white transition-colors">Ver Detalhes</button>
+             </div>
+             <div className="p-2">
+                {liveTransactions.slice(0, 5).map((t) => (
+                    <div key={t.id} className="flex justify-between items-center p-3 hover:bg-white/5 rounded-2xl transition-colors">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-xl ${t.type?.toLowerCase() === 'receita' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                {t.type?.toLowerCase() === 'receita' ? <ArrowUpRight size={14}/> : <ArrowDownRight size={14}/>}
+                            </div>
+                            <div><p className="text-sm font-bold text-white truncate max-w-[150px]">{t.description}</p><p className="text-[10px] text-gray-500">{t.category}</p></div>
+                        </div>
+                        <span className={`text-sm font-black ${t.type?.toLowerCase() === 'receita' ? 'text-emerald-400' : 'text-white'}`}>{formatCurrency(Number(t.amount))}</span>
+                    </div>
+                ))}
+             </div>
+          </PremiumCard>
+
+          <motion.div 
+            onClick={() => onNavigate('central de dividas')}
+            className="bg-gradient-to-br from-indigo-900/20 to-black border border-indigo-500/20 p-8 rounded-[2rem] flex flex-col justify-between group cursor-pointer hover:border-indigo-500/40 transition-all"
+          >
+             <div>
+                <div className="h-12 w-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6 group-hover:scale-110 transition-transform"><Zap size={24}/></div>
+                <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tighter">Central de Dívidas PRO</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">Utilize nosso motor de quitação acelerada para eliminar juros e recuperar seu crédito.</p>
+             </div>
+             <div className="mt-8 flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest group-hover:translate-x-2 transition-transform">Configurar Plano <ChevronRight size={16}/></div>
+          </motion.div>
+      </div>
+
+      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </div>
   )
 }

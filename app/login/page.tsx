@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link' 
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, Sparkles, Lock, ShieldCheck, Mail, LogIn, User, ArrowRight } from 'lucide-react'
+import { Loader2, Lock, Mail, User, ArrowRight, BrainCircuit, ShieldCheck, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
@@ -18,15 +18,12 @@ const GoogleIcon = () => (
   </svg>
 )
 
+type ViewState = 'login' | 'register' | 'forgot'
+
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true) // Controla se é Login ou Cadastro
+  const [view, setView] = useState<ViewState>('login')
   const [loading, setLoading] = useState(false)
-  
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: ''
-  })
+  const [formData, setFormData] = useState({ fullName: '', email: '', password: '' })
   
   const supabase = createClient()
   const router = useRouter()
@@ -36,17 +33,24 @@ export default function AuthPage() {
     setLoading(true)
 
     try {
-      if (isLogin) {
-        // --- LÓGICA DE LOGIN ---
+      if (view === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: `${window.location.origin}/nova-senha`,
+        })
+        if (error) throw error
+        toast.success('Link de recuperação enviado! Verifique seu e-mail.')
+        setView('login') 
+      } 
+      else if (view === 'login') {
         const { error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         })
         if (error) throw error
-        toast.success('Bem-vindo de volta!')
-        router.push('/')
-      } else {
-        // --- LÓGICA DE CADASTRO ---
+        toast.success('Acesso liberado. Bem-vindo de volta!')
+        router.push('/') // 🔥 CORRIGIDO PARA A ROTA PRINCIPAL
+      } 
+      else if (view === 'register') {
         const { error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -58,13 +62,11 @@ export default function AuthPage() {
           }
         })
         if (error) throw error
-        toast.success('Conta criada com sucesso! Você já pode entrar.')
-        
-        // Se o Supabase não exigir confirmação de email, redireciona direto:
-        router.push('/') 
+        toast.success('Conta criada com sucesso! Acessando o sistema...')
+        router.push('/') // 🔥 CORRIGIDO PARA A ROTA PRINCIPAL
       }
     } catch (error: any) {
-      toast.error(error.message || 'Erro na autenticação')
+      toast.error(error.message || 'Erro na autenticação. Verifique seus dados.')
     } finally {
       setLoading(false)
     }
@@ -79,174 +81,205 @@ export default function AuthPage() {
         queryParams: { 
           access_type: 'offline', 
           prompt: 'consent', 
-          scope: 'openid profile email https://www.googleapis.com/auth/calendar' // Escopo da Agenda
+          scope: 'openid profile email https://www.googleapis.com/auth/calendar'
         }
       }
     })
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden font-sans text-white bg-[#050505] selection:bg-blue-500/30 selection:text-blue-100">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden font-sans text-white bg-[#050505] selection:bg-indigo-500/30 selection:text-indigo-100 p-4">
       
-      {/* Background Atmosférico */}
+      {/* Background Atmosférico (Estilo Cérebro.OS) */}
       <div className="absolute inset-0 w-full h-full pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_-30%,#1e1e2e40,transparent)]"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[150px]"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[120px]"></div>
+        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.02]"></div>
       </div>
 
       <motion.div 
         layout
-        initial={{ opacity: 0, scale: 0.98, y: 15 }} 
-        animate={{ opacity: 1, scale: 1, y: 0 }} 
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative w-full max-w-[400px] px-6 z-10"
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="relative w-full max-w-[420px] z-10"
       >
-        <div className="absolute -inset-[1px] bg-gradient-to-b from-blue-500/20 to-transparent rounded-3xl blur-sm opacity-40"></div>
-
-        <div className="relative bg-[#09090b]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center ring-1 ring-white/5">
+        <div className="relative bg-[#09090b]/80 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl p-8 flex flex-col items-center ring-1 ring-white/5 overflow-hidden">
           
-          {/* Logo */}
-          <div className="mb-6 relative group">
-             <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out"></div>
-             <div className="relative bg-gradient-to-br from-[#1a1a1a] to-black border border-white/10 p-3 rounded-xl shadow-lg">
-                <Sparkles className="h-6 w-6 text-blue-400 fill-blue-400/10" />
+          {/* Brilho interno sutil */}
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent pointer-events-none"></div>
+
+          {/* Logo e Branding Dinâmico */}
+          <div className="mb-8 relative z-10 text-center flex flex-col items-center">
+             <div className="p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 mb-4">
+                <BrainCircuit className="h-8 w-8 text-indigo-400" />
              </div>
+             <h1 className="text-2xl font-black tracking-tight text-white mb-1">
+               {view === 'login' ? 'Bem-vindo ao Cérebro.OS' : view === 'register' ? 'Criar Conta Mestre' : 'Recuperar Acesso'}
+             </h1>
+             <p className="text-xs text-gray-400 font-medium text-balance">
+               {view === 'login' ? 'Acesse seu painel financeiro blindado.' : view === 'register' ? 'O motor de decisões do seu patrimônio.' : 'Enviaremos um link de segurança para redefinir sua senha.'}
+             </p>
           </div>
 
-          <div className="space-y-1 mb-8">
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
-            </h1>
-            <p className="text-xs text-gray-400 font-medium">
-              {isLogin ? 'Acesse seu painel financeiro' : 'Comece a controlar seu império'}
-            </p>
-          </div>
-
-          <form onSubmit={handleAuth} className="w-full space-y-3">
+          {/* Formulário Principal */}
+          <form onSubmit={handleAuth} className="w-full space-y-4 relative z-10">
             
-            {/* Campo Nome (Só aparece no Cadastro) */}
+            {/* Campo Nome (Apenas Cadastro) */}
             <AnimatePresence initial={false}>
-              {!isLogin && (
+              {view === 'register' && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus-within:border-blue-500/50 transition-all group mb-3">
-                    <User size={16} className="text-gray-500 group-focus-within:text-blue-400 mr-3 transition-colors" />
-                    <input 
-                      required 
-                      placeholder="Nome Completo" 
-                      className="bg-transparent text-white w-full outline-none text-sm placeholder-gray-600"
-                      value={formData.fullName}
-                      onChange={e => setFormData({...formData, fullName: e.target.value})}
-                    />
+                  <div className="space-y-1.5 pb-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Nome Completo</label>
+                      <div className="relative">
+                          <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                          <input 
+                              required={view === 'register'}
+                              type="text"
+                              placeholder="Como quer ser chamado?" 
+                              className="w-full bg-[#13131a] border border-white/5 rounded-xl py-3 pl-11 pr-4 text-white focus:border-indigo-500/50 focus:bg-white/10 outline-none transition-all text-sm placeholder-gray-600"
+                              value={formData.fullName}
+                              onChange={e => setFormData({...formData, fullName: e.target.value})}
+                          />
+                      </div>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus-within:border-blue-500/50 transition-all group">
-              <Mail size={16} className="text-gray-500 group-focus-within:text-blue-400 mr-3 transition-colors" />
-              <input 
-                type="email" 
-                required 
-                placeholder="seu@email.com" 
-                className="bg-transparent text-white w-full outline-none text-sm placeholder-gray-600"
-                value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
-              />
+            {/* Campo E-mail (Sempre Visível) */}
+            <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">E-mail de Acesso</label>
+                <div className="relative">
+                    <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input 
+                        type="email" 
+                        required 
+                        placeholder="seu@email.com" 
+                        className="w-full bg-[#13131a] border border-white/5 rounded-xl py-3 pl-11 pr-4 text-white focus:border-indigo-500/50 focus:bg-white/10 outline-none transition-all text-sm font-mono placeholder-gray-600"
+                        value={formData.email}
+                        onChange={e => setFormData({...formData, email: e.target.value})}
+                    />
+                </div>
             </div>
 
-            <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus-within:border-blue-500/50 transition-all group">
-              <Lock size={16} className="text-gray-500 group-focus-within:text-blue-400 mr-3 transition-colors" />
-              <input 
-                type="password" 
-                required 
-                placeholder="••••••••" 
-                className="bg-transparent text-white w-full outline-none text-sm placeholder-gray-600"
-                value={formData.password}
-                onChange={e => setFormData({...formData, password: e.target.value})}
-              />
-            </div>
+            {/* Campo Senha (Oculto na Recuperação) */}
+            <AnimatePresence initial={false}>
+              {view !== 'forgot' && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-1.5 pt-1">
+                      <div className="flex justify-between items-center ml-1">
+                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Senha de Segurança</label>
+                          {view === 'login' && (
+                              <button type="button" onClick={() => setView('forgot')} className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors">
+                                Esqueceu?
+                              </button>
+                          )}
+                      </div>
+                      <div className="relative">
+                          <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                          <input 
+                              type="password" 
+                              required // 🔥 CORRIGIDO: O TS não vai mais reclamar aqui
+                              placeholder="••••••••" 
+                              className="w-full bg-[#13131a] border border-white/5 rounded-xl py-3 pl-11 pr-4 text-white focus:border-indigo-500/50 focus:bg-white/10 outline-none transition-all text-sm font-mono placeholder-gray-600"
+                              value={formData.password}
+                              onChange={e => setFormData({...formData, password: e.target.value})}
+                          />
+                      </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <button 
               type="submit" 
               disabled={loading}
-              className="group w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-70 shadow-lg shadow-blue-900/20 mt-2"
+              className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black py-3.5 px-4 rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-70 shadow-[0_0_20px_rgba(79,70,229,0.3)] flex items-center justify-center gap-2 text-xs uppercase tracking-widest"
             >
               {loading ? <Loader2 className="animate-spin h-4 w-4"/> : (
                 <>
-                  <span>{isLogin ? 'Entrar' : 'Criar Conta'}</span>
-                  {isLogin ? <LogIn className="w-4 h-4 opacity-70" /> : <ArrowRight className="w-4 h-4 opacity-70" />}
+                  <span>
+                    {view === 'login' ? 'Desbloquear Cofre' : view === 'register' ? 'Criar Conta Mestre' : 'Enviar Link de Recuperação'}
+                  </span>
+                  <ArrowRight className="w-4 h-4 opacity-70" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="relative w-full flex items-center justify-center my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-            <div className="relative bg-[#09090b] px-3 text-[10px] uppercase font-bold text-gray-600 tracking-widest">Ou</div>
-          </div>
+          {/* Divisor e Botão do Google (Escondidos na Recuperação de Senha) */}
+          <AnimatePresence>
+            {view !== 'forgot' && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="w-full overflow-hidden">
+                <div className="relative w-full flex items-center justify-center my-6 z-10">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+                  <div className="relative bg-[#09090b] px-4 text-[10px] uppercase font-bold text-gray-600 tracking-widest">Autenticação Segura</div>
+                </div>
 
-          <button 
-            onClick={handleGoogleLogin} 
-            disabled={loading} 
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-[#f0f0f0] text-[#09090b] font-bold py-3 px-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-70"
-          >
-            {loading ? <Loader2 className="animate-spin h-4 w-4 text-gray-600"/> : (
-              <>
-                <GoogleIcon />
-                <span className="text-sm font-bold">Google</span>
-              </>
-            )}
-          </button>
-
-          {/* RODAPÉ DO CARD */}
-          <div className="mt-6 pt-4 border-t border-white/5 w-full flex flex-col items-center gap-3">
-              
-              <p className="text-xs text-gray-500">
-                {isLogin ? 'Não tem uma conta?' : 'Já tem uma conta?'}
                 <button 
-                  type="button" 
-                  onClick={() => setIsLogin(!isLogin)} 
-                  className="ml-1.5 text-blue-400 hover:text-blue-300 font-bold transition-colors hover:underline"
+                  type="button"
+                  onClick={handleGoogleLogin} 
+                  disabled={loading} 
+                  className="relative z-10 w-full flex items-center justify-center gap-3 bg-[#13131a] border border-white/10 hover:bg-white/5 text-white font-bold py-3.5 px-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-70"
                 >
-                  {isLogin ? 'Cadastre-se' : 'Fazer Login'}
+                  {loading ? <Loader2 className="animate-spin h-4 w-4 text-gray-400"/> : (
+                    <>
+                      <GoogleIcon />
+                      <span className="text-sm">Continuar com Google</span>
+                    </>
+                  )}
                 </button>
-              </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* LINKS PARA O GOOGLE - ABRINDO EM NOVA ABA */}
-              <div className="flex items-center gap-3 text-[10px] text-gray-600 font-medium">
-                 <Link 
-                    href="/politica-privacidade" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="hover:text-blue-400 transition-colors cursor-pointer"
-                 >
-                    Política de Privacidade
-                 </Link>
-                 <span className="h-1 w-1 rounded-full bg-gray-700"></span>
-                 <Link 
-                    href="/termos-uso" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="hover:text-blue-400 transition-colors cursor-pointer"
-                 >
-                    Termos de Uso
-                 </Link>
+          {/* Toggle Login/Cadastro/Voltar */}
+          <div className="mt-8 pt-6 border-t border-white/5 w-full flex flex-col items-center gap-4 relative z-10">
+              <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                {view === 'forgot' ? (
+                  <button type="button" onClick={() => setView('login')} className="flex items-center gap-1 font-bold text-indigo-400 hover:text-indigo-300 transition-colors">
+                    <ArrowLeft size={14} /> Voltar para o Login
+                  </button>
+                ) : (
+                  <>
+                    {view === 'login' ? 'Ainda não é um membro?' : 'Já possui acesso ao sistema?'}
+                    <button 
+                      type="button" 
+                      onClick={() => { setView(view === 'login' ? 'register' : 'login'); setFormData({ fullName: '', email: '', password: '' }); }} 
+                      className="font-bold text-white hover:text-indigo-400 transition-colors underline underline-offset-4 decoration-indigo-500/30"
+                    >
+                      {view === 'login' ? 'Cadastre-se agora' : 'Fazer Login'}
+                    </button>
+                  </>
+                )}
               </div>
 
+              {/* Links Legais */}
+              <div className="flex items-center gap-3 text-[10px] text-gray-600 font-medium">
+                 <Link href="/privacidade" className="hover:text-indigo-400 transition-colors">Privacidade</Link>
+                 <span className="h-1 w-1 rounded-full bg-gray-800"></span>
+                 <Link href="/termos" className="hover:text-indigo-400 transition-colors">Termos de Uso</Link>
+              </div>
           </div>
 
         </div>
       </motion.div>
       
-      <div className="absolute bottom-6 flex items-center gap-2 text-white/20 select-none">
+      {/* Badge de Segurança Fixo no Rodapé */}
+      <div className="absolute bottom-6 flex items-center gap-2 text-white/20 select-none pointer-events-none">
          <ShieldCheck className="h-3 w-3" />
-         <span className="text-[10px] font-semibold tracking-widest uppercase">Cérebro Financial OS / Google Gemini</span>
+         <span className="text-[9px] font-bold tracking-widest uppercase font-mono">Ambiente Seguro & Criptografado</span>
       </div>
 
     </div>

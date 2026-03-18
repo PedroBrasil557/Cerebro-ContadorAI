@@ -24,7 +24,7 @@ import SmartShoppingView from '@/modules/personal/views/SmartShoppingView'
 // ==========================================
 import CaixaView from '@/modules/professional/views/CaixaView'
 import NailDesignView from '@/modules/professional/views/NailDesignView'
-import FinancialCommandCenter from '@/modules/professional/components/FinancialCommandCenter' // ✅ IMPORTAÇÃO DO NOVO CFO VIRTUAL
+import FinancialCommandCenter from '@/modules/professional/components/FinancialCommandCenter'
 
 interface ViewContainerProps {
   activeTab: string
@@ -95,10 +95,10 @@ export default function ViewContainer({
   // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
   
-  // Prioriza investimentos vindo das props (MainAppLayout), senão usa o local do container
+  // Prioriza investimentos vindo das props, senão usa o local do container
   const finalInvestments = propsInvestments.length > 0 ? propsInvestments : localInvestments
 
-  // 🛡️ CONTROLE DE ACESSO DA CAMADA (Sincronizado com os Metadados da Sessão)
+  // 🛡️ CONTROLE DE ACESSO DA CAMADA
   const accountMode = user?.user_metadata?.account_mode || user?.account_mode || 'personal'
 
   const pageVariants = { 
@@ -110,56 +110,53 @@ export default function ViewContainer({
   return (
     <AnimatePresence mode='wait'>
       <motion.div 
-        key={`${accountMode}-${activeTab}`} // Key composta para forçar transição ao trocar de modo
+        key={`${accountMode}-${activeTab}`}
         initial="initial" 
         animate="enter" 
         exit="exit" 
         variants={pageVariants} 
         transition={{ duration: 0.3, ease: "easeInOut" }} 
-        className="w-full h-full relative p-4 md:p-8" // ✅ Padding adicionado para a tela respirar corretamente
+        className="w-full h-full relative p-4 md:p-8"
       >
         
         {/* ========================================== */}
-        {/* 🟢 RENDERIZAÇÃO MODO PESSOAL (CPF)           */}
+        {/* 🟢 RENDERIZAÇÃO MODO PESSOAL (CPF)          */}
         {/* ========================================== */}
         {accountMode === 'personal' && (
           <>
             {currentTab === 'dashboard' && (
               <DashboardView 
+                user={user}
                 summary={summary}
                 recentTransactions={transactions.slice(0, 5)}
                 onNavigate={handleRedirect}
-                chartData={charts.monthlyBalanceHistory}
-                chartRange={charts.range}
-                setChartRange={charts.setRange}
                 transactions={transactions}
-                goals={goals}
-                cards={cards}
                 investments={finalInvestments} 
               />
             )}
 
             {(currentTab === 'compras inteligentes' || currentTab === 'compras') && (
-              <SmartShoppingView /> 
+              <SmartShoppingView user={user} /> 
             )}
             
             {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
-              <TransactionsView /> 
+              <TransactionsView user={user} /> 
             )}
             
             {currentTab === 'investimentos' && (
               <InvestmentsView 
+                user={user}
                 goals={goals} 
                 onAddGoal={onAddGoal} 
               />
             )}
             
             {(currentTab === 'minha carteira' || currentTab === 'carteira') && (
-              <WalletView /> 
+              <WalletView user={user} /> 
             )}
             
             {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
-              <DebtCenterView summary={summary} />
+              <DebtCenterView user={user} summary={summary} />
             )}
           </>
         )}
@@ -169,12 +166,10 @@ export default function ViewContainer({
         {/* ========================================== */}
         {accountMode === 'professional' && (
           <>
-            {/* ✅ O NOVO CORAÇÃO FINANCEIRO (Assume a aba principal "Nail Design") */}
             {(currentTab === 'nail design' || currentTab === 'dashboard') && (
               <FinancialCommandCenter />
             )}
 
-            {/* ✅ A AGENDA CLÁSSICA (Movida para a aba "Agenda Smart") */}
             {(currentTab === 'agenda smart' || currentTab === 'agenda') && (
               <NailDesignView />
             )}
@@ -192,7 +187,7 @@ export default function ViewContainer({
         {/* ⚙️ CAMADA 1: MÓDULOS GLOBAIS (Ambos modos) */}
         {/* ========================================== */}
         {(currentTab === 'meu perfil' || currentTab === 'perfil') && (
-          <ProfileView user={user} />
+          <ProfileView user={user as any} /> 
         )}
 
       </motion.div>

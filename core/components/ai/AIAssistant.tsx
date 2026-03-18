@@ -4,11 +4,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   MessageSquare, X, Send, Sparkles, Wallet, 
-  TrendingUp, TrendingDown, Bot, User
+  TrendingUp, Bot, User, Lock 
 } from 'lucide-react'
 import { financeService } from '@/services/financeService'
 import { formatCurrency } from '@/lib/utils'
 import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
+import UpgradeModal from '@/core/components/UpgradeModal' // 🔥 IMPORTADO
 
 interface Message {
   id: string
@@ -16,8 +17,13 @@ interface Message {
   content: string
 }
 
-export default function AIAssistant() {
+interface AIAssistantProps {
+  user: any // Recebe o user do layout para checar o plano
+}
+
+export default function AIAssistant({ user }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false) // Controle do Paywall
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'assistant', content: 'Olá! Sou seu Cérebro Financeiro 🧠. Estou conectado aos seus dados. O que vamos analisar hoje?' }
@@ -30,24 +36,24 @@ export default function AIAssistant() {
       goals: [],
       balance: null
   })
+
+  // 🛡️ Lógica de Plano
+  const userPlan = user?.user_metadata?.plan_tier || 'free'
+  const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const loadContext = async () => {
         try {
-            // 🔥 CORREÇÃO: Removido o getDebts() temporariamente para não quebrar a tela
             const [trans, goals, caixa] = await Promise.all([
                 financeService.getTransactions(),
                 financeService.getGoals(),
                 financeService.getCaixaData()
             ])
-            
-            const debts: any[] = [] // Fallback temporário
-
             setContextData({
                 transactions: trans || [],
-                debts: debts,
+                debts: [],
                 goals: goals || [],
                 balance: caixa
             })
@@ -62,7 +68,21 @@ export default function AIAssistant() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
+  const handleOpenChat = () => {
+    if (isFreePlan) {
+        setShowUpgradeModal(true) // Bloqueia antes de abrir
+        return
+    }
+    setIsOpen(!isOpen)
+  }
+
   const handleSend = async () => {
+    // Dupla checagem de segurança
+    if (isFreePlan) {
+        setShowUpgradeModal(true)
+        return
+    }
+
     if (!input.trim()) return
     const userText = input
     setInput('') 
@@ -105,11 +125,8 @@ export default function AIAssistant() {
 
   const totals = (contextData.transactions || []).reduce((acc: any, t: any) => {
     const val = Number(t.amount)
-    if (t.type === 'receita') {
-        acc.income += val
-    } else {
-        acc.expense += Math.abs(val)
-    }
+    if (t.type === 'receita') { acc.income += val } 
+    else { acc.expense += Math.abs(val) }
     return acc
   }, { income: 0, expense: 0 })
 
@@ -121,10 +138,17 @@ export default function AIAssistant() {
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${isOpen ? 'bg-rose-500 rotate-90' : 'bg-blue-600'}`}
+        onClick={handleOpenChat}
+        className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${
+            isOpen ? 'bg-rose-500 rotate-90' : isFreePlan ? 'bg-indigo-600/80' : 'bg-blue-600'
+        }`}
       >
-        {isOpen ? <X className="text-white" /> : <MessageSquare className="text-white" />}
+        {isOpen ? <X className="text-white" /> : (
+            <div className="relative">
+                <MessageSquare className="text-white" />
+                {isFreePlan && <Lock size={10} className="absolute -top-1 -right-1 text-indigo-200" />}
+            </div>
+        )}
       </motion.button>
 
       {/* JANELA DO CHAT */}
@@ -155,6 +179,7 @@ export default function AIAssistant() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                {/* ... (Seu conteúdo de Saldo e Entradas mantido igual) */}
                 <div className="space-y-4 mb-6">
                     <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide">
                          <div className="min-w-[140px] bg-white/5 p-3 rounded-2xl border border-white/5">
@@ -172,10 +197,9 @@ export default function AIAssistant() {
                             <p className="text-lg font-bold text-emerald-400">{formatCurrency(totals.income)}</p>
                          </div>
                     </div>
-                    
                     <div className="bg-black/20 rounded-2xl p-4 border border-white/5">
                         <h4 className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-2">
-                           <Wallet size={12} /> Próximas Contas
+                            <Wallet size={12} /> Próximas Contas
                         </h4>
                         <FixedExpensesList 
                             transactions={contextData.transactions} 
@@ -199,9 +223,7 @@ export default function AIAssistant() {
                                 ? 'bg-blue-600 text-white rounded-tr-sm' 
                                 : 'bg-[#1a1a1a] text-gray-200 rounded-tl-sm border border-white/5'
                         }`}>
-                            <div className="whitespace-pre-wrap font-light">
-                                {msg.content}
-                            </div>
+                            <div className="whitespace-pre-wrap font-light">{msg.content}</div>
                         </div>
                     </motion.div>
                 ))}
@@ -244,6 +266,12 @@ export default function AIAssistant() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* MODAL DE UPGRADE INTEGRADO */}
+      <UpgradeModal 
+        isOpen={showUpgradeModal} 
+        onClose={() => setShowUpgradeModal(false)} 
+      />
     </>
   )
 }

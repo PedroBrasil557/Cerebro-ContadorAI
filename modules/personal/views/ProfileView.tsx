@@ -1,225 +1,318 @@
 'use client'
 
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
+import React, { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  User, Mail, Phone, MapPin, Globe, Lock, ShieldCheck, 
-  Edit3, Camera, Upload, LogOut, Award, ChevronRight,
-  Settings, Key, CreditCard, Bell
+  User, Mail, Phone, MapPin, Star, 
+  Camera, Loader2, Zap, Save, CheckCircle2,
+  CreditCard, BrainCircuit, ShieldCheck, Lock, Bell, LogOut, ChevronRight, Target, X
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import { UserProfile } from '@/types_db'
+import UpgradeModal from '@/core/components/UpgradeModal' // ✅ CORRIGIDO: Importação adicionada
 
-// --- 1. COMPONENTES VISUAIS (Mantendo o Design Premium) ---
+// --- TIPAGENS ---
+interface ProfileViewProps {
+  user: any 
+}
 
-const GlassCard = ({ children, className = "", onClick }: any) => (
+// --- COMPONENTE VISUAL BASE ---
+const PremiumCard = ({ children, className = "", glowColor = "from-indigo-500/5" }: any) => (
   <motion.div 
-    whileHover={{ y: -2 }}
-    transition={{ duration: 0.3 }}
-    onClick={onClick}
-    className={`relative bg-[#09090b]/60 backdrop-blur-xl border border-white/[0.06] rounded-3xl overflow-hidden shadow-2xl ${className}`}
+    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+    className={`relative group bg-[#09090b]/40 backdrop-blur-2xl border border-white/[0.05] rounded-[2.5rem] overflow-hidden shadow-2xl ${className}`}
   >
-    <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] pointer-events-none" />
-    <div className="relative z-10">{children}</div>
+    <div className={`absolute inset-0 bg-gradient-to-br ${glowColor} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none`} />
+    <div className="relative z-10 h-full p-8 flex flex-col">
+      {children}
+    </div>
   </motion.div>
 )
 
-const Badge = ({ email }: { email: string }) => {
-  // Lógica simples: Se tiver email, é membro. Futuramente pode vir do banco (ex: user.subscription_tier)
-  return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 text-purple-400">
-      <Award size={14} />
-      <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider">Membro Ativo</span>
-    </div>
-  )
-}
-
 const MenuOption = ({ icon: Icon, label, value, color = "text-white", onClick }: any) => (
     <button 
+        type="button"
         onClick={onClick}
-        className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition active:bg-white/10 group first:rounded-t-2xl last:rounded-b-2xl border-b border-white/5 last:border-0"
+        className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition active:bg-white/10 group border-b border-white/5 last:border-0"
     >
         <div className="flex items-center gap-4">
-            <div className="p-2 bg-white/5 rounded-xl text-gray-400 group-hover:text-white transition-colors">
+            <div className={`p-2.5 bg-white/5 rounded-xl text-gray-400 group-hover:${color === 'text-rose-500' ? 'text-rose-500' : 'text-white'} transition-colors`}>
                 <Icon size={20} />
             </div>
-            <span className={`font-medium text-sm md:text-base ${color}`}>{label}</span>
+            <span className={`font-black text-[10px] uppercase tracking-widest ${color}`}>{label}</span>
         </div>
         <div className="flex items-center gap-2">
-            {value && <span className="text-xs text-gray-500 font-medium">{value}</span>}
-            <ChevronRight size={16} className="text-gray-600" />
+            {value && <span className="text-[10px] text-gray-500 font-bold uppercase">{value}</span>}
+            <ChevronRight size={14} className="text-gray-600 group-hover:text-white transition-colors" />
         </div>
     </button>
 )
 
-const InfoField = ({ label, value, icon: Icon, isEditable = false }: any) => (
-  <div className="group relative">
-    <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all">
-      <div className="p-2 rounded-xl bg-white/5 text-gray-400 group-hover:text-white transition-colors">
-        <Icon size={18} />
-      </div>
-      <div className="flex-1 overflow-hidden">
-        <p className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-sm md:text-base text-white font-medium leading-relaxed truncate" title={value}>
-            {value || 'Não informado'}
-        </p>
-      </div>
-      {isEditable && (
-        <button className="opacity-0 group-hover:opacity-100 p-2 text-gray-500 hover:text-blue-400 transition-all">
-          <Edit3 size={16} />
-        </button>
-      )}
-    </div>
-  </div>
-)
-
-// --- VIEW PRINCIPAL ---
-
-export default function ProfileView({ user }: { user?: any }) {
+export default function ProfileView({ user: authUserFromProps }: ProfileViewProps) {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [profile, setProfile] = useState<Partial<UserProfile>>({})
+  const [userId, setUserId] = useState<string | null>(null)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  
+  const [iaEnabled, setIaEnabled] = useState(true)
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false)
+  
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passLoading, setPassLoading] = useState(false)
 
-  // Extração Segura dos Dados Reais do Supabase
-  // O objeto 'user' pode vir do 'session.user' ou da tabela 'user_profiles'
-  const realData = {
-    fullName: user?.full_name || user?.user_metadata?.full_name || 'Usuário',
-    email: user?.email || '',
-    phone: user?.phone || user?.user_metadata?.phone || '',
-    avatarUrl: user?.avatar_url || user?.user_metadata?.avatar_url,
-    createdAt: user?.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Recentemente',
-    location: user?.location || 'Brasil', // Se não tiver no banco, mantém um genérico ou vazio
-    bio: user?.bio || 'Configurações da sua conta.'
+  const [pushNotif, setPushNotif] = useState(true)
+  const [emailNotif, setEmailNotif] = useState(true)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        setUserId(user.id)
+
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (data) {
+            setProfile(data)
+        } else {
+            setProfile({ 
+                email: user.email, 
+                full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+                avatar_url: user.user_metadata?.avatar_url
+            })
+        }
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setProfile(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  // Inicial do nome para o avatar padrão
-  const userInitial = realData.fullName ? realData.fullName.charAt(0).toUpperCase() : 'U';
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.full_name,
+          phone: profile.phone,
+          location: profile.location,
+          bio: profile.bio
+        })
+        .eq('id', userId)
+
+      if (error) throw error
+      toast.success("Perfil sincronizado!", { icon: <CheckCircle2 className="text-emerald-500" /> })
+      setIsEditing(false)
+    } catch (error: any) {
+      toast.error(`Falha ao salvar: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (newPassword !== confirmPassword) return toast.error("Senhas divergentes.")
+      setPassLoading(true)
+      try {
+          const { error } = await supabase.auth.updateUser({ password: newPassword })
+          if (error) throw error
+          toast.success("Segurança reforçada!")
+          setIsPasswordModalOpen(false)
+          setNewPassword(''); setConfirmPassword('')
+      } catch (error: any) {
+          toast.error("Erro na atualização.")
+      } finally {
+          setPassLoading(false)
+      }
+  }
+
+  const handleLogout = async () => {
+      await supabase.auth.signOut()
+      window.location.href = '/' 
+  }
+
+  if (loading) {
+    return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
+  }
+
+  const isPro = profile.plan_tier === 'pro' || profile.plan_tier === 'premium'
 
   return (
-    <div className="p-4 md:p-10 space-y-8 md:space-y-10 max-w-[1600px] mx-auto pb-32 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8 space-y-10 pb-32 max-w-7xl mx-auto">
       
-      {/* 1. HEADER PERFIL */}
-      <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
-          
-          {/* Avatar Grande */}
-          <div className="relative group">
-             <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 p-[3px] shadow-2xl shadow-blue-900/30">
-                <div className="w-full h-full rounded-full bg-[#0a0a0a] flex items-center justify-center overflow-hidden relative">
-                   {realData.avatarUrl ? (
-                      <img src={realData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                   ) : (
-                      <span className="text-3xl md:text-4xl font-black text-white">{userInitial}</span>
-                   )}
-                   
-                   {/* Overlay de Edição (Visual apenas por enquanto) */}
-                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm">
-                      <Camera className="text-white h-6 w-6 md:h-8 md:w-8" />
-                   </div>
-                </div>
-             </div>
-             <div className="absolute bottom-0 right-0 p-2 bg-blue-600 rounded-full text-white shadow-lg border-4 border-[#050505]">
-                <Upload size={14} />
-             </div>
-          </div>
-
-          {/* Infos Principais */}
-          <div className="flex-1 text-center md:text-left">
-             <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight mb-2">{realData.fullName}</h1>
-             <p className="text-sm md:text-base text-gray-400 mb-4 md:mb-6 max-w-lg mx-auto md:mx-0">{realData.email}</p>
-             
-             <div className="flex flex-wrap justify-center md:justify-start gap-3 w-full">
-                <Badge email={realData.email} />
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02] text-gray-400">
-                   <span className="text-[10px] font-bold uppercase tracking-wider">Membro desde {realData.createdAt}</span>
-                </div>
-             </div>
-          </div>
-
-          {/* Botões de Ação (Desktop) */}
-          <div className="hidden md:flex gap-3 self-start">
-             <button 
-                onClick={() => setIsEditing(!isEditing)}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-900/20 transition-all"
-             >
-                {isEditing ? 'Salvar Alterações' : 'Editar Perfil'}
-             </button>
-          </div>
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+            <h1 className="text-4xl font-black tracking-tight mb-2 uppercase italic">Configurações</h1>
+            <p className="text-gray-500 font-medium uppercase tracking-widest text-xs">Identidade Digital e Parâmetros do Cérebro.OS</p>
+        </div>
+        <div className="flex items-center gap-3 bg-emerald-500/10 px-6 py-3 rounded-2xl border border-emerald-500/20">
+            <ShieldCheck size={18} className="text-emerald-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Ativos Criptografados</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 items-start">
-         
-         {/* 2. COLUNA ESQUERDA (Menu de Configurações) */}
-         <div className="lg:col-span-4 space-y-6 order-2 lg:order-1">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* COLUNA ESQUERDA */}
+        <div className="lg:col-span-4 space-y-8">
             
-            {/* Grupo: Conta */}
-            <div className="bg-[#09090b] border border-white/10 rounded-3xl overflow-hidden">
-                <p className="px-6 pt-6 pb-2 text-xs font-bold text-gray-500 uppercase tracking-widest">Geral</p>
-                <MenuOption icon={User} label="Dados Pessoais" />
-                <MenuOption icon={CreditCard} label="Assinatura" value="Basic" />
-                <MenuOption icon={Bell} label="Notificações" value="On" />
-            </div>
-
-            {/* Grupo: Segurança */}
-            <div className="bg-[#09090b] border border-white/10 rounded-3xl overflow-hidden">
-                <p className="px-6 pt-6 pb-2 text-xs font-bold text-gray-500 uppercase tracking-widest">Segurança</p>
-                <MenuOption icon={Lock} label="Alterar Senha" />
-                <MenuOption icon={ShieldCheck} label="Privacidade" />
-                <MenuOption icon={Settings} label="Preferências do App" />
-            </div>
-
-            {/* Logout */}
-            <button className="w-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 p-4 rounded-2xl flex items-center justify-center gap-2 text-rose-500 font-bold transition">
-                <LogOut size={18} /> Sair da Conta
-            </button>
-            
-            <p className="text-center text-[10px] text-gray-600 uppercase pt-2">ID: {user?.id?.slice(0, 8) || '...'}</p>
-         </div>
-
-         {/* 3. COLUNA DIREITA (Detalhes Reais) */}
-         <div className="lg:col-span-8 space-y-6 order-1 lg:order-2">
-            
-            {/* Grid de Informações */}
-            <GlassCard className="p-6 md:p-8">
-               <div className="flex items-center gap-2 mb-6 md:mb-8">
-                  <User className="text-blue-400" size={20} />
-                  <h3 className="text-lg font-bold text-white">Dados da Conta</h3>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                  <InfoField label="Nome Completo" value={realData.fullName} icon={User} isEditable />
-                  <InfoField label="Email Principal" value={realData.email} icon={Mail} />
-                  <InfoField label="Telefone" value={realData.phone} icon={Phone} isEditable />
-                  <InfoField label="Localização" value={realData.location} icon={MapPin} isEditable />
-               </div>
-
-               {/* Botão Salvar Mobile */}
-               {isEditing && (
-                   <button 
-                      onClick={() => setIsEditing(false)}
-                      className="md:hidden w-full mt-6 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg"
-                   >
-                      Salvar Alterações
-                   </button>
-               )}
-               {!isEditing && (
-                   <button 
-                      onClick={() => setIsEditing(true)}
-                      className="md:hidden w-full mt-6 py-4 bg-white/5 border border-white/10 text-white font-bold rounded-xl"
-                   >
-                      Editar Dados
-                   </button>
-               )}
-            </GlassCard>
-
-            {/* Banner de Status */}
-            <div className="bg-gradient-to-r from-emerald-900/20 to-blue-900/20 border border-emerald-500/20 p-6 rounded-3xl flex items-center gap-4">
-                <div className="p-3 bg-emerald-500/10 rounded-full text-emerald-400 shrink-0">
-                    <ShieldCheck size={24} />
+            <PremiumCard glowColor="from-indigo-500/10" className="flex flex-col items-center text-center">
+                <div className="relative group/avatar cursor-pointer mb-8">
+                    <div className="w-36 h-36 rounded-full border-4 border-[#09090b] shadow-2xl bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center overflow-hidden relative group-hover:scale-105 transition-transform">
+                        {profile.avatar_url ? (
+                            <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                            <span className="text-5xl font-black text-white/40 uppercase">{profile.full_name?.charAt(0) || 'U'}</span>
+                        )}
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity backdrop-blur-sm">
+                            <Camera size={28} className="text-white" />
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <h4 className="text-base font-bold text-white">Conta Verificada</h4>
-                    <p className="text-sm text-emerald-100/70">Seus dados estão sincronizados e seguros.</p>
-                </div>
-            </div>
+                <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic truncate w-full">{profile.full_name || 'Usuário'}</h2>
+                <p className="text-xs font-mono text-gray-500 mt-2 tracking-widest lowercase">{profile.email}</p>
+                <div className="mt-8 w-full h-px bg-white/5" />
+                <p className="mt-6 text-[9px] font-black text-gray-600 uppercase tracking-[0.2em]">Célula Financeira desde {profile.created_at ? new Date(profile.created_at).getFullYear() : '2024'}</p>
+            </PremiumCard>
 
-         </div>
+            <PremiumCard glowColor={isPro ? "from-emerald-500/10" : "from-indigo-500/10"}>
+                <div className="flex justify-between items-center mb-8">
+                    <div className={`p-4 rounded-2xl ${isPro ? 'bg-emerald-500/10 text-emerald-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                        {isPro ? <Star size={24} /> : <Zap size={24} />}
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full border ${isPro ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
+                        Cérebro {profile.plan_tier?.toUpperCase() || 'FREE'}
+                    </span>
+                </div>
+                <h3 className="text-lg font-black text-white uppercase tracking-tight mb-3">Nível de Processamento</h3>
+                <p className="text-xs text-gray-500 mb-8 leading-relaxed font-medium uppercase">
+                    {isPro 
+                        ? "Potencial cognitivo máximo ativado. IA operando em 100% da capacidade."
+                        : "Capacidade limitada. Sincronize com o plano PRO para auditoria fiscal e IA estratégica."}
+                </p>
+                <button type="button" onClick={() => !isPro && setShowUpgradeModal(true)} className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl ${isPro ? 'bg-white/5 text-gray-400 hover:text-white border border-white/5' : 'bg-white text-black hover:bg-gray-200'}`}>
+                    {isPro ? 'Configurar Plano' : 'Ativar Versão PRO'}
+                </button>
+            </PremiumCard>
+
+            <div className="bg-[#09090b]/40 border border-white/[0.05] rounded-[2rem] overflow-hidden shadow-xl backdrop-blur-md">
+                <p className="px-6 pt-6 pb-2 text-[9px] font-black text-gray-600 uppercase tracking-[0.3em]">Hardware & Segurança</p>
+                <MenuOption icon={Lock} label="Blindar Senha" onClick={() => setIsPasswordModalOpen(true)} />
+                <MenuOption icon={Bell} label="Fluxo de Alertas" value={pushNotif ? "Ativos" : "Mudos"} onClick={() => setIsNotificationsModalOpen(true)} />
+                <MenuOption icon={LogOut} label="Terminar Sessão" color="text-rose-500" onClick={handleLogout} />
+            </div>
+        </div>
+
+        {/* COLUNA DIREITA */}
+        <div className="lg:col-span-8">
+            <PremiumCard>
+                <div className="flex items-center justify-between mb-10 pb-8 border-b border-white/5">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-400"><User size={20} /></div>
+                        <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">Perímetro do Perfil</h2>
+                    </div>
+                    {!isEditing && (
+                        <button type="button" onClick={() => setIsEditing(true)} className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-6 py-2.5 rounded-xl border border-indigo-500/10 transition-all hover:bg-indigo-500/20">Modificar</button>
+                    )}
+                </div>
+
+                <form onSubmit={handleSaveProfile} className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Nome Completo</label>
+                            <input name="full_name" value={profile.full_name || ''} onChange={handleChange} required disabled={!isEditing} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white text-sm font-black focus:border-indigo-500/50 outline-none transition-all disabled:opacity-30" />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Telefone de Segurança</label>
+                            <input name="phone" value={profile.phone || ''} onChange={handleChange} disabled={!isEditing} className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white text-sm font-mono focus:border-indigo-500/50 outline-none transition-all disabled:opacity-30" placeholder="(00) 00000-0000" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Target size={12} className="text-indigo-500"/> Diretriz Financeira Principal</label>
+                        <textarea name="bio" value={profile.bio || ''} onChange={handleChange} disabled={!isEditing} rows={3} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-white text-sm font-medium focus:border-indigo-500/50 outline-none transition-all resize-none disabled:opacity-30" placeholder="Defina seu objetivo para a IA analisar..." />
+                    </div>
+
+                    <div className="pt-8 border-t border-white/5">
+                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 italic">Arquitetura Cognitiva</h3>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div 
+                                onClick={() => setIaEnabled(!iaEnabled)}
+                                className={`p-6 rounded-[1.5rem] border transition-all cursor-pointer ${iaEnabled ? 'border-indigo-500/30 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'border-white/5 bg-white/5 opacity-50'}`}
+                             >
+                                 <div className="flex items-center justify-between">
+                                     <div className="flex items-center gap-4">
+                                         <BrainCircuit size={24} className={iaEnabled ? "text-indigo-400" : "text-gray-500"}/>
+                                         <div>
+                                             <p className={`text-xs font-black uppercase tracking-tight ${iaEnabled ? "text-white" : "text-gray-400"}`}>Motor Analítico</p>
+                                             <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mt-1">Processamento de Dados</p>
+                                         </div>
+                                     </div>
+                                     <div className={`w-10 h-5 rounded-full relative transition-colors ${iaEnabled ? 'bg-indigo-500' : 'bg-gray-600'}`}>
+                                         <motion.div layout animate={{ x: iaEnabled ? 22 : 2 }} className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm" />
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                    </div>
+
+                    <AnimatePresence>
+                        {isEditing && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pt-8 flex flex-col md:flex-row justify-end gap-4">
+                                <button type="button" onClick={() => setIsEditing(false)} className="bg-white/5 hover:bg-white/10 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest">Abortar</button>
+                                <button type="submit" disabled={saving} className="bg-white text-black px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-xl hover:scale-105 active:scale-95">
+                                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Sincronizar Alterações
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </form>
+            </PremiumCard>
+        </div>
       </div>
+
+      {/* MODAL DE SENHA */}
+      <AnimatePresence>
+        {isPasswordModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="w-full max-w-md bg-[#09090b] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative">
+                <button type="button" onClick={() => setIsPasswordModalOpen(false)} className="absolute top-6 right-6 p-2 text-gray-500 hover:text-white rounded-full transition-colors"><X size={20}/></button>
+                <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tighter">Segurança Máxima</h3>
+                <p className="text-xs text-gray-500 mb-8 font-medium">Atualize sua chave de acesso ao sistema.</p>
+                <form onSubmit={handleUpdatePassword} className="space-y-6">
+                    <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Nova Senha</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-mono outline-none focus:border-indigo-500/50" /></div>
+                    <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Confirmar Senha</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-mono outline-none focus:border-indigo-500/50" /></div>
+                    <button type="submit" disabled={passLoading} className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-5 text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-xl transition-all flex justify-center items-center gap-3">
+                        {passLoading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />} Sobrescrever Senha
+                    </button>
+                </form>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} /> 
     </div>
   )
 }
