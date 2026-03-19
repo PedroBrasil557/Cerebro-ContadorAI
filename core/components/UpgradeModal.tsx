@@ -2,7 +2,10 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, X, CheckCircle2, Zap, BrainCircuit, Loader2, ShieldCheck } from 'lucide-react'
+import { 
+  Sparkles, X, Zap, BrainCircuit, Loader2, 
+  ShieldCheck, Swords, TrendingDown, Layers 
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 interface UpgradeModalProps {
@@ -21,7 +24,8 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          priceId: 'PRO_PRICE_ID_DO_STRIPE', // Substitua pelo ID real do seu produto no Stripe
+          // ✅ ID ATUALIZADO COM SUCESSO
+          priceId: 'price_1TCfihIH9EXlJxoZ4ujtjQUh', 
           planTier: 'pro' 
         }),
       })
@@ -142,6 +146,3 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
     </AnimatePresence>
   )
 }
-
-// Ícones adicionais necessários para o grid
-import { Swords, TrendingDown, Layers } from 'lucide-react'
