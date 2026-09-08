@@ -56,6 +56,7 @@ export default function FinancialCommandCenter() {
         .from('transactions')
         .select('amount, type')
         .eq('user_id', user.id)
+        .eq('scope', 'business')
         .gte('date', startOfMonth)
 
       // 3. Buscar Insumos (Custos)
@@ -87,15 +88,14 @@ export default function FinancialCommandCenter() {
         : 0
       const totalMaterialCost = materialCostPerApp * totalAppointments
       
-      // Simulação de Despesa Fixa (ex: aluguel) = 30% do faturamento (ajustável no futuro)
-      const estimatedFixedCost = grossRev * 0.30 
-      
-      const netProfit = grossRev - totalMaterialCost - estimatedFixedCost
+      const registeredExpenses = (txs ?? [])
+        .filter((tx: { type: string }) => tx.type === 'despesa_fixa' || tx.type === 'despesa_variavel')
+        .reduce((sum: number, tx: { amount: number }) => sum + Math.abs(Number(tx.amount)), 0)
+      const netProfit = grossRev - totalMaterialCost - registeredExpenses
       const margin = grossRev > 0 ? (netProfit / grossRev) * 100 : 0
       
-      // Algoritmo do Pró-labore (Seguro sacar 60% do lucro, reinvestir 40%)
-      const safeProLabore = netProfit > 0 ? netProfit * 0.6 : 0
-      const reinvestment = netProfit > 0 ? netProfit * 0.4 : 0
+      const safeProLabore = 0
+      const reinvestment = 0
 
       // Algoritmo do Índice de Estabilidade (0 a 100)
       let stability = 0
@@ -212,20 +212,20 @@ export default function FinancialCommandCenter() {
                     Margem: {health.profit_margin_pct.toFixed(1)}%
                   </span>
                 </div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Lucro Líquido Real</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Lucro Líquido Estimado</p>
                 <h3 className="text-3xl font-black text-white mt-1 relative z-10">{formatCurrency(health.net_profit)}</h3>
               </div>
             </div>
 
             <div className="bg-[#050505] border border-white/5 rounded-3xl p-6 shadow-inner">
-               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Distribuição de Lucro Recomendada</h4>
+               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Distribuição pendente de configuração <span className="ml-2 text-amber-400">ESTIMATIVA</span></h4>
                <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Pró-Labore Seguro (Saque)</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Pró-Labore não configurado</p>
                      <p className="text-xl font-black text-emerald-400">{formatCurrency(health.safe_pro_labore)}</p>
                   </div>
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Caixa da Empresa (Reinvestir)</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Reinvestimento não configurado</p>
                      <p className="text-xl font-black text-white">{formatCurrency(health.reinvestment_pool)}</p>
                   </div>
                </div>

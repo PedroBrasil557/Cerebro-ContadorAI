@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   TrendingUp, Wallet, Activity, BrainCircuit, Zap, ChevronRight, 
@@ -11,9 +11,10 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar
 } from 'recharts'
-import { Transaction, Goal, CreditCard, Investment } from '@/types_db'
-import { getDashboardSummary, getTransactions } from '@/core/action/transactions'
+import { Transaction, Goal, CreditCard, Investment, ActiveTab } from '@/types_db'
+import { calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 import UpgradeModal from '@/core/components/UpgradeModal'
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 // --- COMPONENTES AUXILIARES ---
 const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
@@ -58,39 +59,23 @@ const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay }: any)
 }
 
 interface DashboardViewProps {
-  user: any
   summary: { balance: number; income: number; expense: number; emergencyTotal: number }
   recentTransactions: Transaction[]
-  onNavigate: (tab: string) => void
+  onNavigate: (tab: ActiveTab) => void
   transactions: Transaction[] 
   investments: Investment[]
 }
 
-export default function DashboardView({ user, summary: initialSummary, onNavigate, transactions: initialTransactions = [], investments = [] }: DashboardViewProps) {
+export default function DashboardView({ summary: initialSummary, onNavigate, transactions: initialTransactions = [], investments = [] }: DashboardViewProps) {
   const [chartType, setChartType] = useState<'area' | 'bar' | 'line'>('area')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
-  const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
+  const { plan } = useEntitlements()
+  const isFreePlan = plan === 'free'
 
-  const [liveTransactions, setLiveTransactions] = useState<Transaction[]>(initialTransactions)
-  const [liveSummary, setLiveSummary] = useState(initialSummary)
-
-  useEffect(() => {
-    const fetchFreshData = async () => {
-      try {
-        const freshTransactions = await getTransactions()
-        const freshSummary = await getDashboardSummary()
-        setLiveTransactions(freshTransactions)
-        setLiveSummary({
-          ...freshSummary,
-          emergencyTotal: initialSummary?.emergencyTotal || 0
-        })
-      } catch (error) { console.error("Erro ao sincronizar:", error) }
-    }
-    fetchFreshData()
-  }, [initialSummary?.emergencyTotal])
+  const liveTransactions = initialTransactions
+  const liveSummary = initialSummary
 
   // --- LÓGICA DE CÁLCULO NORMALIZADA (SÓ O MÊS ATUAL) ---
   const stats = useMemo(() => {
@@ -105,13 +90,8 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
         return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
     
-    const income = monthTransactions
-      .filter(t => t?.type?.toLowerCase() === 'receita')
-      .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0)
-
-    const expense = monthTransactions
-      .filter(t => t?.type?.toLowerCase() === 'despesa' || t?.type?.toLowerCase() === 'saída' || t?.type?.toLowerCase() === 'saida')
-      .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0)
+    const income = calculateIncome(monthTransactions)
+    const expense = calculateExpenses(monthTransactions)
 
     // Soma dos bancos adicionados na aba Carteira (LocalStorage)
     const localBanks = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('cerebro_banks') || '[]') : []
@@ -119,8 +99,7 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
 
     const totalInvestments = (investments || []).reduce((acc, inv) => acc + Number(inv?.amount_invested || 0), 0)
     
-    // IA Score Calculado dinamicamente para o Gauge
-    const score = income > 0 ? Math.min(Math.round((income / (expense || 1)) * 40), 100) : 0
+    const score = expense > 0 ? Math.min(Math.round((income / expense) * 100), 100) : income > 0 ? 100 : 0
 
     return { 
         income, 
@@ -144,8 +123,8 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
       if (d.getFullYear() === selectedYear) {
         const m = d.getMonth()
         const amt = Math.abs(Number(t.amount || 0))
-        if (t.type?.toLowerCase() === 'receita') months[m].receita += amt
-        else months[m].despesa += amt
+        if (t.type === 'receita') months[m].receita += amt
+        else if (t.type === 'despesa_fixa' || t.type === 'despesa_variavel') months[m].despesa += amt
       }
     })
     return months
@@ -177,7 +156,7 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
       {/* MOTOR COGNITIVO COM PAYWALL */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
         <PremiumCard className={`lg:col-span-2 relative transition-all duration-500 ${isFreePlan ? 'blur-md grayscale pointer-events-none' : ''}`}>
-            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6"><Activity size={16}/> Score de Saúde IA</h3>
+            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6"><Activity size={16}/> Cobertura de despesas do mês</h3>
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 h-full">
                 <div className="relative w-64 h-36">
                     <svg viewBox="0 0 200 120" className="w-full h-full overflow-visible">

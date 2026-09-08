@@ -144,6 +144,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
+        .eq('scope', 'business')
         .gte('date', startOfMonth)
         .order('date', { ascending: false })
       
@@ -162,12 +163,11 @@ export default function CaixaView({ data, transactions: initialTransactions = []
 
   // 1. CONSTRUÇÃO DO DOMÍNIO (Data Prep)
   const metrics: BusinessMetrics = useMemo(() => {
-    const today = new Date()
-    const thisMonth = today.getMonth()
-    
     // Calcula com base nas transações reais carregadas do Supabase
     const revenue = liveTransactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    const expenses = liveTransactions.filter(t => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
+    const expenses = liveTransactions
+      .filter(t => t.type === 'despesa_fixa' || t.type === 'despesa_variavel')
+      .reduce((acc, t) => acc + Math.abs(Number(t.amount)), 0)
 
     // O Saldo real atualizado
     const realBalance = (safeData.currentBalance || 0) + revenue - expenses
@@ -233,6 +233,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
       description: newTx.description,
       amount: parseFloat(newTx.amount),
       type: txType,
+      scope: 'business',
       category: newTx.category,
       date: new Date().toISOString(),
       status: 'concluido'

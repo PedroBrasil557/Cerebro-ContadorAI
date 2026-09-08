@@ -1,12 +1,11 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import { 
-  Transaction, ClientAppointment, Goal, CaixaData, 
-  CreditCard, UserProfile, NewGoal, Investment 
+  Transaction, Goal, CaixaData, NewGoal, Investment, ActiveTab
 } from '@/types_db'
+import type { User } from '@supabase/supabase-js'
 
 // ==========================================
 // 📦 CAMADA 2: MÓDULOS PESSOAIS
@@ -27,9 +26,9 @@ import NailDesignView from '@/modules/professional/views/NailDesignView'
 import FinancialCommandCenter from '@/modules/professional/components/FinancialCommandCenter'
 
 interface ViewContainerProps {
-  activeTab: string
-  handleRedirect: (tab: any) => void
-  user: UserProfile | any
+  activeTab: ActiveTab
+  handleRedirect: (tab: ActiveTab) => void
+  user: User
   
   // Resumo Financeiro
   summary: {
@@ -47,59 +46,26 @@ interface ViewContainerProps {
   }
   
   // Dados
-  cards: CreditCard[]
   goals: Goal[]
   transactions: Transaction[]
-  appointments: ClientAppointment[]
   caixaData: CaixaData
   investments: Investment[] 
-  
-  // Props Extras
-  emergencyFund: any 
-  cdiRate: number
-  healthScore: number
 
   // Handlers
-  onUpdateEmergencyFund: (val: any) => Promise<void>
   onAddGoal: (goal: NewGoal) => Promise<void>
-  onUpdateGoal: (goal: Goal) => void
-  onUpdateStatus: (id: string, status: string) => void
-  onAddAppointment: (appt: any) => void
 }
 
 export default function ViewContainer({ 
-  activeTab, handleRedirect, user, summary, transactions = [], appointments = [], goals = [], caixaData, cards = [],
-  onAddGoal, onUpdateStatus, onAddAppointment, charts, onUpdateGoal, investments: propsInvestments = []
+  activeTab, handleRedirect, user, summary, transactions = [], goals = [], caixaData,
+  onAddGoal, investments = []
 }: ViewContainerProps) {
-
-  const [localInvestments, setLocalInvestments] = useState<Investment[]>([])
-  const supabase = createClient()
-
-  // ✅ BUSCA DINÂMICA DE INVESTIMENTOS
-  const fetchInvestments = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser) {
-      const { data } = await supabase
-        .from('investments')
-        .select('*')
-        .eq('user_id', authUser.id)
-      
-      if (data) setLocalInvestments(data as Investment[])
-    }
-  }
-
-  useEffect(() => {
-    fetchInvestments()
-  }, [activeTab])
 
   // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
   
   // Prioriza investimentos vindo das props, senão usa o local do container
-  const finalInvestments = propsInvestments.length > 0 ? propsInvestments : localInvestments
-
   // 🛡️ CONTROLE DE ACESSO DA CAMADA
-  const accountMode = user?.user_metadata?.account_mode || user?.account_mode || 'personal'
+  const accountMode = user.user_metadata?.account_mode || 'personal'
 
   const pageVariants = { 
     initial: { opacity: 0, scale: 0.98 }, 
@@ -126,12 +92,11 @@ export default function ViewContainer({
           <>
             {currentTab === 'dashboard' && (
               <DashboardView 
-                user={user}
                 summary={summary}
                 recentTransactions={transactions.slice(0, 5)}
                 onNavigate={handleRedirect}
                 transactions={transactions}
-                investments={finalInvestments} 
+                investments={investments} 
               />
             )}
 

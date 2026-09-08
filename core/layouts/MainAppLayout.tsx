@@ -15,8 +15,9 @@ import Navigation from '@/core/components/Navigation'
 import AIAssistant from '@/core/components/ai/AIAssistant' 
 
 import { checkAndTriggerSystemNotifications } from '@/core/action/notifications'
+import { calculateBalance, calculateExpenses, calculateIncome, groupTransactionsByMonth } from '@/core/finance/transactionMath'
 import { ActiveTab } from '@/types'
-import { CreditCard, Goal, Transaction, ClientAppointment, CaixaData, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
+import { Goal, Transaction, CaixaData, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
 
 // ============================================================================
 // COMPONENTE: TOPBAR (CÉREBRO.OS GLOBAL HEADER)
@@ -156,9 +157,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [appointments, setAppointments] = useState<ClientAppointment[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
-  const [cards, setCards] = useState<CreditCard[]>([]) 
   const [investments, setInvestments] = useState<Investment[]>([]) 
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [caixa, setCaixa] = useState<CaixaData>({ currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] })
@@ -169,13 +168,11 @@ export default function MainAppLayout({ session }: { session: Session }) {
         try {
             await checkAndTriggerSystemNotifications()
 
-            const [dbProfile, dbTrans, dbAppts, dbGoals, dbCaixaData, dbCards, dbNotifs, dbInvests] = await Promise.all([
+            const [dbProfile, dbTrans, dbGoals, dbCaixaData, dbNotifs, dbInvests] = await Promise.all([
                 financeService.getProfile(),
                 financeService.getTransactions(),
-                financeService.getAppointments(),
                 financeService.getGoals(),
                 financeService.getCaixaData(),
-                financeService.getCards(),       
                 financeService.getNotifications(),
                 financeService.getInvestments()
             ])
@@ -185,9 +182,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
                 if (dbProfile.account_mode) setAccountMode(dbProfile.account_mode)
             }
             if (dbTrans) setTransactions(dbTrans)
-            if (dbAppts) setAppointments(dbAppts)
             if (dbGoals) setGoals(dbGoals)
-            if (dbCards) setCards(dbCards)
             if (dbNotifs) setNotifications(dbNotifs)
             if (dbInvests) setInvestments(dbInvests)
             if (dbCaixaData) setCaixa(dbCaixaData)
@@ -200,7 +195,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
         }
     }
     loadData()
-  }, [session, activeTab])
+  }, [session?.user?.id])
 
   const handleLogout = async () => {
       await supabase.auth.signOut()
@@ -209,20 +204,16 @@ export default function MainAppLayout({ session }: { session: Session }) {
 
   // ✅ CÁLCULO DO SUMMARY FINANCEIRO (O motor que alimenta a IA)
   const financialSummary = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    const expense = transactions.filter(t => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    return { balance: income - expense, income, expense, emergencyTotal: caixa.currentBalance }
+    const income = calculateIncome(transactions)
+    const expense = calculateExpenses(transactions)
+    return { balance: calculateBalance(transactions), income, expense, emergencyTotal: caixa.currentBalance }
   }, [transactions, caixa])
 
   const historyChartData = useMemo(() => {
-    if (transactions.length === 0) return []
-    const dataMap = new Map()
-    transactions.slice(-10).forEach(t => {
-        const key = new Date(t.date).toLocaleDateString('pt-BR', { month: 'short' })
-        const currentVal = dataMap.get(key) || 0
-        dataMap.set(key, currentVal + (t.type === 'receita' ? Number(t.amount) : -Number(t.amount)))
-    })
-    return Array.from(dataMap).map(([name, value]) => ({ name, value }))
+    return groupTransactionsByMonth(transactions).slice(-10).map(({ month, balance }) => ({
+      name: new Date(`${month}-01T12:00:00`).toLocaleDateString('pt-BR', { month: 'short' }),
+      value: balance,
+    }))
   }, [transactions])
 
   return (
@@ -260,20 +251,11 @@ export default function MainAppLayout({ session }: { session: Session }) {
               user={session?.user} 
               summary={financialSummary}
               charts={{ monthlyBalanceHistory: historyChartData, range: chartRange, setRange: setChartRange }} 
-              cards={cards}
               goals={goals}
               transactions={transactions} 
-              appointments={appointments}
               caixaData={caixa}
               investments={investments} 
-              emergencyFund={{ current_amount: caixa.currentBalance, target_amount: 30000, monthly_expenses: 5000, months_covered: Math.floor(caixa.currentBalance / 5000), target_months: 6, status: 'safe' }}
-              cdiRate={13.65}
-              healthScore={850}
-              onUpdateEmergencyFund={async () => {}}
               onAddGoal={(g) => financeService.createGoal(g).then(res => setGoals(prev => [...prev, res]))}
-              onUpdateGoal={(g) => setGoals(prev => prev.map(item => item.id === g.id ? g : item))}
-              onUpdateStatus={async (id, status) => financeService.updateAppointmentStatus(id, status).then(() => setAppointments(prev => prev.map(a => a.id === id ? {...a, status: status as any} : a)))}
-              onAddAppointment={(appt: any) => financeService.createAppointment(appt).then(res => setAppointments(prev => [...prev, res]))} 
            />
            <div className="h-24" /> 
         </div>

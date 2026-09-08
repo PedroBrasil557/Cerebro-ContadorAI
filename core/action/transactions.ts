@@ -12,6 +12,7 @@ export interface Transaction {
   description: string
   amount: number
   type: 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia'
+  scope: 'personal' | 'business'
   category: string
   date: string
   is_fixed: boolean // 🔥 Removida a interrogação (?)
@@ -32,6 +33,7 @@ export async function getTransactions() {
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
+    .eq('scope', 'personal')
     .order('date', { ascending: false })
     .limit(500)
 
@@ -96,6 +98,7 @@ export async function createTransaction(formData: FormData) {
     description: description,
     amount: isNaN(amount) ? 0 : amount,
     type: type,
+    scope: 'personal',
     category: formData.get('category') as string,
     date: date,
     is_fixed: isFixed,
@@ -202,7 +205,7 @@ export async function copyFixedTransactionsToMonth(targetDateStr: string) {
     const oldDate = new Date(t.date)
     const newTxDate = new Date(Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), oldDate.getUTCDate()))
     return {
-      user_id: user.id, description: t.description, amount: t.amount, type: t.type, category: t.category, is_fixed: true,
+      user_id: user.id, description: t.description, amount: t.amount, type: t.type, scope: 'personal', category: t.category, is_fixed: true,
       is_paid: false, status: 'pendente', date: newTxDate.toISOString().split('T')[0], due_date: newTxDate.toISOString().split('T')[0], 
       payment_method: t.payment_method
     }

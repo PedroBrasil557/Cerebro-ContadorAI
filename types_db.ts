@@ -6,6 +6,7 @@ export type SystemRole = 'user' | 'admin' | 'founder'
 export type AccountMode = 'personal' | 'professional'
 export type PlanTier = 'free' | 'basic' | 'pro' | 'premium' | 'professional_full'
 export type TransactionType = 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia'
+export type TransactionScope = 'personal' | 'business'
 
 // --- 1. PERFIL E CONFIGURAÇÕES ---
 export interface UserProfile {
@@ -42,6 +43,7 @@ export interface Transaction {
   description: string
   amount: number | string
   type: TransactionType
+  scope: TransactionScope
   category: string
   payment_method?: string
   card_id?: string
@@ -238,13 +240,15 @@ export interface EmergencyFund {
 
 export type ActiveTab = 
   | 'dashboard' 
-  | 'agenda' 
-  | 'transacoes' 
-  | 'investimentos' 
-  | 'carteira' 
-  | 'caixa' 
+  | 'compras inteligentes'
+  | 'transações'
+  | 'investimentos'
+  | 'minha carteira'
+  | 'central de dividas'
+  | 'nail design'
+  | 'caixa empresarial'
+  | 'agenda smart'
   | 'meu perfil'
-  | 'central_dividas';
   // --- ENGENHARIA DE CUSTOS ---
 export interface NailProduct {
   id: string;

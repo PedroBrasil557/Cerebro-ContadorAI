@@ -1,11 +1,1 @@
-export type ActiveTab = 
-  | 'dashboard' 
-  | 'compras inteligentes'
-  | 'transações'
-  | 'investimentos' 
-  | 'minha carteira'
-  | 'central de dividas'
-  | 'nail design'
-  | 'caixa empresarial'
-  | 'agenda smart'
-  | 'meu perfil'
+export type { ActiveTab } from '@/types_db'

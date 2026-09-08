@@ -38,6 +38,7 @@ export default function DecisionModePanel() {
         .from('transactions')
         .select('amount, type')
         .eq('user_id', user.id)
+        .eq('scope', 'business')
         .gte('date', startOfMonth)
 
       // Buscar Custos de Produto
@@ -65,8 +66,10 @@ export default function DecisionModePanel() {
           0
         )
         : 0
-      const fixedCost = grossRev * 0.30 // Simulação de Custo Fixo a 30%
-      const netProf = grossRev - (matCost * totalAppointments) - fixedCost
+      const registeredExpenses = (txs ?? [])
+        .filter((tx: { type: string }) => tx.type === 'despesa_fixa' || tx.type === 'despesa_variavel')
+        .reduce((sum: number, tx: { amount: number }) => sum + Math.abs(Number(tx.amount)), 0)
+      const netProf = grossRev - (matCost * totalAppointments) - registeredExpenses
       const margin = grossRev > 0 ? (netProf / grossRev) * 100 : 0
       const avgTicket = totalAppointments > 0 ? grossRev / totalAppointments : 0
 
@@ -92,6 +95,7 @@ export default function DecisionModePanel() {
 
   const profitDiff = projectedProfit - baseProfit
   const isPositiveDecision = profitDiff > 0
+  const confidence = baseRevenue > 0 && averageTicket > 0 && materialCostPerClient > 0 ? 'alta' : 'baixa'
 
   // Se o estúdio for novo e ainda não tiver faturamento, usamos um fallback visual
   const isNewBusiness = baseRevenue === 0
@@ -225,15 +229,20 @@ export default function DecisionModePanel() {
 
         {/* Parecer do CFO (IA) */}
         <div className="mt-auto relative z-10">
+          <div className="mb-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-[11px] text-gray-400 space-y-1">
+            <p><strong className="text-gray-300">Dados utilizados:</strong> faturamento, despesas e insumos cadastrados no mês.</p>
+            <p><strong className="text-gray-300">Hipóteses:</strong> {extraClientsPerMonth} novos atendimentos e custo mensal de {formatCurrency(assistantCost)}.</p>
+            <p><strong className="text-gray-300">Confiança:</strong> {confidence}; revise os valores antes de decidir.</p>
+          </div>
           <div className={`p-5 rounded-2xl border backdrop-blur-md flex gap-4 items-start ${isPositiveDecision ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
             <BrainCircuit className={isPositiveDecision ? 'text-emerald-400' : 'text-rose-400'} size={24} />
             <div>
               <h4 className={`text-xs font-black uppercase tracking-widest mb-1 ${isPositiveDecision ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {isPositiveDecision ? 'Expansão Aprovada' : 'Risco de Prejuízo'}
+                {isPositiveDecision ? 'Cenário financeiramente positivo' : 'Cenário com risco de prejuízo'}
               </h4>
               <p className="text-sm text-gray-300 leading-relaxed font-medium">
                 {isPositiveDecision 
-                  ? `Se a auxiliar trouxer ${extraClientsPerMonth} clientes (baseado no seu ticket atual de R$ ${averageTicket.toFixed(2)}), ela paga-se a si mesma e ainda injeta R$ ${formatCurrency(profitDiff)} de lucro limpo no caixa. Siga em frente com a contratação.`
+                  ? `Se a auxiliar trouxer ${extraClientsPerMonth} clientes (baseado no seu ticket atual de R$ ${averageTicket.toFixed(2)}), a projeção indica R$ ${formatCurrency(profitDiff)} de resultado adicional. Confirme capacidade, demanda e custos antes da contratação.`
                   : `Atenção: A matemática não fecha. Com o seu ticket médio atual e o custo dos seus géis, a auxiliar não gera receita suficiente para cobrir o salário dela de R$ ${assistantCost}. Vai ter um PREJUÍZO de R$ ${formatCurrency(Math.abs(profitDiff))}. Tente aumentar as suas margens primeiro.`}
               </p>
             </div>

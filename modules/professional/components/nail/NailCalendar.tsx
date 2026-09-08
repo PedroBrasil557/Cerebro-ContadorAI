@@ -53,6 +53,7 @@ export default function NailCalendar() {
         description: 'Checkout Profissional',
         amount: parseFloat(inputValue),
         type: 'receita',
+        scope: 'business',
         category: 'Serviço',
         date: new Date().toISOString(),
         status: 'concluido'

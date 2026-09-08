@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import { DataServiceError } from '@/lib/data/errors'
+import { logger } from '@/lib/logger'
 import { 
   ClientAppointment, 
   Transaction, 
@@ -16,6 +18,21 @@ import {
 
 const supabase = createClient()
 
+async function getAuthenticatedUser(feature: string) {
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error) {
+    logger.error('Falha ao validar sessão.', { feature, errorCode: error.code })
+    throw new DataServiceError('AUTH_FAILED', 'Não foi possível validar sua sessão.', { cause: error })
+  }
+  if (!user) throw new DataServiceError('UNAUTHENTICATED', 'Faça login para continuar.')
+  return user
+}
+
+function databaseError(feature: string, userId: string, error: { code?: string; message: string }) {
+  logger.error('Falha ao consultar o banco.', { feature, userId, errorCode: error.code })
+  return new DataServiceError('DATABASE_ERROR', 'Não foi possível carregar seus dados.', { cause: error })
+}
+
 interface CreateAppointmentInput {
   client_name: string
   client_email?: string
@@ -25,26 +42,16 @@ interface CreateAppointmentInput {
   time?: string
 }
 
+export type EditableProfileFields = Pick<
+  UserProfile,
+  'full_name' | 'avatar_url' | 'phone' | 'location' | 'bio' | 'base_currency' | 'timezone'
+>
+
 // --- FUNÇÃO AUXILIAR DE SEGURANÇA ---
 async function ensureProfileAndSettings(user: User) {
   if (!user) return
 
-  // 1. Verifica/Cria Perfil
-  const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).single()
-  
-  if (!profile) {
-    const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário'
-    await supabase.from('profiles').upsert({
-      id: user.id,
-      email: user.email,
-      full_name: fullName,
-      avatar_url: user.user_metadata?.avatar_url,
-      account_mode: 'personal',
-      plan_tier: 'free'
-    })
-  }
-
-  // 2. Verifica/Cria Configurações de Caixa
+  // O perfil é criado pelo trigger do banco; o cliente nunca define papel ou plano.
   const { data: settings } = await supabase.from('business_settings').select('user_id').eq('user_id', user.id).single()
   
   if (!settings) {
@@ -64,15 +71,13 @@ export const financeService = {
   // PERFIL DO USUÁRIO
   // ============================================================================
   getProfile: async (): Promise<UserProfile | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return null
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      return data
-    } catch { return null }
+    const user = await getAuthenticatedUser('profile')
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+    if (error) throw databaseError('profile', user.id, error)
+    return data as UserProfile | null
   },
 
-  updateProfile: async (updates: Partial<UserProfile>) => {
+  updateProfile: async (updates: Partial<EditableProfileFields>) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não logado')
     await ensureProfileAndSettings(user)
@@ -84,16 +89,15 @@ export const financeService = {
   // TRANSAÇÕES
   // ============================================================================
   getTransactions: async (): Promise<Transaction[]> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return []
-      const { data } = await supabase
+      const user = await getAuthenticatedUser('transactions')
+      const { data, error } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
+        .eq('scope', 'personal')
         .order('date', { ascending: false })
-      return (data as Transaction[]) || []
-    } catch { return [] }
+      if (error) throw databaseError('transactions', user.id, error)
+      return (data as Transaction[]) ?? []
   },
 
   createTransaction: async (transaction: Partial<NewTransaction>) => {
@@ -107,6 +111,7 @@ export const financeService = {
         description: transaction.description,
         amount: Number(transaction.amount),
         type: transaction.type,
+        scope: 'personal',
         category: transaction.category || 'Geral',
         date: transaction.date || new Date().toISOString(),
         status: 'concluido',
@@ -124,12 +129,10 @@ export const financeService = {
   // CARTÕES DE CRÉDITO
   // ============================================================================
   getCards: async (): Promise<CreditCard[]> => {
-     try {
-         const { data: { user } } = await supabase.auth.getUser()
-         if (!user) return []
-         const { data } = await supabase.from('credit_cards').select('*').eq('user_id', user.id)
-         return (data as CreditCard[]) || []
-     } catch { return [] }
+     const user = await getAuthenticatedUser('credit_cards')
+     const { data, error } = await supabase.from('credit_cards').select('*').eq('user_id', user.id)
+     if (error) throw databaseError('credit_cards', user.id, error)
+     return (data as CreditCard[]) ?? []
   },
 
   createCard: async (card: Partial<CreditCard>) => {
@@ -163,12 +166,10 @@ export const financeService = {
   // INVESTIMENTOS
   // ============================================================================
   getInvestments: async (): Promise<Investment[]> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return []
-      const { data } = await supabase.from('investments').select('*').eq('user_id', user.id)
-      return (data as Investment[]) || []
-    } catch { return [] }
+    const user = await getAuthenticatedUser('investments')
+    const { data, error } = await supabase.from('investments').select('*').eq('user_id', user.id)
+    if (error) throw databaseError('investments', user.id, error)
+    return (data as Investment[]) ?? []
   },
 
   createInvestment: async (investment: Partial<Investment>) => {
@@ -189,33 +190,29 @@ export const financeService = {
   // DÍVIDAS (DEBTS) - ESSENCIAL PARA O CHAT IA E BUILD
   // ============================================================================
   getDebts: async (): Promise<Debt[]> => {
-    try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return []
-        const { data } = await supabase
+        const user = await getAuthenticatedUser('debts')
+        const { data, error } = await supabase
           .from('debts')
           .select('*')
           .eq('user_id', user.id)
           .order('due_day', { ascending: true })
-        return (data as Debt[]) || []
-    } catch { return [] }
+        if (error) throw databaseError('debts', user.id, error)
+        return (data as Debt[]) ?? []
   },
 
   // ============================================================================
   // NOTIFICAÇÕES
   // ============================================================================
   getNotifications: async (): Promise<NotificationItem[]> => {
-     try {
-         const { data: { user } } = await supabase.auth.getUser()
-         if (!user) return []
-         const { data } = await supabase
+         const user = await getAuthenticatedUser('notifications')
+         const { data, error } = await supabase
           .from('notifications')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(20)
-         return (data as NotificationItem[]) || []
-     } catch { return [] }
+         if (error) throw databaseError('notifications', user.id, error)
+         return (data as NotificationItem[]) ?? []
   },
 
   markNotificationAsRead: async (id: string) => {
@@ -232,16 +229,14 @@ export const financeService = {
   // AGENDA SMART / NAIL DESIGN
   // ============================================================================
   getAppointments: async (): Promise<ClientAppointment[]> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return []
-      const { data } = await supabase
+      const user = await getAuthenticatedUser('appointments')
+      const { data, error } = await supabase
         .from('appointments')
         .select('*')
         .eq('user_id', user.id)
         .order('date', { ascending: true })
-      return (data as ClientAppointment[]) || []
-    } catch { return [] }
+      if (error) throw databaseError('appointments', user.id, error)
+      return (data as ClientAppointment[]) ?? []
   },
 
   createAppointment: async (appt: CreateAppointmentInput): Promise<ClientAppointment> => {
@@ -286,12 +281,10 @@ export const financeService = {
   // METAS (GOALS)
   // ============================================================================
   getGoals: async (): Promise<Goal[]> => {
-    try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return []
-        const { data } = await supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: true })
-        return (data as Goal[]) || []
-    } catch { return [] }
+        const user = await getAuthenticatedUser('goals')
+        const { data, error } = await supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: true })
+        if (error) throw databaseError('goals', user.id, error)
+        return (data as Goal[]) ?? []
   },
 
   createGoal: async (goal: NewGoal) => {
@@ -317,26 +310,24 @@ export const financeService = {
   // FLUXO DE CAIXA / CAIXA EMPRESARIAL
   // ============================================================================
   getCaixaData: async (): Promise<CaixaData> => {
-    try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error('User not found')
-        
-        const { data: settings } = await supabase.from('business_settings').select('*').eq('user_id', user.id).single()
-        const { data: entries } = await supabase
+        const user = await getAuthenticatedUser('business_cash')
+        const [{ data: settings, error: settingsError }, { data: entries, error: entriesError }] = await Promise.all([
+          supabase.from('business_settings').select('*').eq('user_id', user.id).maybeSingle(),
+          supabase
           .from('transactions')
           .select('*')
           .eq('user_id', user.id)
-          .eq('category', 'Caixa Empresarial')
+          .eq('scope', 'business'),
+        ])
+        if (settingsError) throw databaseError('business_settings', user.id, settingsError)
+        if (entriesError) throw databaseError('business_cash', user.id, entriesError)
 
         return {
           currentBalance: Number(settings?.current_balance) || 0,
-          monthlyGoal: Number(settings?.monthly_goal) || 15000,
-          taxRate: Number(settings?.tax_rate) || 6,
-          reserveRate: Number(settings?.reserve_rate) || 20,
+          monthlyGoal: Number(settings?.monthly_goal) || 0,
+          taxRate: Number(settings?.tax_rate) || 0,
+          reserveRate: Number(settings?.reserve_rate) || 0,
           entries: (entries as Transaction[]) || []
         }
-    } catch {
-        return { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, reserveRate: 20, entries: [] }
-    }
   }
 }
