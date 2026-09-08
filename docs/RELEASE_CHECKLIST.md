@@ -15,8 +15,8 @@ Use `[x]` somente com evidência do ambiente que será publicado. Itens marcados
 - [x] usuário não altera plano nem role;
 - [x] Service Role isolada em módulo de servidor;
 - [x] chaves privadas sem prefixo `NEXT_PUBLIC_`;
-- [ ] corrigir RLS da tabela legada `public.audit_logs`;
-- [ ] revisar todos os advisors Supabase sem findings críticos.
+- [x] `public.audit_logs` protegida por RLS e exclusiva da Service Role;
+- [x] advisors Supabase sem findings de nível `ERROR` após as migrations;
 
 ## Stripe
 
@@ -39,14 +39,14 @@ Use `[x]` somente com evidência do ambiente que será publicado. Itens marcados
 - [x] escopos pessoal e empresarial separados;
 - [x] simulações e indisponibilidade de mercado identificadas;
 - [x] agendamento persiste mesmo se convite falhar;
-- [ ] implementar e validar idempotência de agendamento.
+- [x] idempotência de agendamento validada por constraint no banco.
 
 ## Conta e qualidade
 
 - [x] edição segura de perfil, exportação e exclusão implementadas;
 - [x] typecheck e testes unitários aprovados;
 - [x] CI configurada para bloquear build quebrado;
-- [ ] lint completo sem erros;
+- [x] lint completo sem erros (avisos legados permanecem rastreados);
 - [ ] E2E autenticado e integrações reais aprovados;
-- [ ] build final aprovado com variáveis de homologação;
+- [x] build de produção aprovado com variáveis de validação sem segredos;
 - [ ] dependências sem vulnerabilidades críticas conhecidas.

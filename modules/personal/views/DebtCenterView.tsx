@@ -159,7 +159,7 @@ export default function DebtManagerWarRoom({ user, summary }: DebtCenterViewProp
         monthlyPmtTotal += pmt;
 
         if (pmt > 0 && rem > 0) {
-            let m = rate > 0 && pmt > rem * rate 
+            const m = rate > 0 && pmt > rem * rate
                 ? Math.ceil(-Math.log(1 - (rate * rem) / pmt) / Math.log(1 + rate))
                 : Math.ceil(rem / (pmt || 1));
             if (m > maxMonths) maxMonths = m;

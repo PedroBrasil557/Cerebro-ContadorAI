@@ -168,6 +168,10 @@ export interface ClientAppointment {
   status: string
   caixa_percentage?: number 
   invite_sent?: boolean
+  invite_status?: 'pending' | 'sent' | 'failed'
+  invite_error?: string | null
+  invite_sent_at?: string | null
+  idempotency_key?: string | null
   created_at?: string
 }
 

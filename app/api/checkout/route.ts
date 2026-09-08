@@ -35,7 +35,7 @@ async function getOrCreateCustomer(userId: string, email: string) {
   const customer = await stripe.customers.create({
     email,
     metadata: { userId },
-  })
+  }, { idempotencyKey: `customer:${userId}` })
   return customer.id
 }
 
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       : serverEnv.STRIPE_PRICE_PREMIUM
     const customer = await getOrCreateCustomer(user.id, user.email)
 
+    const checkoutWindow = Math.floor(Date.now() / 60_000)
     const session = await getStripe().checkout.sessions.create({
       customer,
       line_items: [{ price: priceId, quantity: 1 }],
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       },
       client_reference_id: user.id,
       allow_promotion_codes: true,
-    })
+    }, { idempotencyKey: `checkout:${user.id}:${plan}:${checkoutWindow}` })
 
     if (!session.url) throw new Error('Stripe did not return a checkout URL.')
     return successResponse({ url: session.url })

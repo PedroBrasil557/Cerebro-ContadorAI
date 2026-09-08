@@ -12,8 +12,6 @@ import { getTransactions, createTransaction, updateTransaction, deleteTransactio
 import { financeService } from '@/services/financeService'
 import TransactionDetailModal from '@/modules/personal/components/TransactionDetailModal'
 import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
 import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
@@ -153,10 +151,10 @@ function NewTransactionModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; 
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-lg bg-[#09090b] border border-white/10 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+      <motion.div role="dialog" aria-modal="true" aria-labelledby="new-transaction-title" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-lg bg-[#09090b] border border-white/10 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
         <div className={`h-28 w-full flex items-center justify-center relative ${type === 'receita' ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
-             <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition"><X size={20} /></button>
-             <h3 className={`text-sm font-black uppercase tracking-[0.3em] ${type === 'receita' ? 'text-emerald-500' : 'text-rose-500'}`}>Registrar Fluxo</h3>
+             <button aria-label="Fechar nova transação" onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition"><X size={20} /></button>
+             <h3 id="new-transaction-title" className={`text-sm font-black uppercase tracking-[0.3em] ${type === 'receita' ? 'text-emerald-500' : 'text-rose-500'}`}>Registrar Fluxo</h3>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -248,8 +246,12 @@ export default function TransactionsView({ user }: TransactionsViewProps) {
 
   const format = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     if (isFreePlan) { setShowUpgradeModal(true); return }
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ])
     const doc = new jsPDF()
     doc.setFillColor(10, 10, 15); doc.rect(0, 0, 210, 45, 'F')
     doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(24); doc.text("CÉREBRO.OS", 15, 25)
@@ -274,9 +276,9 @@ export default function TransactionsView({ user }: TransactionsViewProps) {
                 <div>
                     <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic">Transações</h2>
                     <div className="flex items-center gap-4 mt-2 bg-white/5 w-fit px-3 py-1.5 rounded-2xl border border-white/5">
-                        <button onClick={handlePrevMonth} className="p-1 text-gray-400 hover:text-white transition"><ChevronLeft size={18}/></button>
+                        <button aria-label="Mês anterior" onClick={handlePrevMonth} className="p-1 text-gray-400 hover:text-white transition"><ChevronLeft size={18}/></button>
                         <span className="text-xs font-black text-indigo-400 uppercase tracking-widest min-w-[140px] text-center select-none">{currentMonthLabel}</span>
-                        <button onClick={handleNextMonth} className="p-1 text-gray-400 hover:text-white transition"><ChevronRight size={18}/></button>
+                        <button aria-label="Próximo mês" onClick={handleNextMonth} className="p-1 text-gray-400 hover:text-white transition"><ChevronRight size={18}/></button>
                     </div>
                 </div>
                 <div className="flex gap-2">

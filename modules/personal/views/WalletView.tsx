@@ -176,7 +176,7 @@ export default function WalletView({ user }: WalletViewProps) {
 
   const handleDeleteCard = async (id: string) => {
     if(!confirm("Tem certeza que deseja remover este cartão?")) return
-    try { await (financeService as any).deleteCard(id); toast.success("Removido"); loadData() } catch (e) { toast.error("Erro ao remover") }
+    try { await financeService.deleteCard(id); toast.success("Removido"); loadData() } catch { toast.error("Erro ao remover") }
   }
 
   const handleGenerateLimitStrategy = async () => {

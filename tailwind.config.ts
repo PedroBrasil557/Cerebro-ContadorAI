@@ -1,5 +1,6 @@
 // tailwind.config.ts
 import type { Config } from 'tailwindcss'
+import typography from '@tailwindcss/typography'
 
 const config: Config = {
   darkMode: 'media', 
@@ -39,7 +40,7 @@ const config: Config = {
     },
   },
   plugins: [
-    require('@tailwindcss/typography'), 
+    typography,
   ],
 }
 export default config

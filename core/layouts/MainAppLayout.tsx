@@ -69,7 +69,7 @@ const TopBar = ({ user, profile, notifications, onMarkAsRead, onToggleMenu, onNa
   return (
     <header className="sticky top-0 z-30 flex h-20 md:h-24 items-center justify-between px-4 md:px-8 bg-[#050505]/70 backdrop-blur-2xl border-b border-white/5">
       <div className="flex items-center gap-3 md:gap-4">
-        <button onClick={onToggleMenu} className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+        <button aria-label="Abrir menu" onClick={onToggleMenu} className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
             <Menu className="h-6 w-6" />
         </button>
         <div className="flex flex-col justify-center">
@@ -157,7 +157,7 @@ const TopBar = ({ user, profile, notifications, onMarkAsRead, onToggleMenu, onNa
 // ============================================================================
 export default function MainAppLayout({ session }: { session: Session }) {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const [accountMode, setAccountMode] = useState<AccountMode>('personal')
@@ -204,7 +204,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
         }
     }
     loadData()
-  }, [session?.user?.id])
+  }, [session?.user])
 
   const handleLogout = async () => {
       await supabase.auth.signOut()

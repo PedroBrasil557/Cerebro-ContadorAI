@@ -43,6 +43,8 @@ export async function createCard(formData: FormData) {
   const last4 = formData.get('last4') as string
   const limit = parseFloat(formData.get('limit') as string)
   const brand = formData.get('brand') as string
+  const dueDay = Number(formData.get('due_day') ?? 10)
+  const closingDay = Number(formData.get('closing_day') ?? 3)
   
   // REMOVIDO: const color = ... (Não vamos mais salvar isso)
 
@@ -54,9 +56,10 @@ export async function createCard(formData: FormData) {
     user_id: user.id,
     name: name,
     last_4_digits: last4 || '0000',
-    limit: limit,
+    limit_amount: limit,
     brand: brand,
-    due_day: 10 
+    due_day: dueDay,
+    closing_day: closingDay,
     // REMOVIDO: color: color
   })
 

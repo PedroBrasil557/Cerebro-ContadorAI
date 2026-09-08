@@ -154,6 +154,7 @@ export default function AuthPage() {
                       <div className="relative">
                           <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                           <input 
+                              aria-label="Nome completo"
                               required={view === 'register'}
                               type="text"
                               placeholder="Como quer ser chamado?" 
@@ -173,6 +174,7 @@ export default function AuthPage() {
                 <div className="relative">
                     <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                     <input 
+                        aria-label="E-mail de acesso"
                         type="email" 
                         required 
                         placeholder="seu@email.com" 
@@ -204,6 +206,7 @@ export default function AuthPage() {
                       <div className="relative">
                           <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                           <input 
+                              aria-label="Senha de segurança"
                               type="password" 
                               required
                               minLength={view === 'register' ? 8 : undefined}

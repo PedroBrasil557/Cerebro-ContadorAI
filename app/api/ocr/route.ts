@@ -1,4 +1,3 @@
-import Tesseract from 'tesseract.js'
 import { RateLimitError, ValidationError } from '@/lib/api/errors'
 import { errorResponse, successResponse } from '@/lib/api/response'
 import { requireUser } from '@/lib/auth/requireUser'
@@ -28,6 +27,7 @@ export async function POST(request: Request) {
     const usage = await checkUsageLimit(user.id, 'ocr', billing.plan)
     if (!usage.allowed) throw new RateLimitError('Limite mensal de OCR atingido.')
 
+    const { default: Tesseract } = await import('tesseract.js')
     const result = await Tesseract.recognize(Buffer.from(await file.arrayBuffer()), 'por')
     const parsed = parseReceiptText(result.data.text)
     const confidence = Math.min(parsed.confidence, Math.max(result.data.confidence / 100, 0))

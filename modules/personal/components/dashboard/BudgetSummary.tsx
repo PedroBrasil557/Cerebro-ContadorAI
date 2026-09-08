@@ -23,7 +23,7 @@ export default function BudgetSummary({ income, transactions }: BudgetProps) {
     }
 
     // Calcular gastos reais baseados nas categorias das transações
-    let spent = { essentials: 0, lifestyle: 0, savings: 0 }
+    const spent = { essentials: 0, lifestyle: 0, savings: 0 }
 
     transactions.forEach(t => {
       if (t.type === 'receita') return // Ignora entradas

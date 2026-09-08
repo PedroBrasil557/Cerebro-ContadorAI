@@ -162,6 +162,16 @@ export const financeService = {
      return data
   },
 
+  deleteCard: async (id: string) => {
+     const user = await getAuthenticatedUser('credit_cards')
+     const { error } = await supabase
+       .from('credit_cards')
+       .delete()
+       .eq('id', id)
+       .eq('user_id', user.id)
+     if (error) throw databaseError('credit_cards', user.id, error)
+  },
+
   // ============================================================================
   // INVESTIMENTOS
   // ============================================================================
@@ -258,6 +268,7 @@ export const financeService = {
         date: datePart,
         time,
         caixaPercentage: 20,
+        idempotencyKey: crypto.randomUUID(),
       }),
     })
     const result = await response.json() as {

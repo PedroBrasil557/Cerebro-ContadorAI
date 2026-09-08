@@ -16,7 +16,8 @@ const inputSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   caixaPercentage: z.coerce.number().finite().min(0).max(100).default(20),
-})
+  idempotencyKey: z.uuid(),
+}).strict()
 
 function normalizeInput(input: unknown) {
   const source = z.record(z.string(), z.unknown()).parse(input)
@@ -28,6 +29,7 @@ function normalizeInput(input: unknown) {
     date: source.date,
     time: source.time,
     caixaPercentage: source.caixaPercentage ?? source.caixa_percentage ?? 20,
+    idempotencyKey: source.idempotencyKey ?? source.idempotency_key,
   })
 }
 
@@ -50,10 +52,28 @@ export async function POST(request: Request) {
         caixa_percentage: input.caixaPercentage,
         invite_sent: false,
         invite_status: 'pending',
+        idempotency_key: input.idempotencyKey,
       })
       .select()
       .single()
 
+    if (insertError?.code === '23505') {
+      const { data: existing, error: existingError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('idempotency_key', input.idempotencyKey)
+        .single()
+      if (existingError) throw existingError
+      return successResponse({
+        appointment: existing,
+        invite: {
+          status: existing.invite_status ?? 'pending',
+          warning: 'Solicitação já processada; nenhum agendamento duplicado foi criado.',
+        },
+        idempotentReplay: true,
+      })
+    }
     if (insertError) throw insertError
 
     let inviteStatus: 'sent' | 'failed' = 'failed'

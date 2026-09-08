@@ -402,11 +402,11 @@ export default function ProfileView() {
       <AnimatePresence>
         {isDeleteModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} className="w-full max-w-md rounded-[2rem] border border-rose-500/20 bg-[#09090b] p-8">
-              <h3 className="text-2xl font-black text-white">Excluir conta permanentemente</h3>
+            <motion.div role="dialog" aria-modal="true" aria-labelledby="delete-account-title" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} className="w-full max-w-md rounded-[2rem] border border-rose-500/20 bg-[#09090b] p-8">
+              <h3 id="delete-account-title" className="text-2xl font-black text-white">Excluir conta permanentemente</h3>
               <p className="mt-3 text-sm leading-relaxed text-gray-400">A assinatura será cancelada e seus dados e recibos serão removidos. Esta ação não pode ser desfeita.</p>
               <label className="mt-6 block text-[10px] font-black uppercase tracking-widest text-gray-500">Digite EXCLUIR para confirmar</label>
-              <input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-white outline-none focus:border-rose-500" />
+              <input aria-label="Confirmação de exclusão" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-white outline-none focus:border-rose-500" />
               <div className="mt-6 flex gap-3">
                 <button type="button" onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmation('') }} className="flex-1 rounded-2xl bg-white/5 py-4 text-xs font-black uppercase tracking-widest text-white">Cancelar</button>
                 <button type="button" onClick={handleDeleteAccount} disabled={deleting || deleteConfirmation !== 'EXCLUIR'} className="flex-1 rounded-2xl bg-rose-600 py-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-40">

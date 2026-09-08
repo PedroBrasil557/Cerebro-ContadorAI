@@ -6,25 +6,27 @@ import {
   Transaction, Goal, CaixaData, NewGoal, Investment, ActiveTab
 } from '@/types_db'
 import type { User } from '@supabase/supabase-js'
+import dynamic from 'next/dynamic'
 
 // ==========================================
 // 📦 CAMADA 2: MÓDULOS PESSOAIS
 // ==========================================
-import DashboardView from '@/modules/personal/views/DashboardView'
-import TransactionsView from '@/modules/personal/views/TransactionsView'
-import InvestmentsView from '@/modules/personal/views/InvestmentsView'
-import WalletView from '@/modules/personal/views/WalletView'
-import DebtCenterView from '@/modules/personal/views/DebtCenterView'
-import ProfileView from '@/modules/personal/views/ProfileView'
-import SmartShoppingView from '@/modules/personal/views/SmartShoppingView'
+const moduleLoading = () => <div role="status" aria-live="polite" className="p-8 text-sm text-gray-400">Carregando módulo…</div>
+const DashboardView = dynamic(() => import('@/modules/personal/views/DashboardView'), { loading: moduleLoading })
+const TransactionsView = dynamic(() => import('@/modules/personal/views/TransactionsView'), { loading: moduleLoading })
+const InvestmentsView = dynamic(() => import('@/modules/personal/views/InvestmentsView'), { loading: moduleLoading })
+const WalletView = dynamic(() => import('@/modules/personal/views/WalletView'), { loading: moduleLoading })
+const DebtCenterView = dynamic(() => import('@/modules/personal/views/DebtCenterView'), { loading: moduleLoading })
+const ProfileView = dynamic(() => import('@/modules/personal/views/ProfileView'), { loading: moduleLoading })
+const SmartShoppingView = dynamic(() => import('@/modules/personal/views/SmartShoppingView'), { loading: moduleLoading })
 
 // ==========================================
 // 💼 CAMADA 3: MÓDULOS PROFISSIONAIS (B2B)
 // ==========================================
-import CaixaView from '@/modules/professional/views/CaixaView'
-import NailDesignView from '@/modules/professional/views/NailDesignView'
-import FinancialCommandCenter from '@/modules/professional/components/FinancialCommandCenter'
-import FounderDashboard from '@/modules/admin/views/FounderDashboard'
+const CaixaView = dynamic(() => import('@/modules/professional/views/CaixaView'), { loading: moduleLoading })
+const NailDesignView = dynamic(() => import('@/modules/professional/views/NailDesignView'), { loading: moduleLoading })
+const FinancialCommandCenter = dynamic(() => import('@/modules/professional/components/FinancialCommandCenter'), { loading: moduleLoading })
+const FounderDashboard = dynamic(() => import('@/modules/admin/views/FounderDashboard'), { loading: moduleLoading })
 
 interface ViewContainerProps {
   activeTab: ActiveTab
