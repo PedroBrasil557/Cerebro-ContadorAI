@@ -23,21 +23,24 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          // ✅ ID ATUALIZADO COM SUCESSO
-          priceId: 'price_1TCfihIH9EXlJxoZ4ujtjQUh', 
-          planTier: 'pro' 
-        }),
+        body: JSON.stringify({ plan: 'pro' }),
       })
 
-      const data = await response.json()
+      const data = await response.json() as {
+        url?: string
+        error?: { message?: string }
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Falha ao iniciar checkout.')
+      }
 
       if (data.url) {
         window.location.href = data.url
       } else {
         throw new Error('Falha ao gerar link de pagamento')
       }
-    } catch (error) {
+    } catch {
       toast.error('Erro ao iniciar portal de pagamento. Tente novamente.')
       setIsRedirecting(false)
     }

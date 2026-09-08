@@ -1,24 +1,34 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  User, Mail, Phone, MapPin, Star, 
+  User, Star,
   Camera, Loader2, Zap, Save, CheckCircle2,
-  CreditCard, BrainCircuit, ShieldCheck, Lock, Bell, LogOut, ChevronRight, Target, X
+  BrainCircuit, ShieldCheck, Lock, Bell, LogOut, ChevronRight, Target, X,
+  type LucideIcon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { UserProfile } from '@/types_db'
 import UpgradeModal from '@/core/components/UpgradeModal' // ✅ CORRIGIDO: Importação adicionada
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
-// --- TIPAGENS ---
-interface ProfileViewProps {
-  user: any 
+interface PremiumCardProps {
+  children: ReactNode
+  className?: string
+  glowColor?: string
 }
 
-// --- COMPONENTE VISUAL BASE ---
-const PremiumCard = ({ children, className = "", glowColor = "from-indigo-500/5" }: any) => (
+interface MenuOptionProps {
+  icon: LucideIcon
+  label: string
+  value?: string
+  color?: string
+  onClick: () => void
+}
+
+const PremiumCard = ({ children, className = "", glowColor = "from-indigo-500/5" }: PremiumCardProps) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
     className={`relative group bg-[#09090b]/40 backdrop-blur-2xl border border-white/[0.05] rounded-[2.5rem] overflow-hidden shadow-2xl ${className}`}
@@ -30,7 +40,7 @@ const PremiumCard = ({ children, className = "", glowColor = "from-indigo-500/5"
   </motion.div>
 )
 
-const MenuOption = ({ icon: Icon, label, value, color = "text-white", onClick }: any) => (
+const MenuOption = ({ icon: Icon, label, value, color = "text-white", onClick }: MenuOptionProps) => (
     <button 
         type="button"
         onClick={onClick}
@@ -49,24 +59,25 @@ const MenuOption = ({ icon: Icon, label, value, color = "text-white", onClick }:
     </button>
 )
 
-export default function ProfileView({ user: authUserFromProps }: ProfileViewProps) {
+export default function ProfileView() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState<Partial<UserProfile>>({})
   const [userId, setUserId] = useState<string | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const { plan } = useEntitlements()
   
   const [iaEnabled, setIaEnabled] = useState(true)
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false)
+  const [, setIsNotificationsModalOpen] = useState(false)
   
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passLoading, setPassLoading] = useState(false)
 
-  const [pushNotif, setPushNotif] = useState(true)
-  const [emailNotif, setEmailNotif] = useState(true)
+  const [pushNotif] = useState(true)
 
   const supabase = createClient()
 
@@ -99,7 +110,7 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
       }
     }
     fetchProfile()
-  }, [])
+  }, [supabase])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setProfile(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -122,8 +133,8 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
       if (error) throw error
       toast.success("Perfil sincronizado!", { icon: <CheckCircle2 className="text-emerald-500" /> })
       setIsEditing(false)
-    } catch (error: any) {
-      toast.error(`Falha ao salvar: ${error.message}`)
+    } catch (error: unknown) {
+      toast.error(`Falha ao salvar: ${error instanceof Error ? error.message : 'erro inesperado'}`)
     } finally {
       setSaving(false)
     }
@@ -131,6 +142,7 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
       e.preventDefault()
+      if (newPassword.length < 8) return toast.error("A senha deve ter pelo menos 8 caracteres.")
       if (newPassword !== confirmPassword) return toast.error("Senhas divergentes.")
       setPassLoading(true)
       try {
@@ -139,7 +151,7 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
           toast.success("Segurança reforçada!")
           setIsPasswordModalOpen(false)
           setNewPassword(''); setConfirmPassword('')
-      } catch (error: any) {
+      } catch {
           toast.error("Erro na atualização.")
       } finally {
           setPassLoading(false)
@@ -151,11 +163,34 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
       window.location.href = '/' 
   }
 
+  const handlePlanAction = async () => {
+    if (plan === 'free') {
+      setShowUpgradeModal(true)
+      return
+    }
+
+    setPortalLoading(true)
+    try {
+      const response = await fetch('/api/billing/portal', { method: 'POST' })
+      const data = await response.json() as {
+        url?: string
+        error?: { message?: string }
+      }
+      if (!response.ok || !data.url) {
+        throw new Error(data.error?.message || 'Não foi possível abrir o portal.')
+      }
+      window.location.href = data.url
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível abrir o portal.')
+      setPortalLoading(false)
+    }
+  }
+
   if (loading) {
     return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
   }
 
-  const isPro = profile.plan_tier === 'pro' || profile.plan_tier === 'premium'
+  const isPro = plan === 'pro' || plan === 'premium'
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8 space-y-10 pb-32 max-w-7xl mx-auto">
@@ -202,7 +237,7 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
                         {isPro ? <Star size={24} /> : <Zap size={24} />}
                     </div>
                     <span className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full border ${isPro ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
-                        Cérebro {profile.plan_tier?.toUpperCase() || 'FREE'}
+                        Cérebro {plan.toUpperCase()}
                     </span>
                 </div>
                 <h3 className="text-lg font-black text-white uppercase tracking-tight mb-3">Nível de Processamento</h3>
@@ -211,8 +246,8 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
                         ? "Potencial cognitivo máximo ativado. IA operando em 100% da capacidade."
                         : "Capacidade limitada. Sincronize com o plano PRO para auditoria fiscal e IA estratégica."}
                 </p>
-                <button type="button" onClick={() => !isPro && setShowUpgradeModal(true)} className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl ${isPro ? 'bg-white/5 text-gray-400 hover:text-white border border-white/5' : 'bg-white text-black hover:bg-gray-200'}`}>
-                    {isPro ? 'Configurar Plano' : 'Ativar Versão PRO'}
+                <button type="button" disabled={portalLoading} onClick={handlePlanAction} className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl disabled:opacity-60 ${isPro ? 'bg-white/5 text-gray-400 hover:text-white border border-white/5' : 'bg-white text-black hover:bg-gray-200'}`}>
+                    {portalLoading ? 'Abrindo Stripe…' : isPro ? 'Configurar Plano' : 'Ativar Versão PRO'}
                 </button>
             </PremiumCard>
 
@@ -301,8 +336,8 @@ export default function ProfileView({ user: authUserFromProps }: ProfileViewProp
                 <h3 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tighter">Segurança Máxima</h3>
                 <p className="text-xs text-gray-500 mb-8 font-medium">Atualize sua chave de acesso ao sistema.</p>
                 <form onSubmit={handleUpdatePassword} className="space-y-6">
-                    <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Nova Senha</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-mono outline-none focus:border-indigo-500/50" /></div>
-                    <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Confirmar Senha</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-mono outline-none focus:border-indigo-500/50" /></div>
+                    <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Nova Senha</label><input type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-mono outline-none focus:border-indigo-500/50" /></div>
+                    <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Confirmar Senha</label><input type="password" minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required placeholder="••••••••" className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white font-mono outline-none focus:border-indigo-500/50" /></div>
                     <button type="submit" disabled={passLoading} className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-5 text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-xl transition-all flex justify-center items-center gap-3">
                         {passLoading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />} Sobrescrever Senha
                     </button>

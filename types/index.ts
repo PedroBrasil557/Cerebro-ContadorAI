@@ -1,10 +1,11 @@
 export type ActiveTab = 
   | 'dashboard' 
-  | 'transacoes' 
+  | 'compras inteligentes'
+  | 'transações'
   | 'investimentos' 
-  | 'carteira' 
-  | 'agenda' 
-  | 'caixa'      // Obrigatório para o menu novo funcionar
-  | 'perfil'     // Obrigatório para o menu novo funcionar
-  | 'reserva' 
-  | 'calendario'
+  | 'minha carteira'
+  | 'central de dividas'
+  | 'nail design'
+  | 'caixa empresarial'
+  | 'agenda smart'
+  | 'meu perfil'

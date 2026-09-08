@@ -187,7 +187,7 @@ export default function ViewContainer({
         {/* ⚙️ CAMADA 1: MÓDULOS GLOBAIS (Ambos modos) */}
         {/* ========================================== */}
         {(currentTab === 'meu perfil' || currentTab === 'perfil') && (
-          <ProfileView user={user as any} /> 
+          <ProfileView />
         )}
 
       </motion.div>

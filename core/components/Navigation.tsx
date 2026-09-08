@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence, Variants } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
+import type { LucideIcon } from 'lucide-react'
 import { 
   LayoutDashboard, 
   ArrowLeftRight, 
@@ -12,7 +14,6 @@ import {
   Briefcase, 
   User, 
   LogOut, 
-  X,
   Sparkles,
   RefreshCw,
   Scissors,
@@ -24,6 +25,7 @@ import { ActiveTab } from '@/types'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
 import { useRouter } from 'next/navigation'
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 interface NavigationProps {
   activeTab: ActiveTab
@@ -31,7 +33,14 @@ interface NavigationProps {
   onLogout: () => void
   isOpen: boolean
   onClose: () => void
-  user: any
+  user: SupabaseUser
+}
+
+interface MenuItem {
+  id: ActiveTab
+  label: string
+  icon: LucideIcon
+  isPro: boolean
 }
 
 const THEMES = {
@@ -61,15 +70,15 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
   const [isSwitching, setIsSwitching] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const { plan, entitlements, refresh } = useEntitlements()
   
-  // 🛡️ Lógica de Plano
-  const accountMode = user?.user_metadata?.account_mode || 'personal'
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
-  const isPro = userPlan === 'pro' || userPlan === 'premium'
-  const isFreePlan = !isPro
+  const [accountMode, setAccountMode] = useState<'personal' | 'professional'>(
+    user.user_metadata?.account_mode === 'professional' ? 'professional' : 'personal'
+  )
+  const isFreePlan = plan === 'free'
   
   // ✅ AJUSTE: O modo profissional só aparece para parceiros "premium"
-  const hasProfessionalAddon = userPlan === 'premium'
+  const hasProfessionalAddon = entitlements.professional
 
   const theme = accountMode === 'personal' ? THEMES.personal : THEMES.professional
 
@@ -77,28 +86,25 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     if (urlParams.get('success') === 'true') {
-      router.replace('/') // Limpa o ?success=true na hora
-      handleRefreshSession(true)
+      router.replace('/')
+      void refresh()
     }
-  }, [router])
+  }, [refresh, router])
 
   const handleRefreshSession = async (isAutomatic = false) => {
     setIsRefreshing(true)
     try {
-      const { data, error } = await supabase.auth.refreshSession()
-      if (error) throw error
-      if (data.session) {
-        if (!isAutomatic) toast.success("Dados sincronizados com sucesso!")
-        router.refresh() 
-      }
-    } catch (err) {
+      await refresh()
+      if (!isAutomatic) toast.success("Dados sincronizados com sucesso!")
+      router.refresh()
+    } catch {
       if (!isAutomatic) toast.error("Erro ao sincronizar.")
     } finally {
       setIsRefreshing(false)
     }
   }
 
-  const personalMenuItems = [
+  const personalMenuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Painel Central', icon: LayoutDashboard, isPro: false },
     { id: 'compras inteligentes', label: 'Smart Shopping', icon: ShoppingCart, isPro: false },
     { id: 'transações', label: 'Transações', icon: ArrowLeftRight, isPro: false },
@@ -107,7 +113,7 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
     { id: 'central de dividas', label: 'Central de Dívidas', icon: ShieldAlert, isPro: true },
   ]
 
-  const professionalMenuItems = [
+  const professionalMenuItems: MenuItem[] = [
     { id: 'nail design', label: 'Gestão de Serviços', icon: Scissors, isPro: false },
     { id: 'caixa empresarial', label: 'Caixa Empresarial', icon: Briefcase, isPro: false },
     { id: 'agenda smart', label: 'Agenda Smart', icon: Calendar, isPro: false },
@@ -115,13 +121,13 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
 
   const activeMenu = accountMode === 'personal' ? personalMenuItems : professionalMenuItems
 
-  const handleTabClick = (item: any) => {
+  const handleTabClick = (item: MenuItem) => {
     if (item.isPro && isFreePlan) {
         setShowUpgradeModal(true)
         if (isMobile) onClose()
         return
     }
-    onSelectTab(item.id as any)
+    onSelectTab(item.id)
     if (isMobile) onClose()
   }
 
@@ -129,12 +135,16 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
     setIsSwitching(true)
     const newMode = accountMode === 'personal' ? 'professional' : 'personal'
     try {
-      const { error } = await supabase.auth.updateUser({ data: { account_mode: newMode } })
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_mode: newMode })
+        .eq('id', user.id)
       if (error) throw error
+      setAccountMode(newMode)
       toast.success(`Modo ${newMode === 'personal' ? 'Pessoal' : 'Empresarial'} ativado!`)
-      onSelectTab(newMode === 'personal' ? 'dashboard' : 'nail design' as any)
+      onSelectTab(newMode === 'personal' ? 'dashboard' : 'nail design')
       router.refresh()
-    } catch (error) {
+    } catch {
       toast.error('Erro ao alternar modo.')
     } finally {
       setIsSwitching(false)
