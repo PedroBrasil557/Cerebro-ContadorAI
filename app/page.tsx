@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client' // <--- Importação nova
 import MainAppLayout from '@/core/layouts/MainAppLayout'
 import { Loader2 } from 'lucide-react'
+import type { Session } from '@supabase/supabase-js'
 
 export default function App() {
-  const [session, setSession] = useState<any>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient() // <--- Instância nova

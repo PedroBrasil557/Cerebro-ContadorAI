@@ -69,7 +69,7 @@ export default function FinancialCommandCenter() {
       let totalAppointments = 0 // Simulação baseada em número de receitas
 
       if (txs) {
-        txs.forEach(tx => {
+        txs.forEach((tx: { amount: number; type: string }) => {
           if (tx.type === 'receita') {
             grossRev += Number(tx.amount)
             totalAppointments += 1
@@ -78,7 +78,13 @@ export default function FinancialCommandCenter() {
       }
 
       // Custo dos materiais por cada atendimento feito
-      const materialCostPerApp = materials ? materials.reduce((acc, curr) => acc + Number(curr.cost_per_application || 0), 0) : 0
+      const materialCostPerApp = materials
+        ? materials.reduce(
+          (acc: number, curr: { cost_per_application: number | null }) =>
+            acc + Number(curr.cost_per_application || 0),
+          0
+        )
+        : 0
       const totalMaterialCost = materialCostPerApp * totalAppointments
       
       // Simulação de Despesa Fixa (ex: aluguel) = 30% do faturamento (ajustável no futuro)

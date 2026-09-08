@@ -51,7 +51,15 @@ export default function AuthPage() {
         router.push('/') // 🔥 CORRIGIDO PARA A ROTA PRINCIPAL
       } 
       else if (view === 'register') {
-        const { error } = await supabase.auth.signUp({
+        if (formData.fullName.trim().length < 2) {
+          throw new Error('Informe seu nome completo.')
+        }
+
+        if (formData.password.length < 8) {
+          throw new Error('A senha deve ter pelo menos 8 caracteres.')
+        }
+
+        const { data, error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
           options: {
@@ -62,11 +70,18 @@ export default function AuthPage() {
           }
         })
         if (error) throw error
-        toast.success('Conta criada com sucesso! Acessando o sistema...')
-        router.push('/') // 🔥 CORRIGIDO PARA A ROTA PRINCIPAL
+
+        if (!data.session) {
+          toast.success('Conta criada. Confirme seu e-mail antes de entrar.')
+          setView('login')
+          return
+        }
+
+        toast.success('Conta criada com sucesso!')
+        router.push('/')
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Erro na autenticação. Verifique seus dados.')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Erro na autenticação. Verifique seus dados.')
     } finally {
       setLoading(false)
     }
@@ -190,7 +205,8 @@ export default function AuthPage() {
                           <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                           <input 
                               type="password" 
-                              required // 🔥 CORRIGIDO: O TS não vai mais reclamar aqui
+                              required
+                              minLength={view === 'register' ? 8 : undefined}
                               placeholder="••••••••" 
                               className="w-full bg-[#13131a] border border-white/5 rounded-xl py-3 pl-11 pr-4 text-white focus:border-indigo-500/50 focus:bg-white/10 outline-none transition-all text-sm font-mono placeholder-gray-600"
                               value={formData.password}
@@ -267,9 +283,9 @@ export default function AuthPage() {
 
               {/* Links Legais */}
               <div className="flex items-center gap-3 text-[10px] text-gray-600 font-medium">
-                 <Link href="/privacidade" className="hover:text-indigo-400 transition-colors">Privacidade</Link>
+                 <Link href="/politica-privacidade" className="hover:text-indigo-400 transition-colors">Privacidade</Link>
                  <span className="h-1 w-1 rounded-full bg-gray-800"></span>
-                 <Link href="/termos" className="hover:text-indigo-400 transition-colors">Termos de Uso</Link>
+                 <Link href="/termos-uso" className="hover:text-indigo-400 transition-colors">Termos de Uso</Link>
               </div>
           </div>
 

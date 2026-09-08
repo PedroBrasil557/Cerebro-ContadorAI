@@ -1,45 +1,18 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   
   if (code) {
-    const cookieStore = await cookies()
-    
-    // Cria o cliente usando a biblioteca NOVA (@supabase/ssr)
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              )
-            } catch {
-              // Ignora erro de cookie em Server Component
-            }
-          },
-        },
-      }
-    )
-    
-    // Troca o código pela sessão
+    const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error) {
-      // Redireciona para o Dashboard
       return NextResponse.redirect(`${origin}`)
     }
   }
 
-  // Se der erro, volta pro login
   return NextResponse.redirect(`${origin}/login`)
 }

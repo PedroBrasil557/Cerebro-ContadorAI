@@ -50,7 +50,7 @@ export default function DecisionModePanel() {
       let totalAppointments = 0
 
       if (txs) {
-        txs.forEach(tx => {
+        txs.forEach((tx: { amount: number; type: string }) => {
           if (tx.type === 'receita') {
             grossRev += Number(tx.amount)
             totalAppointments += 1
@@ -58,7 +58,13 @@ export default function DecisionModePanel() {
         })
       }
 
-      const matCost = materials ? materials.reduce((acc, curr) => acc + Number(curr.cost_per_application || 0), 0) : 0
+      const matCost = materials
+        ? materials.reduce(
+          (acc: number, curr: { cost_per_application: number | null }) =>
+            acc + Number(curr.cost_per_application || 0),
+          0
+        )
+        : 0
       const fixedCost = grossRev * 0.30 // Simulação de Custo Fixo a 30%
       const netProf = grossRev - (matCost * totalAppointments) - fixedCost
       const margin = grossRev > 0 ? (netProf / grossRev) * 100 : 0

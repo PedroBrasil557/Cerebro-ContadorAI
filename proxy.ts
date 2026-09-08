@@ -1,5 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { publicEnv } from '@/lib/env/public'
+
+const PUBLIC_ROUTES = new Set([
+  '/login',
+  '/auth/callback',
+  '/nova-senha',
+  '/politica-privacidade',
+  '/termos-uso',
+])
 
 // A função PRECISA se chamar proxy para funcionar no Next.js 16+
 export async function proxy(request: NextRequest) {
@@ -10,8 +19,8 @@ export async function proxy(request: NextRequest) {
   })
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
+    publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
@@ -35,11 +44,11 @@ export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
   const path = url.pathname
 
-  // Bloqueio de segurança para evitar loops
-  const isAuthPage = path.startsWith('/login')
+  const isAuthPage = path === '/login'
+  const isPublicRoute = PUBLIC_ROUTES.has(path)
   const isPublicFile = path.match(/\.(.*)$/) 
 
-  if (!user && !isAuthPage && !isPublicFile) {
+  if (!user && !isPublicRoute && !isPublicFile) {
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
@@ -52,7 +61,6 @@ export async function proxy(request: NextRequest) {
   return supabaseResponse
 }
 
-// Isso também é obrigatório
 export const config = {
   matcher: [
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
