@@ -71,9 +71,10 @@ export async function checkAndTriggerSystemNotifications() {
     .from('transactions')
     .select('description, amount, date')
     .eq('user_id', user.id)
+    .eq('scope', 'personal')
     .eq('is_paid', false) 
     .lt('date', today)    
-    .neq('type', 'receita') // Ignora receitas atrasadas, foca em contas a pagar
+    .in('type', ['despesa_fixa', 'despesa_variavel'])
 
   if (overdue && overdue.length > 0) {
     const totalAtrasado = overdue.reduce((acc, t) => acc + Number(t.amount), 0)
@@ -105,13 +106,16 @@ export async function checkAndTriggerSystemNotifications() {
     .from('transactions')
     .select('amount, type, is_paid, date')
     .eq('user_id', user.id)
+    .eq('scope', 'personal')
   
   if (transactions) {
       // Saldo Real (Considera apenas o que efetivamente aconteceu: Pago ou Passado)
-      const active = transactions.filter((t: any) => t.is_paid || t.date <= today)
+      const active = transactions.filter((t) => t.is_paid || t.date <= today)
       
-      const income = active.filter((t: any) => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-      const expense = active.filter((t: any) => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
+      const income = active.filter((t) => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
+      const expense = active
+        .filter((t) => t.type === 'despesa_fixa' || t.type === 'despesa_variavel')
+        .reduce((acc, t) => acc + Math.abs(Number(t.amount)), 0)
       const balance = income - expense
 
       // Verificação de Spam de Notificação (mesma lógica de data)

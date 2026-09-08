@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createNotification } from './notifications'
+import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 
 // 🛡️ Definição Completa (Corrigida: 100% compatível com o types_db)
 export interface Transaction {
@@ -53,25 +54,21 @@ export async function getDashboardSummary() {
     .from('transactions')
     .select('amount, type, date, is_paid')
     .eq('user_id', user.id)
+    .eq('scope', 'personal')
 
   if (!transactions) return { balance: 0, income: 0, expense: 0 }
 
-  const activeTransactions = transactions.filter((t: any) => {
+  const activeTransactions = transactions.filter((t) => {
      const isPaid = t.is_paid === true
      const isPastOrToday = t.date <= today
      return isPaid || isPastOrToday
   })
 
-  // toLowerCase() garante que some mesmo se no banco estiver 'Receita' ou 'receita'
-  const income = activeTransactions
-    .filter((t: any) => t.type?.toLowerCase() === 'receita')
-    .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
+  const typedTransactions = activeTransactions as Pick<Transaction, 'amount' | 'type' | 'date'>[]
+  const income = calculateIncome(typedTransactions)
+  const expense = calculateExpenses(typedTransactions)
 
-  const expense = activeTransactions
-    .filter((t: any) => t.type?.toLowerCase() !== 'receita')
-    .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
-
-  return { balance: income - expense, income, expense }
+  return { balance: calculateBalance(typedTransactions), income, expense }
 }
 
 // 3. CRIAR (COM NOTIFICAÇÃO E CORREÇÃO DE COLUNAS)

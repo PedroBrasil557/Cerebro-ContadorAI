@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, DollarSign, Percent, Bitcoin } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { getMarketData } from '@/lib/market/api'
+import { getMarketData, type MarketData } from '@/lib/market/api'
 
 export default function MarketTicker() {
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<MarketData | null>(null)
 
   useEffect(() => {
     getMarketData().then(setData)
@@ -17,35 +17,35 @@ export default function MarketTicker() {
   const cards = [
     { 
       label: 'Taxa Selic', 
-      value: `${data.selic}%`, 
-      sub: 'Ao ano', 
+      value: data.selic === null ? 'Indisponível' : `${data.selic.toFixed(2)}%`,
+      sub: data.source.selic,
       icon: Percent, 
       color: 'text-emerald-400', 
       bg: 'bg-emerald-500/10' 
     },
     { 
       label: 'CDI Hoje', 
-      value: `${data.cdi.toFixed(2)}%`, 
-      sub: '0.99x Selic', 
+      value: data.cdi === null ? 'Indisponível' : `${data.cdi.toFixed(2)}%`,
+      sub: data.source.cdi,
       icon: TrendingUp, 
       color: 'text-blue-400', 
       bg: 'bg-blue-500/10' 
     },
     { 
       label: 'Dólar PTAX', 
-      value: `R$ ${data.dolar.toFixed(2)}`, 
-      sub: 'Cotação BCB', 
+      value: data.dolar === null ? 'Indisponível' : `R$ ${data.dolar.toFixed(2)}`,
+      sub: data.source.dolar,
       icon: DollarSign, 
       color: 'text-amber-400', 
       bg: 'bg-amber-500/10' 
     },
     { 
       label: 'Bitcoin', 
-      value: `R$ ${(data.bitcoin / 1000).toFixed(1)}k`, 
-      sub: `${data.bitcoinChange.toFixed(2)}% (24h)`, 
+      value: data.bitcoin === null ? 'Indisponível' : `R$ ${(data.bitcoin / 1000).toFixed(1)}k`,
+      sub: data.bitcoinChange === null ? data.source.bitcoin : `${data.bitcoinChange.toFixed(2)}% (24h)`,
       icon: Bitcoin, 
-      color: data.bitcoinChange >= 0 ? 'text-emerald-400' : 'text-rose-400', 
-      bg: data.bitcoinChange >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10' 
+      color: (data.bitcoinChange ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400',
+      bg: (data.bitcoinChange ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'
     }
   ]
 

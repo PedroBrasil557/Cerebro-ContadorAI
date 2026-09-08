@@ -4,13 +4,14 @@ import React, { useState, useEffect } from 'react'
 import { Calculator, TrendingUp, DollarSign, Loader2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import { getMarketData } from '@/lib/market/api'
 
 export default function FinancialCalculators() {
   const [activeCalc, setActiveCalc] = useState<'cdi' | 'juros'>('cdi')
   
   // Taxa Selic Real e Estados da Calculadora CDI
-  const [selicRate, setSelicRate] = useState<number>(0)
-  const [cdiRate, setCdiRate] = useState<number>(0)
+  const [selicRate, setSelicRate] = useState<number | null>(null)
+  const [cdiRate, setCdiRate] = useState<number | null>(null)
   const [loadingRates, setLoadingRates] = useState(true)
   
   const [cdiAmount, setCdiAmount] = useState(1000)
@@ -27,21 +28,13 @@ export default function FinancialCalculators() {
   useEffect(() => {
     async function fetchSelic() {
         try {
-            // API do Sistema Gerenciador de Séries Temporais (SGS) do BCB - Código 432 (Taxa Selic Meta)
-            const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json')
-            const data = await response.json()
-            if (data && data.length > 0) {
-                const currentSelic = Number(data[0].valor)
-                setSelicRate(currentSelic)
-                setCdiRate(currentSelic - 0.10) // CDI costuma ser a Selic - 0.10%
-            } else {
-                throw new Error("Dados da Selic não encontrados")
-            }
+            const data = await getMarketData()
+            setSelicRate(data.selic)
+            setCdiRate(data.cdi)
         } catch (error) {
-            console.error("Falha ao buscar Selic do BCB, usando fallback.", error)
-            // Fallback para taxa aproximada de Fevereiro de 2026
-            setSelicRate(11.25) 
-            setCdiRate(11.15)
+            console.error("Falha ao buscar taxas do BCB.", error)
+            setSelicRate(null)
+            setCdiRate(null)
         } finally {
             setLoadingRates(false)
         }
@@ -53,7 +46,7 @@ export default function FinancialCalculators() {
   
   // Cálculo CDI (Simples para demonstração - Não considera IR)
   const calcCdi = () => {
-    const annualRate = (cdiPercent / 100) * (cdiRate / 100)
+    const annualRate = (cdiPercent / 100) * ((cdiRate ?? 0) / 100)
     const monthlyRate = Math.pow(1 + annualRate, 1/12) - 1
     const finalAmount = cdiAmount * Math.pow(1 + monthlyRate, cdiMonths)
     const profit = finalAmount - cdiAmount
@@ -96,7 +89,7 @@ export default function FinancialCalculators() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                     <div className="flex justify-between items-center bg-blue-900/20 border border-blue-500/20 p-4 rounded-xl mb-6">
                         <span className="text-sm font-bold text-blue-400">Taxa Selic Hoje (BCB)</span>
-                        {loadingRates ? <Loader2 size={16} className="animate-spin text-blue-500"/> : <span className="text-xl font-black text-white">{selicRate.toFixed(2)}% a.a.</span>}
+                        {loadingRates ? <Loader2 size={16} className="animate-spin text-blue-500"/> : <span className="text-xl font-black text-white">{selicRate === null ? 'Dados temporariamente indisponíveis' : `${selicRate.toFixed(2)}% a.a.`}</span>}
                     </div>
 
                     <div><label className="text-xs font-bold text-gray-500 uppercase">Valor Inicial (R$)</label><input type="number" value={cdiAmount} onChange={e => setCdiAmount(Number(e.target.value))} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white outline-none focus:border-blue-500" /></div>
