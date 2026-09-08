@@ -140,7 +140,7 @@ export default function DashboardView({ summary: initialSummary, onNavigate, tra
       {/* HEADER */}
       <div className="flex justify-between items-end">
         <div>
-            <h1 className="text-3xl font-black tracking-tight">Dashboard <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-500/20 font-bold uppercase ml-2">Cérebro.OS</span></h1>
+            <h1 className="text-3xl font-black tracking-tight">Dashboard <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-500/20 font-bold uppercase ml-2">Cérebro.IA</span></h1>
             <p className="text-gray-400 mt-2 text-sm font-medium">Motor cognitivo e visão patrimonial.</p>
         </div>
       </div>

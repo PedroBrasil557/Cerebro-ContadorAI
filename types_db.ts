@@ -249,6 +249,7 @@ export type ActiveTab =
   | 'caixa empresarial'
   | 'agenda smart'
   | 'meu perfil'
+  | 'admin'
   // --- ENGENHARIA DE CUSTOS ---
 export interface NailProduct {
   id: string;

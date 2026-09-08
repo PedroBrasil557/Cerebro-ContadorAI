@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Session } from '@supabase/supabase-js'
+import type { Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
 import { CalendarClock, Bell, Menu, LogOut, ChevronDown, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
@@ -15,31 +15,41 @@ import Navigation from '@/core/components/Navigation'
 import AIAssistant from '@/core/components/ai/AIAssistant' 
 
 import { checkAndTriggerSystemNotifications } from '@/core/action/notifications'
-import { calculateBalance, calculateExpenses, calculateIncome, groupTransactionsByMonth } from '@/core/finance/transactionMath'
+import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 import { ActiveTab } from '@/types'
 import { Goal, Transaction, CaixaData, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
 
 // ============================================================================
 // COMPONENTE: TOPBAR (CÉREBRO.OS GLOBAL HEADER)
 // ============================================================================
-const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMenu, onNavigate, onLogout }: any) => {
+interface TopBarProps {
+  user: User
+  profile: UserProfile | null
+  notifications: NotificationItem[]
+  onMarkAsRead: (id: string) => void
+  onToggleMenu: () => void
+  onNavigate: (tab: ActiveTab) => void
+  onLogout: () => void
+}
+
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return 'Bom dia'
+  if (hour >= 12 && hour < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+const TopBar = ({ user, profile, notifications, onMarkAsRead, onToggleMenu, onNavigate, onLogout }: TopBarProps) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifMenu, setShowNotifMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
-  const [greeting, setGreeting] = useState('')
+  const [greeting] = useState(getGreeting)
 
   useEffect(() => {
-    const hour = new Date().getHours()
-    if (hour >= 5 && hour < 12) setGreeting('Bom dia')
-    else if (hour >= 12 && hour < 18) setGreeting('Boa tarde')
-    else setGreeting('Boa noite')
-  }, [])
-
-  useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) setShowProfileMenu(false)
-      if (notifRef.current && !notifRef.current.contains(event.target)) setShowNotifMenu(false)
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setShowProfileMenu(false)
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) setShowNotifMenu(false)
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
@@ -123,7 +133,7 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
                 {showProfileMenu && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-64 rounded-3xl bg-[#0a0a0c] border border-white/10 shadow-2xl z-50 overflow-hidden">
                         <div className="p-5 border-b border-white/5 bg-white/[0.02]">
-                            <p className="text-sm font-bold text-white mb-1">Cérebro.OS Conta</p>
+                            <p className="text-sm font-bold text-white mb-1">Conta Cérebro.IA</p>
                             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                         </div>
                         <div className="p-2">
@@ -153,7 +163,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
   const [accountMode, setAccountMode] = useState<AccountMode>('personal')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [chartRange, setChartRange] = useState<'1M' | '3M' | '6M' | '1A'>('3M')
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -209,13 +218,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
     return { balance: calculateBalance(transactions), income, expense, emergencyTotal: caixa.currentBalance }
   }, [transactions, caixa])
 
-  const historyChartData = useMemo(() => {
-    return groupTransactionsByMonth(transactions).slice(-10).map(({ month, balance }) => ({
-      name: new Date(`${month}-01T12:00:00`).toLocaleDateString('pt-BR', { month: 'short' }),
-      value: balance,
-    }))
-  }, [transactions])
-
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden relative font-sans">
       <AppLoadingScreen isLoading={isLoading} />
@@ -228,11 +230,12 @@ export default function MainAppLayout({ session }: { session: Session }) {
         isOpen={isMenuOpen} 
         onClose={() => setIsMenuOpen(false)} 
         user={session.user} 
+        systemRole={userProfile?.system_role}
+        onAccountModeChange={setAccountMode}
       />
       
       <main className="flex-1 flex flex-col relative h-full">
         <TopBar 
-          title={activeTab} 
           user={session?.user} 
           profile={userProfile} 
           notifications={notifications} 
@@ -240,8 +243,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
           onToggleMenu={() => setIsMenuOpen(!isMenuOpen)} 
           onNavigate={setActiveTab} 
           onLogout={handleLogout}
-          accountMode={accountMode}
-          setAccountMode={setAccountMode} 
         />
         
         <div className="flex-1 overflow-x-hidden overflow-y-auto bg-[url('/bg-grid.svg')] bg-fixed custom-scrollbar">
@@ -250,11 +251,12 @@ export default function MainAppLayout({ session }: { session: Session }) {
               handleRedirect={setActiveTab}
               user={session?.user} 
               summary={financialSummary}
-              charts={{ monthlyBalanceHistory: historyChartData, range: chartRange, setRange: setChartRange }} 
               goals={goals}
               transactions={transactions} 
               caixaData={caixa}
               investments={investments} 
+              systemRole={userProfile?.system_role}
+              accountMode={accountMode}
               onAddGoal={(g) => financeService.createGoal(g).then(res => setGoals(prev => [...prev, res]))}
            />
            <div className="h-24" /> 

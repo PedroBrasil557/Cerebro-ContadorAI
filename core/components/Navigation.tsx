@@ -34,6 +34,8 @@ interface NavigationProps {
   isOpen: boolean
   onClose: () => void
   user: SupabaseUser
+  systemRole?: 'user' | 'admin' | 'founder'
+  onAccountModeChange?: (mode: 'personal' | 'professional') => void
 }
 
 interface MenuItem {
@@ -64,7 +66,7 @@ const THEMES = {
   }
 }
 
-export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, onClose, user }: NavigationProps) {
+export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, onClose, user, systemRole = 'user', onAccountModeChange }: NavigationProps) {
   const supabase = createClient()
   const router = useRouter()
   const [isSwitching, setIsSwitching] = useState(false)
@@ -111,6 +113,9 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
     { id: 'investimentos', label: 'Patrimônio', icon: PieChart, isPro: true },
     { id: 'minha carteira', label: 'Carteira de Cartões', icon: Wallet, isPro: false },
     { id: 'central de dividas', label: 'Central de Dívidas', icon: ShieldAlert, isPro: true },
+    ...((systemRole === 'founder' || systemRole === 'admin')
+      ? [{ id: 'admin' as const, label: 'Administração', icon: ShieldAlert, isPro: false }]
+      : []),
   ]
 
   const professionalMenuItems: MenuItem[] = [
@@ -141,6 +146,7 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
         .eq('id', user.id)
       if (error) throw error
       setAccountMode(newMode)
+      onAccountModeChange?.(newMode)
       toast.success(`Modo ${newMode === 'personal' ? 'Pessoal' : 'Empresarial'} ativado!`)
       onSelectTab(newMode === 'personal' ? 'dashboard' : 'nail design')
       router.refresh()
@@ -176,7 +182,7 @@ export default function Navigation({ activeTab, onSelectTab, onLogout, isOpen, o
               </div>
               <div>
                  <h1 className="text-xl font-black tracking-tight text-white leading-none">
-                    CÉREBRO<span className={theme.text}>.OS</span>
+                    CÉREBRO<span className={theme.text}>.IA</span>
                  </h1>
                  <p className="text-[9px] text-gray-500 font-black uppercase tracking-[0.3em] mt-1">Decision Engine</p>
               </div>

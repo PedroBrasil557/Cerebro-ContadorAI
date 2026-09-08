@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     const googleEvent = {
       summary: `📅 ${event.service} - ${event.client_name}`,
-      description: `Cliente: ${event.client_name}\nServiço: ${event.service}\nValor: R$ ${event.value}\n\nAgendado via Cérebro.AI`,
+      description: `Cliente: ${event.client_name}\nServiço: ${event.service}\nValor: R$ ${event.value}\n\nAgendado via Cérebro.IA`,
       start: {
         dateTime: startDate.toISOString(),
         timeZone: 'America/Sao_Paulo',

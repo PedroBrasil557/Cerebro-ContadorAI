@@ -130,7 +130,7 @@ export default function AuthPage() {
                 <BrainCircuit className="h-8 w-8 text-indigo-400" />
              </div>
              <h1 className="text-2xl font-black tracking-tight text-white mb-1">
-               {view === 'login' ? 'Bem-vindo ao Cérebro.OS' : view === 'register' ? 'Criar Conta Mestre' : 'Recuperar Acesso'}
+               {view === 'login' ? 'Bem-vindo ao Cérebro.IA' : view === 'register' ? 'Criar Conta Mestre' : 'Recuperar Acesso'}
              </h1>
              <p className="text-xs text-gray-400 font-medium text-balance">
                {view === 'login' ? 'Acesse seu painel financeiro blindado.' : view === 'register' ? 'O motor de decisões do seu patrimônio.' : 'Enviaremos um link de segurança para redefinir sua senha.'}

@@ -6,6 +6,7 @@ import {
   User, Star,
   Camera, Loader2, Zap, Save, CheckCircle2,
   BrainCircuit, ShieldCheck, Lock, Bell, LogOut, ChevronRight, Target, X,
+  Download, Trash2,
   type LucideIcon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -13,6 +14,7 @@ import { toast } from 'sonner'
 import { UserProfile } from '@/types_db'
 import UpgradeModal from '@/core/components/UpgradeModal' // ✅ CORRIGIDO: Importação adicionada
 import { useEntitlements } from '@/core/hooks/useEntitlements'
+import { financeService } from '@/services/financeService'
 
 interface PremiumCardProps {
   children: ReactNode
@@ -64,9 +66,12 @@ export default function ProfileView() {
   const [saving, setSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState<Partial<UserProfile>>({})
-  const [userId, setUserId] = useState<string | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const { plan } = useEntitlements()
   
   const [iaEnabled, setIaEnabled] = useState(true)
@@ -86,7 +91,6 @@ export default function ProfileView() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
-        setUserId(user.id)
 
         const { data } = await supabase
           .from('profiles')
@@ -120,17 +124,12 @@ export default function ProfileView() {
     e.preventDefault()
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: profile.full_name,
-          phone: profile.phone,
-          location: profile.location,
-          bio: profile.bio
-        })
-        .eq('id', userId)
-
-      if (error) throw error
+      await financeService.updateProfile({
+        full_name: profile.full_name,
+        phone: profile.phone,
+        location: profile.location,
+        bio: profile.bio,
+      })
       toast.success("Perfil sincronizado!", { icon: <CheckCircle2 className="text-emerald-500" /> })
       setIsEditing(false)
     } catch (error: unknown) {
@@ -186,6 +185,44 @@ export default function ProfileView() {
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const response = await fetch('/api/account/export', { cache: 'no-store' })
+      if (!response.ok) throw new Error('Não foi possível exportar seus dados.')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `cerebro-ia-export-${new Date().toISOString().slice(0, 10)}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+      toast.success('Exportação concluída.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha na exportação.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'EXCLUIR') return
+    setDeleting(true)
+    try {
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: deleteConfirmation }),
+      })
+      const result = await response.json() as { error?: { message?: string } }
+      if (!response.ok) throw new Error(result.error?.message || 'Não foi possível excluir sua conta.')
+      window.location.href = '/login'
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha na exclusão.')
+      setDeleting(false)
+    }
+  }
+
   if (loading) {
     return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
   }
@@ -199,7 +236,7 @@ export default function ProfileView() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
             <h1 className="text-4xl font-black tracking-tight mb-2 uppercase italic">Configurações</h1>
-            <p className="text-gray-500 font-medium uppercase tracking-widest text-xs">Identidade Digital e Parâmetros do Cérebro.OS</p>
+            <p className="text-gray-500 font-medium uppercase tracking-widest text-xs">Identidade Digital e Parâmetros do Cérebro.IA</p>
         </div>
         <div className="flex items-center gap-3 bg-emerald-500/10 px-6 py-3 rounded-2xl border border-emerald-500/20">
             <ShieldCheck size={18} className="text-emerald-400" />
@@ -324,6 +361,21 @@ export default function ProfileView() {
                     </AnimatePresence>
                 </form>
             </PremiumCard>
+
+            <PremiumCard>
+              <div className="mb-6 border-b border-white/5 pb-5">
+                <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">Privacidade e Dados</h2>
+                <p className="mt-2 text-xs text-gray-500">Baixe uma cópia ou exclua permanentemente sua conta.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button type="button" onClick={handleExport} disabled={exporting} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50">
+                  {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Exportar meus dados
+                </button>
+                <button type="button" onClick={() => setIsDeleteModalOpen(true)} className="flex items-center justify-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-xs font-black uppercase tracking-widest text-rose-400">
+                  <Trash2 size={16} /> Excluir minha conta
+                </button>
+              </div>
+            </PremiumCard>
         </div>
       </div>
 
@@ -343,6 +395,25 @@ export default function ProfileView() {
                     </button>
                 </form>
              </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} className="w-full max-w-md rounded-[2rem] border border-rose-500/20 bg-[#09090b] p-8">
+              <h3 className="text-2xl font-black text-white">Excluir conta permanentemente</h3>
+              <p className="mt-3 text-sm leading-relaxed text-gray-400">A assinatura será cancelada e seus dados e recibos serão removidos. Esta ação não pode ser desfeita.</p>
+              <label className="mt-6 block text-[10px] font-black uppercase tracking-widest text-gray-500">Digite EXCLUIR para confirmar</label>
+              <input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-white outline-none focus:border-rose-500" />
+              <div className="mt-6 flex gap-3">
+                <button type="button" onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmation('') }} className="flex-1 rounded-2xl bg-white/5 py-4 text-xs font-black uppercase tracking-widest text-white">Cancelar</button>
+                <button type="button" onClick={handleDeleteAccount} disabled={deleting || deleteConfirmation !== 'EXCLUIR'} className="flex-1 rounded-2xl bg-rose-600 py-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-40">
+                  {deleting ? 'Excluindo…' : 'Excluir definitivamente'}
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

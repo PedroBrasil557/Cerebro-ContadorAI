@@ -24,6 +24,7 @@ import SmartShoppingView from '@/modules/personal/views/SmartShoppingView'
 import CaixaView from '@/modules/professional/views/CaixaView'
 import NailDesignView from '@/modules/professional/views/NailDesignView'
 import FinancialCommandCenter from '@/modules/professional/components/FinancialCommandCenter'
+import FounderDashboard from '@/modules/admin/views/FounderDashboard'
 
 interface ViewContainerProps {
   activeTab: ActiveTab
@@ -38,18 +39,13 @@ interface ViewContainerProps {
     emergencyTotal: number
   }
   
-  // Gráficos
-  charts: {
-      monthlyBalanceHistory: any[]
-      range: any
-      setRange: (r: any) => void
-  }
-  
   // Dados
   goals: Goal[]
   transactions: Transaction[]
   caixaData: CaixaData
   investments: Investment[] 
+  systemRole?: 'user' | 'admin' | 'founder'
+  accountMode: 'personal' | 'professional'
 
   // Handlers
   onAddGoal: (goal: NewGoal) => Promise<void>
@@ -57,7 +53,7 @@ interface ViewContainerProps {
 
 export default function ViewContainer({ 
   activeTab, handleRedirect, user, summary, transactions = [], goals = [], caixaData,
-  onAddGoal, investments = []
+  onAddGoal, investments = [], systemRole = 'user', accountMode
 }: ViewContainerProps) {
 
   // Normaliza o nome da aba para evitar erros de renderização
@@ -65,8 +61,6 @@ export default function ViewContainer({
   
   // Prioriza investimentos vindo das props, senão usa o local do container
   // 🛡️ CONTROLE DE ACESSO DA CAMADA
-  const accountMode = user.user_metadata?.account_mode || 'personal'
-
   const pageVariants = { 
     initial: { opacity: 0, scale: 0.98 }, 
     enter: { opacity: 1, scale: 1 }, 
@@ -153,6 +147,10 @@ export default function ViewContainer({
         {/* ========================================== */}
         {(currentTab === 'meu perfil' || currentTab === 'perfil') && (
           <ProfileView />
+        )}
+
+        {currentTab === 'admin' && (systemRole === 'founder' || systemRole === 'admin') && (
+          <FounderDashboard />
         )}
 
       </motion.div>

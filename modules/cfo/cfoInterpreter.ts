@@ -18,7 +18,7 @@ export const cfoInterpreter = {
 
     // 3. Constrói o contexto blindado
     const prompt = `
-Você é o CFO Virtual (Diretor Financeiro) do "Cérebro.OS", um sistema enterprise de gestão.
+Você é o CFO Virtual (Diretor Financeiro) do "Cérebro.IA", um sistema de gestão.
 Sua função é analisar os dados financeiros da empresa (um estúdio de Nail Design) e fornecer um relatório estratégico, direto e acionável para o dono (Pedro).
 
 DADOS FINANCEIROS REAIS DA EMPRESA (NÃO INVENTE NÚMEROS):

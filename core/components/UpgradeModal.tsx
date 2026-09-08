@@ -94,7 +94,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
               Acesso <span className="text-indigo-400">Total</span>
             </h2>
             <p className="text-sm text-gray-400 mb-10 leading-relaxed font-medium">
-              O núcleo Cérebro.OS aguarda ativação. Desbloqueie auditoria neural, sala de guerra e projeções patrimoniais.
+              O Cérebro.IA aguarda ativação. Desbloqueie análises avançadas, central de dívidas e projeções patrimoniais.
             </p>
 
             {/* Grid de Benefícios Premium */}

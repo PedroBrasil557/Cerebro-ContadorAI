@@ -33,7 +33,7 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'assistant', content: `Conexão Neural Estabelecida. 🧠\nOlá ${user?.user_metadata?.full_name || 'Comandante'}. O núcleo Cérebro.OS está online. Como posso auditar suas estratégias hoje?` }
+    { id: '1', role: 'assistant', content: `Conexão estabelecida. 🧠\nOlá ${user?.user_metadata?.full_name || 'Comandante'}. O Cérebro.IA está online. Como posso ajudar hoje?` }
   ])
   const [isTyping, setIsTyping] = useState(false)
   
@@ -132,7 +132,7 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white italic">Cérebro.OS</h3>
+                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white italic">Cérebro.IA</h3>
                             <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/30 font-black">CORE V2</span>
                         </div>
                         <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1.5 uppercase mt-0.5">
