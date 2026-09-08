@@ -42,4 +42,25 @@ describe('transactionMath', () => {
       { month: '2026-10', balance: -20 },
     ])
   })
+
+  it('aceita valores zero sem alterar os totais', () => {
+    const zeroValues = [
+      transaction('receita', 0),
+      transaction('despesa_fixa', 0),
+      transaction('despesa_variavel', 0),
+      transaction('transferencia', 0),
+    ]
+
+    expect(calculateIncome(zeroValues)).toBe(0)
+    expect(calculateExpenses(zeroValues)).toBe(0)
+    expect(calculateTransfers(zeroValues)).toBe(0)
+    expect(calculateBalance(zeroValues)).toBe(0)
+  })
+
+  it('normaliza sinais de despesas fixas e variáveis', () => {
+    expect(calculateExpenses([
+      transaction('despesa_fixa', 150),
+      transaction('despesa_variavel', -75),
+    ])).toBe(225)
+  })
 })

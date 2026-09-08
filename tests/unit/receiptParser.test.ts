@@ -31,4 +31,19 @@ describe('receipt parser', () => {
   it('ignores a product without a price', () => {
     expect(parseReceiptText('Sabonete neutro').items).toEqual([])
   })
+
+  it('parses a valid receipt without turning totals into products', () => {
+    const result = parseReceiptText([
+      'MERCADO CENTRAL',
+      'Arroz Integral 25,90',
+      'Feijão Preto 8.50',
+      'TOTAL R$ 34,40',
+    ].join('\n'))
+
+    expect(result.items).toEqual([
+      { name: 'Arroz Integral', price: 25.9 },
+      { name: 'Feijão Preto', price: 8.5 },
+    ])
+    expect(result.confidence).toBe(0.5)
+  })
 })

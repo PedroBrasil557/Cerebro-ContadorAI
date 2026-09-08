@@ -16,6 +16,7 @@ export function parseReceiptText(rawText: string): ReceiptParseResult {
     .filter(Boolean)
   const items: ReceiptItem[] = []
   const pricePattern = /^(.*?)\s+(?:R\$\s*)?(\d{1,6}(?:[.,]\d{2}))\s*$/i
+  const summaryPattern = /^(?:sub\s*total|total|troco|desconto|acr[eé]scimo|taxa|imposto)\b/i
 
   for (const line of lines) {
     const match = line.match(pricePattern)
@@ -29,7 +30,7 @@ export function parseReceiptText(rawText: string): ReceiptParseResult {
       .trim()
     const price = Number.parseFloat(match[2].replace(',', '.'))
 
-    if (name.length >= 2 && Number.isFinite(price) && price > 0) {
+    if (name.length >= 2 && !summaryPattern.test(name) && Number.isFinite(price) && price > 0) {
       items.push({ name, price })
     }
   }

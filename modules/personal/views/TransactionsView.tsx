@@ -16,6 +16,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
+import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 
 interface TransactionsViewProps {
   user: any
@@ -238,9 +239,11 @@ export default function TransactionsView({ user }: TransactionsViewProps) {
 
   const totals = useMemo(() => {
       const monthData = transactions.filter(t => t.date.startsWith(currentMonthStr))
-      const inc = monthData.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-      const exp = monthData.filter(t => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-      return { income: inc, expense: exp, balance: inc - exp }
+      return {
+        income: calculateIncome(monthData),
+        expense: calculateExpenses(monthData),
+        balance: calculateBalance(monthData),
+      }
   }, [transactions, currentMonthStr])
 
   const format = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
