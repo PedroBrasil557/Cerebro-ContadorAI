@@ -16,7 +16,6 @@ import { createClient } from '@/lib/supabase/client'
 // Importando a Camada de Domínio (O Cérebro do Negócio)
 import { cfoEngine, BusinessMetrics } from '@/modules/cfo/cfoEngine'
 import { cfoRulesEngine } from '@/modules/cfo/cfoRulesEngine'
-import { cfoInterpreter } from '@/modules/cfo/cfoInterpreter'
 import { cfoSimulator } from '@/modules/cfo/cfoSimulator'
 
 // --- COMPONENTES VISUAIS AUXILIARES ---
@@ -196,16 +195,23 @@ export default function CaixaView({ data, transactions: initialTransactions = []
   const handleAnalyzeCash = async () => {
     setAnalyzing(true)
     try {
-      const prompt = cfoInterpreter.generatePrompt(metrics)
-      
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('/api/cfo-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt })
+        body: JSON.stringify({
+          caixaData: {
+            currentBalance: metrics.cashReserve,
+            monthlyGoal: safeData.monthlyGoal,
+            taxRate: safeData.taxRate,
+            reserveRate: safeData.reserveRate ?? 10,
+          },
+          recentTransactions: liveTransactions.slice(0, 50).map(({ amount, type }) => ({ amount, type })),
+        })
       })
 
       const result = await response.json()
-      setCfoAnalysis(result.response)
+      if (!response.ok) throw new Error(result.error || 'Falha ao consultar o CFO Virtual.')
+      setCfoAnalysis(result.analysis)
       toast.success("Análise estratégica concluída!")
     } catch (error) {
       toast.error("Erro ao consultar o CFO Virtual.")

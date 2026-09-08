@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 import { 
   ClientAppointment, 
   Transaction, 
@@ -15,8 +16,17 @@ import {
 
 const supabase = createClient()
 
+interface CreateAppointmentInput {
+  client_name: string
+  client_email?: string
+  service: string
+  value: number
+  date: string
+  time?: string
+}
+
 // --- FUNÇÃO AUXILIAR DE SEGURANÇA ---
-async function ensureProfileAndSettings(user: any) {
+async function ensureProfileAndSettings(user: User) {
   if (!user) return
 
   // 1. Verifica/Cria Perfil
@@ -122,7 +132,7 @@ export const financeService = {
      } catch { return [] }
   },
 
-  createCard: async (card: any) => {
+  createCard: async (card: Partial<CreditCard>) => {
      const { data: { user } } = await supabase.auth.getUser()
      if (!user) throw new Error('User not found')
      await ensureProfileAndSettings(user)
@@ -144,7 +154,7 @@ export const financeService = {
      
      try {
          await financeService.createNotification("Novo Cartão", `Cartão ${card.name} adicionado.`, "success")
-     } catch (e) {}
+     } catch {}
 
      return data
   },
@@ -234,53 +244,37 @@ export const financeService = {
     } catch { return [] }
   },
 
-  createAppointment: async (appt: any) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
+  createAppointment: async (appt: CreateAppointmentInput): Promise<ClientAppointment> => {
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
 
-    const googleToken = session?.provider_token
+    const [datePart, embeddedTime] = appt.date.split('T')
+    const time = appt.time ?? embeddedTime?.slice(0, 5)
+    if (!datePart || !time) throw new Error('Data e horário são obrigatórios')
 
-    try {
-        // Tenta sincronizar com Google Calendar se o token existir
-        if (googleToken) {
-          const response = await fetch('/api/schedule', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  clientName: appt.client_name,
-                  clientEmail: appt.client_email,
-                  service: appt.service,
-                  value: appt.value,
-                  date: appt.date.split('T')[0],
-                  time: appt.date.split('T')[1].substring(0, 5),
-                  caixaPercentage: 20,
-                  providerToken: googleToken 
-              })
-          })
-          if (response.ok) {
-            const result = await response.json()
-            return result.data
-          }
-        }
-        throw new Error("Sincronização externa indisponível, salvando localmente.")
-
-    } catch (error) {
-        // Fallback: Salva apenas no Supabase
-        const { data, error: dbError } = await supabase.from('appointments').insert({
-            user_id: user.id,
-            client_name: appt.client_name,
-            client_email: appt.client_email,
-            service: appt.service,
-            value: appt.value,
-            date: appt.date.split('T')[0],
-            time: appt.date.split('T')[1].substring(0, 5),
-            status: 'agendado'
-        }).select().single()
-
-        if (dbError) throw dbError
-        return data
+    const response = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientName: appt.client_name,
+        clientEmail: appt.client_email,
+        service: appt.service,
+        value: appt.value,
+        date: datePart,
+        time,
+        caixaPercentage: 20,
+      }),
+    })
+    const result = await response.json() as {
+      appointment?: ClientAppointment
+      error?: { message?: string }
     }
+
+    if (!response.ok || !result.appointment) {
+      throw new Error(result.error?.message || 'Não foi possível criar o agendamento')
+    }
+
+    return result.appointment
   },
 
   updateAppointmentStatus: async (id: string, status: string) => {

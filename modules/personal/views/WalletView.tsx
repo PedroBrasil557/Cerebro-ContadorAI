@@ -185,8 +185,10 @@ export default function WalletView({ user }: WalletViewProps) {
     setGeneratingStrategy(true)
     try {
         const cardData = `Cartão: ${cards[0].name} (Limite: R$ ${cards[0].limit_amount}, Uso: R$ ${cards[0].current_invoice})`
-        const response = await fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: "Estratégia para aumento de limite.", context: { cardData } }) })
-        const data = await response.json(); setAiLimitStrategy(data.response)
+        const response = await fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: "Estratégia para aumento de limite.", context: { context: cardData } }) })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Falha ao consultar a IA.')
+        setAiLimitStrategy(data.response)
     } catch (error) { toast.error("Erro na IA.") } finally { setGeneratingStrategy(false) }
   }
 

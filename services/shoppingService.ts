@@ -1,5 +1,9 @@
 // src/services/shoppingService.ts
 import { createClient } from '@/lib/supabase/client'
+import type { ShoppingItem } from '@/types_db'
+
+type NewShoppingItem = Pick<ShoppingItem, 'session_id' | 'name' | 'category' | 'estimated_price'>
+  & Partial<Omit<ShoppingItem, 'id' | 'session_id' | 'name' | 'category' | 'estimated_price'>>
 
 export const shoppingService = {
   // ============================================================================
@@ -15,12 +19,14 @@ export const shoppingService = {
     const today = new Date()
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
 
-    let { data: session, error } = await supabase
+    const { data: existingSession, error } = await supabase
       .from('monthly_shopping_sessions')
       .select('*')
       .eq('user_id', user.id)
       .eq('month', firstDayOfMonth)
       .single()
+
+    let session = existingSession
 
     if (!session || error) {
       const { data: newSession, error: insertError } = await supabase
@@ -70,7 +76,7 @@ export const shoppingService = {
   },
 
   // Adiciona novo item
-  async addItem(itemData: any) {
+  async addItem(itemData: NewShoppingItem) {
     const supabase = createClient()
     const { data, error } = await supabase
       .from('shopping_items')
@@ -83,7 +89,7 @@ export const shoppingService = {
   },
 
   // Atualiza um item (nome, preço, status de compra)
-  async updateItem(itemId: string, updates: any) {
+  async updateItem(itemId: string, updates: Partial<NewShoppingItem>) {
     const supabase = createClient()
     const { error } = await supabase
       .from('shopping_items')
@@ -111,30 +117,28 @@ export const shoppingService = {
   // Faz o upload da imagem para o Supabase Storage (Bucket: 'receipts')
   async uploadReceiptImage(file: File, sessionId: string) {
     const supabase = createClient()
-    const fileExt = file.name.split('.').pop() || 'jpg'
-    const fileName = `${sessionId}/${Date.now()}.${fileExt}`
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Usuário não autenticado')
 
-    const { data, error } = await supabase.storage
+    const fileExt = file.name.split('.').pop() || 'jpg'
+    const storagePath = `${user.id}/${sessionId}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`
+
+    const { error } = await supabase.storage
       .from('receipts')
-      .upload(fileName, file)
+      .upload(storagePath, file, { contentType: file.type, upsert: false })
 
     if (error) throw error
-
-    const { data: publicUrlData } = supabase.storage
-      .from('receipts')
-      .getPublicUrl(fileName)
-
-    return publicUrlData.publicUrl
+    return storagePath
   },
 
   // Salva o registro do cupom no banco de dados
-  async saveReceiptRecord(sessionId: string, imageUrl: string, extractedTotal: number = 0) {
+  async saveReceiptRecord(sessionId: string, storagePath: string, extractedTotal: number = 0) {
     const supabase = createClient()
     const { data, error } = await supabase
       .from('shopping_receipts')
       .insert({
         session_id: sessionId,
-        image_url: imageUrl,
+        storage_path: storagePath,
         extracted_total: extractedTotal,
         extracted_date: new Date().toISOString().split('T')[0],
         processing_status: 'processed'
@@ -156,7 +160,24 @@ export const shoppingService = {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data
+    if (!data) return []
+
+    return Promise.all(data.map(async (receipt: {
+      id: string
+      storage_path?: string | null
+      image_url?: string | null
+      extracted_total: number
+      created_at: string
+    }) => {
+      if (!receipt.storage_path) return receipt
+
+      const { data: signed, error: signedError } = await supabase.storage
+        .from('receipts')
+        .createSignedUrl(receipt.storage_path, 300)
+
+      if (signedError) throw signedError
+      return { ...receipt, image_url: signed.signedUrl }
+    }))
   },
 
   // ✅ NOVA: Deleta o registro do cupom e remove o arquivo físico do Storage
@@ -166,16 +187,15 @@ export const shoppingService = {
     // 1. Busca a URL da imagem para saber qual arquivo deletar no storage
     const { data: receipt } = await supabase
       .from('shopping_receipts')
-      .select('image_url')
+      .select('storage_path, image_url')
       .eq('id', receiptId)
       .single()
 
-    if (receipt?.image_url) {
-        // Extrai o caminho do arquivo da URL (tudo que vem depois de /receipts/)
-        const path = receipt.image_url.split('/receipts/').pop()
-        if (path) {
-            await supabase.storage.from('receipts').remove([path])
-        }
+    const storagePath = receipt?.storage_path
+      || receipt?.image_url?.split('/receipts/').pop()
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from('receipts').remove([storagePath])
+      if (storageError) throw storageError
     }
 
     // 2. Deleta o registro na tabela

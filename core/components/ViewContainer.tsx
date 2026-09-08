@@ -136,7 +136,7 @@ export default function ViewContainer({
             )}
 
             {(currentTab === 'compras inteligentes' || currentTab === 'compras') && (
-              <SmartShoppingView user={user} /> 
+              <SmartShoppingView />
             )}
             
             {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (

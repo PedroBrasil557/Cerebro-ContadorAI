@@ -3,11 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  X, Send, Sparkles, Zap, BrainCircuit, Loader2, Lock, LayoutDashboard, Terminal
+  X, Send, Zap, BrainCircuit, Loader2, LayoutDashboard, Terminal
 } from 'lucide-react'
+import type { User } from '@supabase/supabase-js'
 import { financeService } from '@/services/financeService'
-import { formatCurrency } from '@/lib/utils'
-import UpgradeModal from '@/core/components/UpgradeModal'
+import type { Goal, Transaction } from '@/types_db'
 
 interface Message {
   id: string
@@ -16,28 +16,33 @@ interface Message {
 }
 
 interface AIAssistantProps {
-  user: any
+  user: User
   realBalance: number
+}
+
+interface AssistantContext {
+  transactions: Transaction[]
+  goals: Goal[]
+  balance: {
+    currentBalance: number
+    monthlyGoal: number
+  }
 }
 
 export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'assistant', content: `Conexão Neural Estabelecida. 🧠\nOlá ${user?.user_metadata?.full_name || 'Comandante'}. O núcleo Cérebro.OS está online. Como posso auditar suas estratégias hoje?` }
   ])
   const [isTyping, setIsTyping] = useState(false)
   
-  const [contextData, setContextData] = useState<any>({
+  const [contextData, setContextData] = useState<AssistantContext>({
       transactions: [],
       goals: [],
-      balance: realBalance
+      balance: { currentBalance: realBalance, monthlyGoal: 0 }
   })
 
-  // 🛡️ Lógica de Plano Reativada
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
-  const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,30 +52,23 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
                 financeService.getTransactions(),
                 financeService.getGoals()
             ])
-            setContextData({ transactions: trans || [], goals: goals || [], balance: realBalance })
+            setContextData({
+              transactions: trans || [],
+              goals: goals || [],
+              balance: { currentBalance: realBalance, monthlyGoal: 0 },
+            })
         } catch (error) { console.error("Erro Contexto IA:", error) }
     }
-    if (isOpen && !isFreePlan) loadContext()
-  }, [isOpen, realBalance, isFreePlan])
+    if (isOpen) loadContext()
+  }, [isOpen, realBalance])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  const handleOpenChat = () => {
-    if (isFreePlan) {
-      setShowUpgradeModal(true)
-      return
-    }
-    setIsOpen(!isOpen)
-  }
+  const handleOpenChat = () => setIsOpen(!isOpen)
 
   const handleSend = async (customText?: string) => {
-    if (isFreePlan) {
-        setShowUpgradeModal(true)
-        return
-    }
-
     const textToSend = customText || input
     if (!textToSend.trim()) return
     
@@ -87,15 +85,15 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
                 message: textToSend, 
                 context: {
                     ...contextData,
-                    currentBalance: realBalance,
-                    systemPrompt: `Você é o Cérebro.OS. REGRA ABSOLUTA: Sempre que o usuário perguntar sobre o "saldo atual", "quanto tem na conta" ou valores disponíveis, você deve confirmar que o sistema está sincronizado, mas instruir o usuário a olhar o valor exato no CARD DE SALDO do Dashboard principal para segurança total. Nunca tente adivinhar o valor se não tiver certeza absoluta.`
+                    balance: { ...contextData.balance, currentBalance: realBalance },
                 } 
             })
         })
         
         const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Falha ao consultar a IA.')
         setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: data.response }])
-    } catch (error) {
+    } catch {
         setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: '⚠️ Falha na sinapse neural. Tente novamente.' }])
     } finally { setIsTyping(false) }
   }
@@ -113,12 +111,7 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
       >
         {isOpen ? <X className="text-white" /> : (
             <div className="relative">
-                <BrainCircuit className={`${isFreePlan ? 'text-gray-500' : 'text-indigo-400'} group-hover:text-indigo-300 transition-colors`} size={28} />
-                {isFreePlan && (
-                    <div className="absolute -top-3 -right-3 bg-amber-500 rounded-full p-1 border-2 border-[#050505]">
-                        <Lock size={10} className="text-black" />
-                    </div>
-                )}
+                <BrainCircuit className="text-indigo-400 group-hover:text-indigo-300 transition-colors" size={28} />
             </div>
         )}
       </motion.button>
@@ -228,8 +221,6 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </>
   )
 }

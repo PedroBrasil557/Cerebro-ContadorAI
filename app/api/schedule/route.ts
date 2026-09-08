@@ -1,127 +1,136 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { z } from 'zod'
 import nodemailer from 'nodemailer'
-import ical, { ICalCalendarMethod, ICalAttendeeRole, ICalAttendeeStatus } from 'ical-generator'
+import ical, { ICalAttendeeRole, ICalAttendeeStatus, ICalCalendarMethod } from 'ical-generator'
+import { errorResponse, successResponse } from '@/lib/api/response'
+import { requireUser } from '@/lib/auth/requireUser'
+import { serverEnv } from '@/lib/env/server'
+import { createClient } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
+
+const inputSchema = z.object({
+  clientName: z.string().trim().min(2).max(200),
+  clientEmail: z.email().optional(),
+  service: z.string().trim().min(2).max(200),
+  value: z.coerce.number().finite().nonnegative(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  caixaPercentage: z.coerce.number().finite().min(0).max(100).default(20),
+})
+
+function normalizeInput(input: unknown) {
+  const source = z.record(z.string(), z.unknown()).parse(input)
+  return inputSchema.parse({
+    clientName: source.clientName ?? source.client_name,
+    clientEmail: source.clientEmail ?? source.client_email,
+    service: source.service,
+    value: source.value,
+    date: source.date,
+    time: source.time,
+    caixaPercentage: source.caixaPercentage ?? source.caixa_percentage ?? 20,
+  })
+}
 
 export async function POST(request: Request) {
-  // 1. Cria o cliente Supabase
-  const supabase = await createClient()
-  
-  // 2. Verificação de segurança (Usuário logado)
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user || !user.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
-    const body = await request.json()
-
-    // 3. Tratamento de Dados (CamelCase -> SnakeCase e Fallbacks)
-    const client_name = body.client_name || body.clientName
-    const service = body.service
-    const value = body.value
-    const date = body.date
-    const time = body.time
-    const caixa_percentage = body.caixa_percentage || body.caixaPercentage || 20
-    
-    // Email do cliente (Se não vier, usa o do profissional como fallback para teste)
-    const client_email = body.client_email || body.clientEmail || user.email
-
-    // Validação de Campos Obrigatórios
-    if (!client_name || !service || !value || !date || !time) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
-
-    // 4. Salvar no Banco de Dados (Supabase)
-    const { data: appointment, error: dbError } = await supabase
+    const user = await requireUser()
+    const input = normalizeInput(await request.json())
+    const supabase = await createClient()
+    const { data: appointment, error: insertError } = await supabase
       .from('appointments')
       .insert({
         user_id: user.id,
-        client_name,
-        client_email,
-        service,
-        value,
-        date,
-        time,
+        client_name: input.clientName,
+        client_email: input.clientEmail ?? null,
+        service: input.service,
+        value: input.value,
+        date: input.date,
+        time: input.time,
         status: 'agendado',
-        caixa_percentage,
-        invite_sent: true
+        caixa_percentage: input.caixaPercentage,
+        invite_sent: false,
+        invite_status: 'pending',
       })
       .select()
       .single()
 
-    if (dbError) throw dbError
+    if (insertError) throw insertError
 
-    // 5. Configuração de Data e Hora (Fuso Horário BR -03:00)
-    // Isso garante que o horário apareça certo no Google Agenda/Outlook
-    const startString = `${date}T${time}:00-03:00`
-    const startTime = new Date(startString)
-    const endTime = new Date(startTime.getTime() + 3600000) // +1 hora de duração (padrão)
+    let inviteStatus: 'sent' | 'failed' = 'failed'
+    let inviteError: string | null = null
 
-    // 6. Gerar o Arquivo de Calendário (iCal)
-    const calendar = ical({ 
-        name: 'Agenda Cérebro.AI',
-        method: ICalCalendarMethod.REQUEST // REQUEST faz aparecer os botões "Sim/Não/Talvez"
-    })
-    
-    calendar.createEvent({
-      start: startTime,
-      end: endTime,
-      summary: `🧠 ${client_name} - ${service}`,
-      description: `Agendamento confirmado via Sistema.\n\nCliente: ${client_name}\nServiço: ${service}\nValor: R$ ${value}`,
-      location: 'Consultório / Online',
-      organizer: { 
-          name: user.user_metadata?.full_name || 'Cérebro.AI', 
-          email: user.email 
-      },
-      attendees: [
-        // Participante 1: O Profissional (Dono da conta)
-        {
-            name: 'Profissional',
-            email: user.email,
-            rsvp: true,
-            role: ICalAttendeeRole.REQ,
-            status: ICalAttendeeStatus.ACCEPTED
+    try {
+      if (!serverEnv.SMTP_USER || !serverEnv.SMTP_PASS) {
+        throw new Error('SMTP_NOT_CONFIGURED')
+      }
+
+      const startTime = new Date(`${input.date}T${input.time}:00-03:00`)
+      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000)
+      const calendar = ical({ name: 'Agenda Cérebro.IA', method: ICalCalendarMethod.REQUEST })
+      calendar.createEvent({
+        start: startTime,
+        end: endTime,
+        summary: `${input.clientName} - ${input.service}`,
+        description: `Agendamento confirmado.\nCliente: ${input.clientName}\nServiço: ${input.service}\nValor: R$ ${input.value.toFixed(2)}`,
+        organizer: { name: 'Cérebro.IA', email: serverEnv.SMTP_USER },
+        attendees: input.clientEmail ? [{
+          name: input.clientName,
+          email: input.clientEmail,
+          rsvp: true,
+          role: ICalAttendeeRole.REQ,
+          status: ICalAttendeeStatus.NEEDSACTION,
+        }] : [],
+      })
+
+      const recipients = [user.email, input.clientEmail].filter((email): email is string => Boolean(email))
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: serverEnv.SMTP_USER, pass: serverEnv.SMTP_PASS },
+      })
+      await transporter.sendMail({
+        from: `"Agenda Cérebro.IA" <${serverEnv.SMTP_USER}>`,
+        to: recipients,
+        subject: `Convite: ${input.service} com ${input.clientName}`,
+        text: `Agendamento em ${input.date} às ${input.time}.`,
+        icalEvent: {
+          filename: 'convite.ics',
+          method: 'request',
+          content: calendar.toString(),
         },
-        // Participante 2: O Cliente
-        {
-            name: client_name,
-            email: client_email,
-            rsvp: true,
-            role: ICalAttendeeRole.REQ,
-            // CORREÇÃO DO ERRO DA IMAGEM:
-            // "NEEDS_ACTION" não existe, o correto na biblioteca é "NEEDSACTION" (sem underscore)
-            status: ICalAttendeeStatus.NEEDSACTION 
-        }
-      ]
-    })
-
-    // 7. Enviar E-mail (Nodemailer)
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        const transporter = nodemailer.createTransport({
-            service: 'gmail', // Ou outro serviço SMTP
-            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-        })
-
-        // Envia para AMBOS (Profissional e Cliente)
-        await transporter.sendMail({
-            from: `"Agenda Cérebro.AI" <${process.env.SMTP_USER}>`, 
-            to: [user.email, client_email], 
-            subject: `Convite: ${service} com ${client_name}`,
-            text: `Olá,\n\nUm novo agendamento foi criado.\n\nCliente: ${client_name}\nServiço: ${service}\nData: ${date} às ${time}\n\nPor favor, aceite o convite no anexo para adicionar à sua agenda.`,
-            // Anexa o arquivo .ics gerado
-            icalEvent: {
-                filename: 'convite.ics',
-                method: 'request',
-                content: calendar.toString()
-            }
-        })
+      })
+      inviteStatus = 'sent'
+    } catch (error) {
+      inviteError = error instanceof Error && error.message === 'SMTP_NOT_CONFIGURED'
+        ? 'SMTP_NOT_CONFIGURED'
+        : 'SMTP_SEND_FAILED'
     }
 
-    return NextResponse.json({ success: true, data: appointment })
+    const { error: statusError } = await supabase
+      .from('appointments')
+      .update({
+        invite_status: inviteStatus,
+        invite_sent: inviteStatus === 'sent',
+        invite_error: inviteError,
+        invite_sent_at: inviteStatus === 'sent' ? new Date().toISOString() : null,
+      })
+      .eq('id', appointment.id)
+      .eq('user_id', user.id)
 
-  } catch (error: any) {
-    console.error("API Error:", error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    const warning = statusError
+      ? 'Agendamento salvo, mas o status do convite não pôde ser atualizado.'
+      : inviteStatus === 'failed'
+        ? 'Agendamento salvo, mas o convite não foi enviado.'
+        : null
+
+    return successResponse({
+      appointment: {
+        ...appointment,
+        invite_status: statusError ? 'pending' : inviteStatus,
+        invite_sent: !statusError && inviteStatus === 'sent',
+      },
+      invite: { status: statusError ? 'pending' : inviteStatus, warning },
+    })
+  } catch (error) {
+    return errorResponse(error)
   }
 }

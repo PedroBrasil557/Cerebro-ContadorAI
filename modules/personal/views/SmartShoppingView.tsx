@@ -4,12 +4,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShoppingCart, Plus, ScanLine, Sparkles, TrendingUp, 
-  CheckCircle2, Trash2, Tag, Info, Camera, Activity, Wallet, BrainCircuit, Loader2, Pencil, Image as ImageIcon, Download, RefreshCcw, Lock
+  CheckCircle2, Trash2, Tag, Camera, Activity, Wallet, BrainCircuit, Loader2, Pencil, Image as ImageIcon, Download, RefreshCcw
 } from 'lucide-react'
 import { toast } from 'sonner'
-import Tesseract from 'tesseract.js' 
 import { shoppingService } from '@/services/shoppingService'
-import UpgradeModal from '@/core/components/UpgradeModal' // 🔥 Importado
 
 // --- TIPAGENS ---
 interface ShoppingItem {
@@ -26,24 +24,26 @@ interface ShoppingItem {
 
 interface ReceiptItem {
   id: string
-  image_url: string
+  image_url?: string | null
+  storage_path?: string | null
   extracted_total: number
   created_at: string
 }
 
-interface SmartShoppingProps {
-  user: any // 🔥 Adicionado para checar plano
+interface ShoppingSession {
+  id: string
+  estimated_total: number
+  actual_total: number
 }
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
-export default function SmartShoppingView({ user }: SmartShoppingProps) {
+export default function SmartShoppingView() {
   const [isLoading, setIsLoading] = useState(true)
   const [isScanning, setIsScanning] = useState(false)
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false) // 🔥 Controle Paywall
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [session, setSession] = useState<any>(null)
+  const [session, setSession] = useState<ShoppingSession | null>(null)
   const [items, setItems] = useState<ShoppingItem[]>([])
   const [receipts, setReceipts] = useState<ReceiptItem[]>([]) 
   
@@ -55,10 +55,6 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editingItemName, setEditingItemName] = useState<string>('')
-
-  // 🛡️ Lógica de Plano
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
-  const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
 
   // ============================================================================
   // 💾 FETCH INICIAL
@@ -86,51 +82,41 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
   // 📷 OCR REFINADO (BLINDADO)
   // ============================================================================
   const handleOCRTrigger = () => {
-    if (isFreePlan) {
-      setShowUpgradeModal(true)
-      return
-    }
     fileInputRef.current?.click()
   }
 
   const handleOCRUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
-      if (!file) return
-      if (file.type === 'application/pdf') {
-          toast.error("Envie uma IMAGEM (foto/print). PDFs não são suportados.")
+      if (!file || !session) return
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+          toast.error("Envie uma imagem JPG, PNG ou WEBP de até 5 MB.")
           if (fileInputRef.current) fileInputRef.current.value = ''
           return
       }
       setIsScanning(true)
       toast.info("Processando cupom fiscal...")
       try {
-          const result = await Tesseract.recognize(file, 'por')
-          const lines = result.data.text.split('\n')
-          const extractedItems = []
-          const regexTotal = /(.+?)\s+[\d,.]+\s+([\d,.]+)\s*$/;
-          for (const line of lines) {
-              const match = line.match(regexTotal)
-              if (match) {
-                  let rawName = match[1].trim()
-                  let priceStr = match[2].replace(',', '.')
-                  const dots = (priceStr.match(/\./g) || []).length
-                  if (dots > 1) priceStr = priceStr.replace('.', '')
-                  const finalPrice = parseFloat(priceStr)
-                  let cleanName = rawName.replace(/^\d{1,3}\s+/, '').replace(/\b\d{6,}\b/g, '').replace(/[^a-zA-ZÀ-ÿ\s]/g, '').trim()
-                  if (cleanName.length > 3 && finalPrice > 0 && finalPrice < 2000) {
-                      extractedItems.push({ name: cleanName, price: finalPrice })
-                  }
-              }
+          const formData = new FormData()
+          formData.set('file', file)
+          const response = await fetch('/api/ocr', { method: 'POST', body: formData })
+          const result = await response.json() as {
+            items?: Array<{ name: string; price: number }>
+            requiresManualReview?: boolean
+            error?: { message?: string }
           }
+          if (!response.ok) throw new Error(result.error?.message || 'Falha ao processar imagem.')
+
+          const extractedItems = result.items ?? []
           if (extractedItems.length === 0) {
-              toast.warning("Não foi possível detectar produtos nítidos.")
-              setIsScanning(false)
+              toast.warning(result.requiresManualReview
+                ? "Cupom ilegível. Revise e insira os itens manualmente."
+                : "Nenhum produto foi identificado.")
               return
           }
           const totalCupom = extractedItems.reduce((acc, item) => acc + item.price, 0)
           try {
-              const imageUrl = await shoppingService.uploadReceiptImage(file, session.id)
-              await shoppingService.saveReceiptRecord(session.id, imageUrl, totalCupom)
+              const storagePath = await shoppingService.uploadReceiptImage(file, session.id)
+              await shoppingService.saveReceiptRecord(session.id, storagePath, totalCupom)
               const dbReceipts = await shoppingService.getReceipts(session.id)
               setReceipts(dbReceipts || [])
           } catch (e) { console.error("Erro storage:", e) }
@@ -171,7 +157,6 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
   }
 
   const handleDeleteReceipt = async (receiptId: string) => {
-    if (isFreePlan) { setShowUpgradeModal(true); return }
     if (!window.confirm("Deseja remover este cupom do arquivo?")) return
     try {
         await shoppingService.deleteReceipt(receiptId)
@@ -182,7 +167,7 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newItemName.trim() || !newEstimatedPrice) return
+    if (!session || !newItemName.trim() || !newEstimatedPrice) return
     const estimatedValue = parseFloat(newEstimatedPrice.replace(',', '.'))
     try {
         const savedItem = await shoppingService.addItem({ session_id: session.id, name: newItemName, category: 'Geral', estimated_price: estimatedValue, is_essential: true, is_purchased: false, price_variation_pct: 0 })
@@ -261,7 +246,7 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8 animate-in fade-in duration-500 pb-32 max-w-7xl mx-auto">
-      <input type="file" accept="image/jpeg, image/png, image/jpg" capture="environment" ref={fileInputRef} onChange={handleOCRUpload} className="hidden" />
+      <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" ref={fileInputRef} onChange={handleOCRUpload} className="hidden" />
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
@@ -275,8 +260,7 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
         {/* BOTÃO ESCANEAR - BLINDADO */}
         <button onClick={handleOCRTrigger} disabled={isScanning} className="group flex items-center gap-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:scale-105 shadow-xl">
           {isScanning ? <Loader2 className="text-indigo-400 animate-spin" size={16} /> : <ScanLine size={16} className="text-indigo-400" />}
-          {isScanning ? 'A LER...' : isFreePlan ? 'ESCANEAR CUPOM (PRO)' : 'ESCANEAR CUPÃO FISCAL'}
-          {isFreePlan && <Lock size={12} className="opacity-50 ml-1" />}
+          {isScanning ? 'A LER...' : 'ESCANEAR CUPÃO FISCAL'}
         </button>
       </div>
 
@@ -369,7 +353,7 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
           <div className="space-y-6">
               {/* IA COGNITIVA COM BLUR */}
               <div className="relative group">
-                <div className={`bg-[#09090b] border border-white/5 rounded-3xl p-6 shadow-2xl transition-all duration-500 ${isFreePlan ? 'blur-md grayscale opacity-40 pointer-events-none' : ''}`}>
+                <div className="bg-[#09090b] border border-white/5 rounded-3xl p-6 shadow-2xl transition-all duration-500">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/5"><div className="h-10 w-10 bg-indigo-600/20 text-indigo-400 rounded-xl flex items-center justify-center"><BrainCircuit size={20} /></div><div><h3 className="font-bold text-white">IA Cognitiva</h3><p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Análise Mensal</p></div></div>
                     <div className="space-y-4">
                         {insights.map(insight => (
@@ -381,13 +365,6 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
                         {insights.length === 0 && <p className="text-xs text-gray-500 text-center py-4 italic">Dados insuficientes para insights.</p>}
                     </div>
                 </div>
-                {isFreePlan && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10">
-                        <div className="h-12 w-12 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center mb-4"><Lock size={20}/></div>
-                        <p className="text-xs font-bold text-white uppercase tracking-widest mb-4">Análise IA Bloqueada</p>
-                        <button onClick={() => setShowUpgradeModal(true)} className="bg-white text-black text-[10px] font-black uppercase px-4 py-2.5 rounded-xl hover:scale-105 transition-transform">Ativar Agora</button>
-                    </div>
-                )}
               </div>
 
               {/* ARQUIVO FISCO */}
@@ -398,18 +375,15 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                       {receipts.length === 0 && <p className="text-xs text-gray-600 text-center py-4">Arquivo vazio.</p>}
-                      {receipts.slice(0, isFreePlan ? 1 : 10).map((receipt) => (
+                      {receipts.slice(0, 10).map((receipt) => (
                           <div key={receipt.id} className="flex justify-between items-center bg-white/[0.03] p-3 rounded-xl hover:bg-white/[0.06] transition-colors group">
                               <div><p className="text-xs font-bold text-white">{new Date(receipt.created_at).toLocaleDateString('pt-BR')}</p><p className="text-[10px] text-emerald-400 font-bold">Lido: {formatCurrency(receipt.extracted_total)}</p></div>
                               <div className="flex items-center gap-1">
-                                  <button onClick={() => { if(isFreePlan) setShowUpgradeModal(true); else window.open(receipt.image_url, '_blank')}} className="p-2 text-gray-400 hover:text-indigo-400 transition-colors" title="Download"><Download size={14} /></button>
+                                  <button disabled={!receipt.image_url} onClick={() => receipt.image_url && window.open(receipt.image_url, '_blank')} className="p-2 text-gray-400 hover:text-indigo-400 transition-colors disabled:opacity-40" title="Download"><Download size={14} /></button>
                                   <button onClick={() => handleDeleteReceipt(receipt.id)} className="p-2 text-gray-400 hover:text-rose-400 transition-colors" title="Excluir"><Trash2 size={14} /></button>
                               </div>
                           </div>
                       ))}
-                      {isFreePlan && receipts.length > 1 && (
-                          <button onClick={() => setShowUpgradeModal(true)} className="w-full py-2 text-[9px] text-gray-500 font-bold uppercase border border-dashed border-white/10 rounded-xl mt-2 hover:text-white transition-all">+ {receipts.length - 1} Arquivos (Ver no PRO)</button>
-                      )}
                   </div>
                   <button onClick={handleOCRTrigger} disabled={isScanning} className="mt-4 w-full bg-white/5 hover:bg-white/10 text-white px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex justify-center items-center gap-2">
                       {isScanning ? <Loader2 size={14} className="animate-spin text-indigo-400"/> : <Camera size={14} className="text-indigo-400"/>}
@@ -419,7 +393,6 @@ export default function SmartShoppingView({ user }: SmartShoppingProps) {
           </div>
       </div>
 
-      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </div>
   )
 }

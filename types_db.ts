@@ -145,7 +145,8 @@ export interface ShoppingItem {
 export interface ShoppingReceipt {
   id: string
   session_id: string
-  image_url: string
+  image_url?: string | null
+  storage_path?: string | null
   extracted_total: number
   extracted_date: string
   processing_status: string
