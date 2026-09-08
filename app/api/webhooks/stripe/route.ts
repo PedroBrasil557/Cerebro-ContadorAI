@@ -127,6 +127,6 @@ export async function POST(request: Request) {
     if (error) throw error
     return successResponse({ processed: Boolean(data) })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'stripe-webhook', route: '/api/webhooks/stripe', provider: 'stripe' })
   }
 }

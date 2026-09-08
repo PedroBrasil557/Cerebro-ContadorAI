@@ -54,6 +54,6 @@ export async function POST(request: Request) {
       resetAt: usage.resetAt,
     })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'cfo-analysis', route: '/api/cfo-analysis', provider: 'groq' })
   }
 }

@@ -69,6 +69,6 @@ export async function POST(request: Request) {
       ?? 'Não foi possível gerar uma análise neste momento.'
     return successResponse({ response, remaining: usage.remaining, resetAt: usage.resetAt })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'ai-chat', route: '/api/ai/chat', provider: 'groq' })
   }
 }

@@ -131,6 +131,6 @@ export async function POST(request: Request) {
       invite: { status: statusError ? 'pending' : inviteStatus, warning },
     })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'schedule', route: '/api/schedule', provider: 'smtp' })
   }
 }

@@ -65,6 +65,6 @@ export async function POST(request: Request) {
 
     return successResponse({ deleted: true })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'account-delete', route: '/api/account/delete', provider: 'supabase' })
   }
 }

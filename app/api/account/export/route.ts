@@ -57,6 +57,6 @@ export async function GET() {
       },
     })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'account-export', route: '/api/account/export', provider: 'supabase' })
   }
 }

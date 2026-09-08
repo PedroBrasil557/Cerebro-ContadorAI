@@ -1,10 +1,14 @@
 type LogLevel = 'info' | 'warn' | 'error'
 
-interface LogContext {
+export interface LogContext {
   requestId?: string
   feature: string
+  route?: string
+  plan?: string
+  provider?: 'supabase' | 'stripe' | 'groq' | 'smtp' | 'ocr' | 'internal'
   userId?: string
   errorCode?: string
+  durationMs?: number
 }
 
 function maskedUserId(userId?: string) {
@@ -18,6 +22,7 @@ function write(level: LogLevel, message: string, context: LogContext) {
     level,
     message,
     ...context,
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'unknown',
     userId: maskedUserId(context.userId),
   }
 

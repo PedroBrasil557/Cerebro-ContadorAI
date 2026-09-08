@@ -10,6 +10,6 @@ export async function GET() {
     const billing = await getUserEntitlements(user.id)
     return successResponse(billing)
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'billing', route: '/api/billing/me', provider: 'stripe' })
   }
 }

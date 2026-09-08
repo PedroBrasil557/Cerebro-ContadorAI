@@ -41,6 +41,6 @@ export async function POST(request: Request) {
       resetAt: usage.resetAt,
     })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'ocr', route: '/api/ocr', provider: 'ocr' })
   }
 }

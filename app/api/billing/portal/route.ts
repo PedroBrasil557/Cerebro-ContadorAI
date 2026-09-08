@@ -29,6 +29,6 @@ export async function POST() {
 
     return successResponse({ url: session.url })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'billing-portal', route: '/api/billing/portal', provider: 'stripe' })
   }
 }

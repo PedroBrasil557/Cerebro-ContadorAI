@@ -67,6 +67,6 @@ export async function POST(request: Request) {
     if (!session.url) throw new Error('Stripe did not return a checkout URL.')
     return successResponse({ url: session.url })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'checkout', route: '/api/checkout', provider: 'stripe' })
   }
 }

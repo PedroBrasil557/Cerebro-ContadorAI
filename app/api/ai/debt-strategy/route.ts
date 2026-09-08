@@ -51,6 +51,6 @@ export async function POST(request: Request) {
       ?? 'Não foi possível gerar a estratégia neste momento.'
     return successResponse({ strategy, remaining: usage.remaining, resetAt: usage.resetAt })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'debt-strategy', route: '/api/ai/debt-strategy', provider: 'groq' })
   }
 }

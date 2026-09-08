@@ -63,6 +63,6 @@ export async function GET() {
       },
     })
   } catch (error) {
-    return errorResponse(error)
+    return errorResponse(error, { feature: 'admin-metrics', route: '/api/admin/metrics', provider: 'supabase' })
   }
 }
