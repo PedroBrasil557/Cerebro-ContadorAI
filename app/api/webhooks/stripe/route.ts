@@ -1,95 +1,132 @@
-export const dynamic = 'force-dynamic';
-
-import { headers } from 'next/headers'
-import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
-import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { headers } from 'next/headers'
+import { errorResponse, successResponse } from '@/lib/api/response'
+import { ValidationError } from '@/lib/api/errors'
+import { serverEnv } from '@/lib/env/server'
+import { getStripe } from '@/lib/stripe'
+import { createAdminClient } from '@/lib/supabase/admin'
+import type { PlanCode, SubscriptionStatus } from '@/lib/billing/plans'
 
-// Inicializa o cliente Admin usando a Service Role Key (Ignora RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
 
-export async function POST(req: Request) {
-  const body = await req.text()
-  
-  // ✅ Next.js 15: Headers precisam de await
-  const headerList = await headers()
-  const signature = headerList.get('Stripe-Signature')
+const PROCESSABLE_EVENTS = new Set([
+  'checkout.session.completed',
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.paid',
+  'invoice.payment_failed',
+])
 
-  if (!signature) {
-    return new NextResponse('Missing Stripe Signature', { status: 400 })
-  }
+function getObjectId(object: string | { id: string } | null): string | null {
+  if (!object) return null
+  return typeof object === 'string' ? object : object.id
+}
 
-  let event: Stripe.Event
-
-  try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
-  } catch (error: any) {
-    console.error(`[WEBHOOK ERROR]: ${error.message}`)
-    return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 })
-  }
-
-  try {
-    // 1. Caso: Checkout finalizado com sucesso (Primeira compra)
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session
-      const userId = session.metadata?.userId
-      const planTier = session.metadata?.planTier
-
-      if (userId && planTier) {
-        await updatePlayerPlan(userId, planTier, session.customer as string)
-      }
-    }
-
-    // 2. Caso: Assinatura atualizada (Renovação ou Upgrade posterior)
-    if (event.type === 'customer.subscription.updated') {
-      const subscription = event.data.object as Stripe.Subscription
-      // Em assinaturas, os metadados geralmente vêm do produto ou da própria sub
-      const userId = subscription.metadata?.userId
-      const planTier = subscription.metadata?.planTier
-
-      if (userId && planTier) {
-        await updatePlayerPlan(userId, planTier, subscription.customer as string)
-      }
-    }
-
-    // 3. Caso: Pagamento falhou ou assinatura cancelada
-    if (event.type === 'customer.subscription.deleted') {
-      const subscription = event.data.object as Stripe.Subscription
-      const userId = subscription.metadata?.userId
-      
-      if (userId) {
-        await updatePlayerPlan(userId, 'free', subscription.customer as string)
-      }
-    }
-
-    return new NextResponse('Webhook finalizado com sucesso', { status: 200 })
-
-  } catch (error: any) {
-    console.error('[DATABASE UPDATE ERROR]:', error.message)
-    return new NextResponse('Internal Server Error', { status: 500 })
+function normalizeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
+  switch (status) {
+    case 'active':
+    case 'trialing':
+    case 'past_due':
+    case 'incomplete':
+    case 'unpaid':
+      return status
+    default:
+      return 'canceled'
   }
 }
 
-// Função auxiliar para evitar repetição de código
-async function updatePlayerPlan(userId: string, planTier: string, customerId: string) {
-  console.log(`[STRIPE WEBHOOK]: Atualizando ${userId} para ${planTier}`)
-  
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    user_metadata: { 
-      plan_tier: planTier,
-      stripe_customer_id: customerId,
-      updated_at: new Date().toISOString()
-    }
-  })
+function planFromPrice(priceId: string): PlanCode {
+  if (priceId === serverEnv.STRIPE_PRICE_PRO) return 'pro'
+  if (priceId === serverEnv.STRIPE_PRICE_PREMIUM) return 'premium'
+  throw new ValidationError('O preço recebido do Stripe não corresponde a um plano conhecido.')
+}
+
+async function subscriptionFromEvent(event: Stripe.Event) {
+  const stripe = getStripe()
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session
+    const id = getObjectId(session.subscription)
+    return id ? stripe.subscriptions.retrieve(id) : null
+  }
+
+  if (event.type.startsWith('customer.subscription.')) {
+    return event.data.object as Stripe.Subscription
+  }
+
+  if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as Stripe.Invoice
+    const subscription = invoice.parent?.subscription_details?.subscription ?? null
+    if (!subscription) return null
+    return typeof subscription === 'string'
+      ? stripe.subscriptions.retrieve(subscription)
+      : subscription
+  }
+
+  return null
+}
+
+async function resolveUserId(subscription: Stripe.Subscription, customerId: string) {
+  const metadataUserId = subscription.metadata.userId
+  if (metadataUserId) return metadataUserId
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('user_id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle<{ user_id: string }>()
 
   if (error) throw error
-  console.log(`[SUCCESS]: Plano ${planTier} aplicado ao usuário ${userId}`)
+  if (!data?.user_id) throw new ValidationError('Não foi possível vincular a assinatura a um usuário.')
+  return data.user_id
+}
+
+export async function POST(request: Request) {
+  try {
+    const signature = (await headers()).get('stripe-signature')
+    if (!signature) throw new ValidationError('Assinatura Stripe ausente.')
+
+    const event = getStripe().webhooks.constructEvent(
+      await request.text(),
+      signature,
+      serverEnv.STRIPE_WEBHOOK_SECRET
+    )
+
+    if (!PROCESSABLE_EVENTS.has(event.type)) {
+      return successResponse({ processed: false })
+    }
+
+    const subscription = await subscriptionFromEvent(event)
+    if (!subscription) throw new ValidationError('Evento sem assinatura associada.')
+
+    const customerId = getObjectId(subscription.customer)
+    const item = subscription.items.data[0]
+    if (!customerId || !item?.price.id) {
+      throw new ValidationError('Assinatura Stripe incompleta.')
+    }
+
+    const userId = await resolveUserId(subscription, customerId)
+    const plan = planFromPrice(item.price.id)
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.rpc('process_stripe_subscription_event', {
+      p_event_id: event.id,
+      p_event_type: event.type,
+      p_user_id: userId,
+      p_stripe_customer_id: customerId,
+      p_stripe_subscription_id: subscription.id,
+      p_stripe_price_id: item.price.id,
+      p_plan: plan,
+      p_status: normalizeStatus(subscription.status),
+      p_current_period_start: new Date(item.current_period_start * 1000).toISOString(),
+      p_current_period_end: new Date(item.current_period_end * 1000).toISOString(),
+      p_cancel_at_period_end: subscription.cancel_at_period_end,
+    })
+
+    if (error) throw error
+    return successResponse({ processed: Boolean(data) })
+  } catch (error) {
+    return errorResponse(error)
+  }
 }

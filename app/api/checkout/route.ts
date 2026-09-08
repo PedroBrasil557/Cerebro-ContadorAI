@@ -1,76 +1,72 @@
-export const dynamic = 'force-dynamic';
+import { z } from 'zod'
+import { errorResponse, successResponse } from '@/lib/api/response'
+import { ValidationError } from '@/lib/api/errors'
+import { requireUser } from '@/lib/auth/requireUser'
+import { publicEnv } from '@/lib/env/public'
+import { serverEnv } from '@/lib/env/server'
+import { getStripe } from '@/lib/stripe'
+import { createAdminClient } from '@/lib/supabase/admin'
 
-import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+export const dynamic = 'force-dynamic'
 
-export async function POST(req: Request) {
-    try {
-        const { priceId, planTier } = await req.json();
+const checkoutSchema = z.object({
+  plan: z.enum(['pro', 'premium']),
+}).strict()
 
-        if (!priceId) {
-            return NextResponse.json({ error: 'Price ID is required' }, { status: 400 });
-        }
+async function getOrCreateCustomer(userId: string, email: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', userId)
+    .maybeSingle<{ stripe_customer_id: string | null }>()
 
-        // Configuração para Next.js 15 + Supabase SSR
-        const cookieStore = await cookies();
-        
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    getAll() {
-                        return cookieStore.getAll();
-                    },
-                    setAll(cookiesToSet) {
-                        try {
-                            cookiesToSet.forEach(({ name, value, options }) =>
-                                cookieStore.set(name, value, options)
-                            );
-                        } catch {
-                            // Silencia erros de set cookie em Server Components
-                        }
-                    },
-                },
-            }
-        );
-        
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (error) throw error
+  if (data?.stripe_customer_id) return data.stripe_customer_id
 
-        if (authError || !user) {
-            console.error('[AUTH_ERROR]:', authError?.message);
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+  const stripe = getStripe()
+  const existing = await stripe.customers.search({
+    query: `metadata['userId']:'${userId}'`,
+    limit: 1,
+  })
 
-        // Criando a sessão de checkout
-        const session = await stripe.checkout.sessions.create({
-            customer_email: user.email,
-            payment_method_types: ['card'],
-            line_items: [{ price: priceId, quantity: 1 }],
-            mode: 'subscription',
-            
-            // ✅ CORREÇÃO AQUI: Ajustado para redirecionar para a raiz (/)
-            // Se o seu painel for em outra rota (ex: /home), troque o "/" abaixo.
-            success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/?success=true`,
-            cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/?canceled=true`,
-            
-            metadata: {
-                userId: user.id,
-                planTier: planTier || 'pro'
-            },
-            client_reference_id: user.id,
-            allow_promotion_codes: true,
-        });
+  if (existing.data[0]) return existing.data[0].id
 
-        return NextResponse.json({ url: session.url });
+  const customer = await stripe.customers.create({
+    email,
+    metadata: { userId },
+  })
+  return customer.id
+}
 
-    } catch (error: any) {
-        console.error('[STRIPE_CHECKOUT_ERROR]:', error.message);
-        return NextResponse.json(
-            { error: error.message || 'Internal Error' }, 
-            { status: 500 }
-        );
-    }
+export async function POST(request: Request) {
+  try {
+    const user = await requireUser()
+    if (!user.email) throw new ValidationError('Sua conta não possui um e-mail válido.')
+
+    const { plan } = checkoutSchema.parse(await request.json())
+    const priceId = plan === 'pro'
+      ? serverEnv.STRIPE_PRICE_PRO
+      : serverEnv.STRIPE_PRICE_PREMIUM
+    const customer = await getOrCreateCustomer(user.id, user.email)
+
+    const session = await getStripe().checkout.sessions.create({
+      customer,
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: 'subscription',
+      success_url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/?success=true`,
+      cancel_url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/?canceled=true`,
+      metadata: { userId: user.id, plan },
+      subscription_data: {
+        metadata: { userId: user.id, plan },
+      },
+      client_reference_id: user.id,
+      allow_promotion_codes: true,
+    })
+
+    if (!session.url) throw new Error('Stripe did not return a checkout URL.')
+    return successResponse({ url: session.url })
+  } catch (error) {
+    return errorResponse(error)
+  }
 }
