@@ -3,13 +3,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const testUrl = process.env.SUPABASE_TEST_URL
 const testAnonKey = process.env.SUPABASE_TEST_ANON_KEY
-const userAEmail = process.env.SUPABASE_TEST_USER_A_EMAIL
-const userAPassword = process.env.SUPABASE_TEST_USER_A_PASSWORD
-const userBEmail = process.env.SUPABASE_TEST_USER_B_EMAIL
-const userBPassword = process.env.SUPABASE_TEST_USER_B_PASSWORD
-const hasCredentials = Boolean(
-  testUrl && testAnonKey && userAEmail && userAPassword && userBEmail && userBPassword
-)
+const freeEmail = process.env.SUPABASE_TEST_USER_A_EMAIL
+const freePassword = process.env.SUPABASE_TEST_USER_A_PASSWORD
+const proEmail = process.env.SUPABASE_TEST_USER_B_EMAIL
+const proPassword = process.env.SUPABASE_TEST_USER_B_PASSWORD
+const premiumEmail = process.env.SUPABASE_TEST_USER_C_EMAIL
+const premiumPassword = process.env.SUPABASE_TEST_USER_C_PASSWORD
+const hasCredentials = Boolean(testUrl && testAnonKey && freeEmail && freePassword && proEmail && proPassword && premiumEmail && premiumPassword)
+const releaseRlsRequired = process.env.RELEASE_RLS_REQUIRED === 'true'
+
+if (releaseRlsRequired && !hasCredentials) {
+  throw new Error('Release RLS tests require the Supabase URL/key and dedicated FREE, PRO and PREMIUM test-user credentials.')
+}
 
 function client() {
   return createClient(testUrl!, testAnonKey!, {
@@ -24,90 +29,116 @@ async function signIn(instance: SupabaseClient, email: string, password: string)
   return data.user
 }
 
-describe.skipIf(!hasCredentials)('Supabase RLS isolation', () => {
-  let a: SupabaseClient
-  let b: SupabaseClient
+async function requirePlan(instance: SupabaseClient, user: User, expectedPlan: 'free' | 'pro' | 'premium') {
+  const { data, error } = await instance
+    .from('subscriptions')
+    .select('plan, status, current_period_end')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (error) throw error
+
+  const isCurrent = !data?.current_period_end || new Date(data.current_period_end).getTime() > Date.now()
+  const activePlan = data && ['active', 'trialing'].includes(data.status) && isCurrent ? data.plan : 'free'
+  if (activePlan !== expectedPlan) {
+    throw new Error(`RLS test user ${user.id} must have active plan ${expectedPlan}; received ${activePlan}.`)
+  }
+}
+
+describe.skipIf(!hasCredentials)('Supabase RLS release matrix', () => {
+  let free: SupabaseClient
+  let pro: SupabaseClient
+  let premium: SupabaseClient
   let anon: SupabaseClient
-  let userA: User
-  let userB: User
+  let freeUser: User
+  let proUser: User
+  let premiumUser: User
   let transactionId = ''
   let debtId = ''
+  let investmentId = ''
   let cardId = ''
   let sessionId = ''
   let receiptId = ''
+  let professionalTransactionId = ''
   let originalPlan: string | null = null
   let originalRole: string | null = null
 
   beforeAll(async () => {
-    a = client()
-    b = client()
+    free = client()
+    pro = client()
+    premium = client()
     anon = client()
-    userA = await signIn(a, userAEmail!, userAPassword!)
-    userB = await signIn(b, userBEmail!, userBPassword!)
-    expect(userA.id).not.toBe(userB.id)
+    freeUser = await signIn(free, freeEmail!, freePassword!)
+    proUser = await signIn(pro, proEmail!, proPassword!)
+    premiumUser = await signIn(premium, premiumEmail!, premiumPassword!)
+    expect(new Set([freeUser.id, proUser.id, premiumUser.id]).size).toBe(3)
 
-    const { data: profile, error: profileError } = await a
+    await Promise.all([
+      requirePlan(free, freeUser, 'free'),
+      requirePlan(pro, proUser, 'pro'),
+      requirePlan(premium, premiumUser, 'premium'),
+    ])
+
+    const { data: profile, error: profileError } = await free
       .from('profiles')
       .select('plan, system_role')
-      .eq('id', userA.id)
+      .eq('id', freeUser.id)
       .single()
     if (profileError) throw profileError
     originalPlan = profile.plan
     originalRole = profile.system_role
 
     const marker = `rls-${crypto.randomUUID()}`
-    const { data: transaction, error: transactionError } = await b
+    const { data: transaction, error: transactionError } = await pro
       .from('transactions')
-      .insert({
-        user_id: userB.id,
-        description: marker,
-        amount: 10,
-        type: 'despesa_variavel',
-        scope: 'personal',
-      })
+      .insert({ user_id: proUser.id, description: marker, amount: 10, type: 'despesa_variavel', scope: 'personal' })
       .select('id')
       .single()
     if (transactionError) throw transactionError
     transactionId = transaction.id
 
-    const { data: debt, error: debtError } = await b
+    const { data: debt, error: debtError } = await pro
       .from('debts')
-      .insert({
-        user_id: userB.id,
-        name: marker,
-        total_amount: 100,
-        remaining_amount: 100,
-      })
+      .insert({ user_id: proUser.id, name: marker, total_amount: 100, remaining_amount: 100 })
       .select('id')
       .single()
     if (debtError) throw debtError
     debtId = debt.id
 
-    const { data: card, error: cardError } = await b
-      .from('credit_cards')
+    const { data: investment, error: investmentError } = await pro
+      .from('investments')
       .insert({
-        user_id: userB.id,
+        user_id: proUser.id,
         name: marker,
-        brand: 'other',
-        limit_amount: 100,
-        due_day: 10,
-        closing_day: 3,
+        ticker: 'RLS',
+        type: 'fixed_income',
+        quantity: 1,
+        average_price: 10,
+        current_price: 10,
+        amount_invested: 10,
       })
+      .select('id')
+      .single()
+    if (investmentError) throw investmentError
+    investmentId = investment.id
+
+    const { data: card, error: cardError } = await pro
+      .from('credit_cards')
+      .insert({ user_id: proUser.id, name: marker, brand: 'other', limit_amount: 100, due_day: 10, closing_day: 3 })
       .select('id')
       .single()
     if (cardError) throw cardError
     cardId = card.id
 
-    const testMonth = `${2200 + Math.floor(Math.random() * 500)}-01-01`
-    const { data: shoppingSession, error: sessionError } = await b
+    const testMonth = `${2200 + (Number.parseInt(crypto.randomUUID().slice(0, 4), 16) % 500)}-01-01`
+    const { data: shoppingSession, error: sessionError } = await pro
       .from('monthly_shopping_sessions')
-      .insert({ user_id: userB.id, month: testMonth, currency_code: 'BRL' })
+      .insert({ user_id: proUser.id, month: testMonth, currency_code: 'BRL' })
       .select('id')
       .single()
     if (sessionError) throw sessionError
     sessionId = shoppingSession.id
 
-    const { data: receipt, error: receiptError } = await b
+    const { data: receipt, error: receiptError } = await pro
       .from('shopping_receipts')
       .insert({ session_id: sessionId, processing_status: 'pending' })
       .select('id')
@@ -117,64 +148,128 @@ describe.skipIf(!hasCredentials)('Supabase RLS isolation', () => {
   })
 
   afterAll(async () => {
-    if (receiptId) await b.from('shopping_receipts').delete().eq('id', receiptId)
-    if (sessionId) await b.from('monthly_shopping_sessions').delete().eq('id', sessionId)
-    if (cardId) await b.from('credit_cards').delete().eq('id', cardId)
-    if (debtId) await b.from('debts').delete().eq('id', debtId)
-    if (transactionId) await b.from('transactions').delete().eq('id', transactionId)
-    await Promise.all([a.auth.signOut(), b.auth.signOut()])
+    if (professionalTransactionId) await premium.from('transactions').delete().eq('id', professionalTransactionId).eq('user_id', premiumUser.id)
+    if (receiptId) await pro.from('shopping_receipts').delete().eq('id', receiptId)
+    if (sessionId) await pro.from('monthly_shopping_sessions').delete().eq('id', sessionId)
+    if (cardId) await pro.from('credit_cards').delete().eq('id', cardId)
+    if (investmentId) await pro.from('investments').delete().eq('id', investmentId)
+    if (debtId) await pro.from('debts').delete().eq('id', debtId)
+    if (transactionId) await pro.from('transactions').delete().eq('id', transactionId)
+    await Promise.all([free.auth.signOut(), pro.auth.signOut(), premium.auth.signOut()])
   })
 
   it.each([
     ['transactions', () => transactionId],
     ['debts', () => debtId],
+    ['investments', () => investmentId],
     ['credit_cards', () => cardId],
     ['shopping_receipts', () => receiptId],
   ])('prevents user A from reading user B rows in %s', async (table, id) => {
-    const { data, error } = await a.from(table).select('id').eq('id', id())
+    const { data, error } = await free.from(table).select('id').eq('id', id())
     expect(error).toBeNull()
     expect(data).toEqual([])
   })
 
   it('prevents user A from editing or deleting user B transaction', async () => {
-    const update = await a
-      .from('transactions')
-      .update({ description: 'cross-tenant-update' })
-      .eq('id', transactionId)
-      .select('id')
+    const update = await free.from('transactions').update({ description: 'cross-tenant-update' }).eq('id', transactionId).select('id')
     expect(update.error).toBeNull()
     expect(update.data).toEqual([])
 
-    const deletion = await a.from('transactions').delete().eq('id', transactionId).select('id')
+    const deletion = await free.from('transactions').delete().eq('id', transactionId).select('id')
     expect(deletion.error).toBeNull()
     expect(deletion.data).toEqual([])
   })
 
   it('prevents user A from editing user B profile', async () => {
-    const { data, error } = await a
-      .from('profiles')
-      .update({ full_name: 'cross-tenant-update' })
-      .eq('id', userB.id)
-      .select('id')
+    const { data, error } = await free.from('profiles').update({ full_name: 'cross-tenant-update' }).eq('id', proUser.id).select('id')
     expect(error).toBeNull()
     expect(data).toEqual([])
   })
 
-  it.each([
-    ['plan', 'premium'],
-    ['system_role', 'founder'],
-  ])('prevents a user from changing protected profile column %s', async (column, value) => {
-    const { error } = await a.from('profiles').update({ [column]: value }).eq('id', userA.id)
-    expect(error).not.toBeNull()
+  it.each([['plan', 'premium'], ['system_role', 'founder']])(
+    'prevents a user from changing protected profile column %s',
+    async (column, value) => {
+      const { error } = await free.from('profiles').update({ [column]: value }).eq('id', freeUser.id)
+      expect(error).not.toBeNull()
 
-    const { data, error: readError } = await a
-      .from('profiles')
-      .select('plan, system_role')
-      .eq('id', userA.id)
-      .single()
-    expect(readError).toBeNull()
-    expect(data?.plan).toBe(originalPlan)
-    expect(data?.system_role).toBe(originalRole)
+      const { data, error: readError } = await free.from('profiles').select('plan, system_role').eq('id', freeUser.id).single()
+      expect(readError).toBeNull()
+      expect(data?.plan).toBe(originalPlan)
+      expect(data?.system_role).toBe(originalRole)
+    },
+  )
+
+  it.each([['plan', 'premium'], ['status', 'active']])(
+    'prevents authenticated users from changing subscription column %s',
+    async (column, value) => {
+      const { error } = await pro.from('subscriptions').update({ [column]: value }).eq('user_id', proUser.id)
+      expect(error).not.toBeNull()
+    },
+  )
+
+  it('blocks FREE from investments, debts and professional data', async () => {
+    const marker = `free-block-${crypto.randomUUID()}`
+    const attempts = await Promise.all([
+      free.from('investments').insert({ user_id: freeUser.id, name: marker, ticker: 'FREE', type: 'fixed_income', quantity: 1, average_price: 1, current_price: 1, amount_invested: 1 }),
+      free.from('debts').insert({ user_id: freeUser.id, name: marker, total_amount: 1, remaining_amount: 1 }),
+      free.from('transactions').insert({ user_id: freeUser.id, description: marker, amount: 1, type: 'receita', scope: 'business' }),
+      free.from('appointments').insert({ user_id: freeUser.id, client_name: marker, service: 'RLS', value: 1, date: '2099-01-01', time: '10:00' }),
+    ])
+    attempts.forEach(({ error }) => expect(error).not.toBeNull())
+  })
+
+  it('allows PRO paid personal resources but blocks professional data', async () => {
+    const { data, error } = await pro.from('investments').select('id').eq('id', investmentId).single()
+    expect(error).toBeNull()
+    expect(data?.id).toBe(investmentId)
+
+    const professionalAttempt = await pro.from('transactions').insert({ user_id: proUser.id, description: `pro-block-${crypto.randomUUID()}`, amount: 1, type: 'receita', scope: 'business' })
+    expect(professionalAttempt.error).not.toBeNull()
+  })
+
+  it('allows PREMIUM professional data', async () => {
+    const { data, error } = await premium.from('transactions').insert({ user_id: premiumUser.id, description: `premium-${crypto.randomUUID()}`, amount: 1, type: 'receita', scope: 'business' }).select('id').single()
+    expect(error).toBeNull()
+    expect(data?.id).toBeTruthy()
+    professionalTransactionId = data!.id
+  })
+
+  it.each([
+    ['credit_cards', () => ({ user_id: freeUser.id, name: '', brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 })],
+    ['goals', () => ({ user_id: freeUser.id, title: '', target_amount: 10, current_amount: 0, deadline: '2099-01-01' })],
+  ])('keeps concurrent FREE inserts at three rows for %s', async (table, payload) => {
+    const marker = `limit-${crypto.randomUUID()}`
+    const markerColumn = table === 'credit_cards' ? 'name' : 'title'
+    const { count: existingCount, error: countError } = await free.from(table).select('*', { count: 'exact', head: true })
+    expect(countError).toBeNull()
+
+    const attempts = await Promise.all(Array.from({ length: 6 }, () => free.from(table).insert({ ...payload(), [markerColumn]: marker }).select('id')))
+    const successful = attempts.flatMap(({ data }) => data ?? []).length
+    expect(successful).toBe(Math.max(0, 3 - (existingCount ?? 0)))
+
+    const { count: finalCount, error: finalCountError } = await free.from(table).select('*', { count: 'exact', head: true })
+    expect(finalCountError).toBeNull()
+    expect(finalCount).toBeLessThanOrEqual(3)
+    await free.from(table).delete().eq(markerColumn, marker).eq('user_id', freeUser.id)
+  })
+
+  it('stores exactly one appointment for concurrent retries with one idempotency key', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const payload = { user_id: premiumUser.id, client_name: `idempotency-${crypto.randomUUID()}`, service: 'RLS', value: 1, date: '2099-01-01', time: '10:00', idempotency_key: idempotencyKey }
+    const attempts = await Promise.all([premium.from('appointments').insert(payload), premium.from('appointments').insert(payload)])
+    expect(attempts.filter(({ error }) => error === null)).toHaveLength(1)
+    expect(attempts.filter(({ error }) => error?.code === '23505')).toHaveLength(1)
+
+    const { data, error } = await premium.from('appointments').select('id').eq('user_id', premiumUser.id).eq('idempotency_key', idempotencyKey)
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    await premium.from('appointments').delete().eq('id', data![0].id).eq('user_id', premiumUser.id)
+  })
+
+  it.each(['audit_logs', 'stripe_events'])('does not expose internal table %s to authenticated users', async (table) => {
+    const { data, error } = await pro.from(table).select('*').limit(1)
+    expect(data ?? []).toEqual([])
+    expect(error).not.toBeNull()
   })
 
   it('does not expose private tables to anonymous requests', async () => {

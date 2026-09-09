@@ -32,6 +32,8 @@ jobs:
       SUPABASE_TEST_USER_A_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_A_PASSWORD }}
       SUPABASE_TEST_USER_B_EMAIL: ${{ secrets.SUPABASE_TEST_USER_B_EMAIL }}
       SUPABASE_TEST_USER_B_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_B_PASSWORD }}
+      SUPABASE_TEST_USER_C_EMAIL: ${{ secrets.SUPABASE_TEST_USER_C_EMAIL }}
+      SUPABASE_TEST_USER_C_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_C_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -52,8 +54,62 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Unit and RLS tests
+      - name: Unit tests
         run: npm run test
 
       - name: Production build
         run: npm run build
+
+  release-rls:
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.base_ref == 'release/v1-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_RLS_REQUIRED: 'true'
+      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      SUPABASE_TEST_USER_A_EMAIL: ${{ secrets.SUPABASE_TEST_USER_A_EMAIL }}
+      SUPABASE_TEST_USER_A_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_A_PASSWORD }}
+      SUPABASE_TEST_USER_B_EMAIL: ${{ secrets.SUPABASE_TEST_USER_B_EMAIL }}
+      SUPABASE_TEST_USER_B_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_B_PASSWORD }}
+      SUPABASE_TEST_USER_C_EMAIL: ${{ secrets.SUPABASE_TEST_USER_C_EMAIL }}
+      SUPABASE_TEST_USER_C_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_C_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Mandatory cross-tenant RLS suite
+        run: npm run test:rls
+
+  release-e2e:
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.base_ref == 'release/v1-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      RELEASE_E2E_REQUIRED: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3100
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_TEST_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      GROQ_API_KEY: test-groq-key
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      STRIPE_PRICE_PRO: price_pro_placeholder
+      STRIPE_PRICE_PREMIUM: price_premium_placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Mandatory release E2E suite
+        run: npm run test:e2e

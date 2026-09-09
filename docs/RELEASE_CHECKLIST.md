@@ -11,7 +11,7 @@ Use `[x]` somente com evidência do ambiente que será publicado. Itens marcados
 
 ## Segurança
 
-- [x] teste transacional A/B executado sem resíduos;
+- [ ] suíte RLS de release com contas FREE, PRO e PREMIUM: 0 falhas e 0 skips;
 - [x] usuário não altera plano nem role;
 - [x] Service Role isolada em módulo de servidor;
 - [x] chaves privadas sem prefixo `NEXT_PUBLIC_`;
@@ -39,14 +39,22 @@ Use `[x]` somente com evidência do ambiente que será publicado. Itens marcados
 - [x] escopos pessoal e empresarial separados;
 - [x] simulações e indisponibilidade de mercado identificadas;
 - [x] agendamento persiste mesmo se convite falhar;
-- [x] idempotência de agendamento validada por constraint no banco.
+- [ ] idempotência de agendamento validada pela suíte RLS real de release.
 
 ## Conta e qualidade
 
 - [x] edição segura de perfil, exportação e exclusão implementadas;
 - [x] typecheck e testes unitários aprovados;
 - [x] CI configurada para bloquear build quebrado;
-- [x] lint completo sem erros (avisos legados permanecem rastreados);
+- [x] lint completo com 0 erros e 0 avisos;
 - [ ] E2E autenticado e integrações reais aprovados;
 - [x] build de produção aprovado com variáveis de validação sem segredos;
-- [ ] dependências sem vulnerabilidades críticas conhecidas.
+- [x] `npm audit` com 0 vulnerabilidades conhecidas.
+
+## Banco e entrega
+
+- [x] baseline do schema público versionado e histórico remoto alinhado;
+- [ ] `supabase db reset` aprovado em Docker local;
+- [ ] proteção contra senhas vazadas habilitada no Supabase Auth;
+- [ ] projeto Vercel canônico identificado e preview READY no SHA final;
+- [ ] CI do GitHub verde no SHA final.
