@@ -14,14 +14,6 @@ const nextConfig = {
       ],
     }]
   },
-  
-  // SOLUÇÃO: Força o uso do Webpack (compilador mais estável)
-  webpack: (config, { isServer }) => {
-    return config; // Usar a função webpack desativa o Turbopack
-  },
-  
-  // Removemos todas as opções problemáticas como swcMinify/experimental.
-
   images: {
     remotePatterns: [
       {

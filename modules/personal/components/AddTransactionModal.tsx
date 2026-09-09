@@ -6,7 +6,15 @@ import { X, Calendar, Clock, User, DollarSign, Briefcase } from 'lucide-react'
 interface AddAppointmentModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (appt: any) => void
+  onSave: (appointment: {
+    clientName: string
+    service: string
+    value: number
+    date: string
+    time: string
+    status: 'agendado'
+    caixaPercentage: number
+  }) => void
 }
 
 export default function AddAppointmentModal({ isOpen, onClose, onSave }: AddAppointmentModalProps) {

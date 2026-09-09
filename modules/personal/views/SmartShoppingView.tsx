@@ -68,8 +68,8 @@ export default function SmartShoppingView() {
         setItems(dbItems || [])
         const dbReceipts = await shoppingService.getReceipts(currentSession.id)
         setReceipts(dbReceipts || [])
-      } catch (error) {
-        console.error("Erro ao carregar compras:", error)
+      } catch {
+        console.error("Erro ao carregar compras")
         toast.error("Erro ao carregar dados.")
       } finally {
         setIsLoading(false)
@@ -135,7 +135,7 @@ export default function SmartShoppingView() {
           const dbItems = await shoppingService.getItems(session.id)
           setItems(dbItems || [])
           toast.success(`OCR Concluído!`)
-      } catch (error) {
+      } catch {
           toast.error("Erro ao processar imagem.")
       } finally {
           setIsScanning(false)
@@ -153,7 +153,7 @@ export default function SmartShoppingView() {
     try {
         await Promise.all(items.map(item => shoppingService.updateItem(item.id, { is_purchased: false, actual_price: null })))
         toast.success("Lista resetada para nova compra!")
-    } catch (error) { toast.error("Erro ao resetar.") }
+    } catch { toast.error("Erro ao resetar.") }
   }
 
   const handleDeleteReceipt = async (receiptId: string) => {
@@ -162,7 +162,7 @@ export default function SmartShoppingView() {
         await shoppingService.deleteReceipt(receiptId)
         setReceipts(receipts.filter(r => r.id !== receiptId))
         toast.success("Cupom removido.")
-    } catch (error) { toast.error("Erro ao remover cupom.") }
+    } catch { toast.error("Erro ao remover cupom.") }
   }
 
   const handleAddItem = async (e: React.FormEvent) => {
@@ -172,7 +172,7 @@ export default function SmartShoppingView() {
     try {
         const savedItem = await shoppingService.addItem({ session_id: session.id, name: newItemName, category: 'Geral', estimated_price: estimatedValue, is_essential: true, is_purchased: false, price_variation_pct: 0 })
         setItems([savedItem, ...items]); setNewItemName(''); setNewEstimatedPrice('')
-    } catch (error) { toast.error("Erro ao salvar item.") }
+    } catch { toast.error("Erro ao salvar item.") }
   }
 
   const togglePurchased = async (id: string) => {
@@ -181,25 +181,25 @@ export default function SmartShoppingView() {
     const isNowPurchased = !item.is_purchased
     const newActualPrice = isNowPurchased && !item.actual_price ? item.estimated_price : item.actual_price
     setItems(items.map(i => i.id === id ? { ...i, is_purchased: isNowPurchased, actual_price: newActualPrice } : i))
-    try { await shoppingService.updateItem(id, { is_purchased: isNowPurchased, actual_price: newActualPrice }) } catch (error) { toast.error("Erro ao atualizar status.") }
+    try { await shoppingService.updateItem(id, { is_purchased: isNowPurchased, actual_price: newActualPrice }) } catch { toast.error("Erro ao atualizar status.") }
   }
 
   const handleUpdateActualPrice = async (id: string, value: string) => {
     const numValue = parseFloat(value.replace(',', '.'))
     if (isNaN(numValue)) return
-    try { await shoppingService.updateItem(id, { actual_price: numValue }) } catch (error) { toast.error("Erro ao salvar preço.") }
+    try { await shoppingService.updateItem(id, { actual_price: numValue }) } catch { toast.error("Erro ao salvar preço.") }
   }
 
   const saveEditingItem = async (id: string) => {
     if (!editingItemName.trim()) { setEditingItemId(null); return }
     setItems(items.map(i => i.id === id ? { ...i, name: editingItemName } : i))
     setEditingItemId(null)
-    try { await shoppingService.updateItem(id, { name: editingItemName }) } catch (error) { toast.error("Erro ao renomear.") }
+    try { await shoppingService.updateItem(id, { name: editingItemName }) } catch { toast.error("Erro ao renomear.") }
   }
 
   const handleDeleteItem = async (id: string) => {
     setItems(items.filter(i => i.id !== id))
-    try { await shoppingService.deleteItem(id) } catch (error) { toast.error("Erro ao remover.") }
+    try { await shoppingService.deleteItem(id) } catch { toast.error("Erro ao remover.") }
   }
 
   const handleClearList = async () => {
@@ -208,7 +208,7 @@ export default function SmartShoppingView() {
     try {
         await Promise.all(itemsToDelete.map(item => shoppingService.deleteItem(item.id)))
         toast.success("Lista limpa.")
-    } catch (error) { toast.error("Erro ao limpar lista.") }
+    } catch { toast.error("Erro ao limpar lista.") }
   }
 
   const handleSaveBudget = async () => {

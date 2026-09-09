@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, type ReactNode } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   User, Star,
@@ -253,7 +254,7 @@ export default function ProfileView() {
                 <div className="relative group/avatar cursor-pointer mb-8">
                     <div className="w-36 h-36 rounded-full border-4 border-[#09090b] shadow-2xl bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center overflow-hidden relative group-hover:scale-105 transition-transform">
                         {profile.avatar_url ? (
-                            <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                            <Image src={profile.avatar_url} alt="Avatar" width={144} height={144} unoptimized className="w-full h-full object-cover" />
                         ) : (
                             <span className="text-5xl font-black text-white/40 uppercase">{profile.full_name?.charAt(0) || 'U'}</span>
                         )}

@@ -1,13 +1,14 @@
 'use client'
 
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { type ReactNode, useCallback, useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  ShieldCheck, AlertTriangle, TrendingUp, Lock, CalendarClock, 
-  Settings2, AlertOctagon, Landmark, PiggyBank, History, Activity,
-  ArrowRight, Sparkles, Loader2, Briefcase, Calculator, Receipt, 
-  TrendingDown, Target, Wallet, Plus, Search, Filter, ArrowUpRight, ArrowDownRight, CheckCircle2, FileText, X
+  ShieldCheck, AlertTriangle, TrendingUp,
+  Settings2, AlertOctagon, PiggyBank, Activity,
+  Sparkles, Loader2, Briefcase, Calculator, Receipt,
+  Target, Wallet, Plus, Search, Filter, ArrowUpRight, ArrowDownRight, CheckCircle2, FileText, X
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { CaixaData, Transaction } from '@/types_db' 
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -19,7 +20,7 @@ import { cfoRulesEngine } from '@/modules/cfo/cfoRulesEngine'
 import { cfoSimulator } from '@/modules/cfo/cfoSimulator'
 
 // --- COMPONENTES VISUAIS AUXILIARES ---
-const GlassCard = ({ children, className = "", glow = false }: any) => (
+const GlassCard = ({ children, className = "", glow = false }: { children: ReactNode; className?: string; glow?: boolean }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -31,7 +32,14 @@ const GlassCard = ({ children, className = "", glow = false }: any) => (
   </motion.div>
 )
 
-const KPICard = ({ label, value, subtext, icon: Icon, colorClass = "text-emerald-400", bgClass = "bg-emerald-500/10" }: any) => (
+const KPICard = ({ label, value, subtext, icon: Icon, colorClass = "text-emerald-400", bgClass = "bg-emerald-500/10" }: {
+  label: string
+  value: string
+  subtext?: string
+  icon: LucideIcon
+  colorClass?: string
+  bgClass?: string
+}) => (
   <div className="min-w-[160px] md:min-w-0 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all group flex flex-col justify-between h-36">
     <div className="flex justify-between items-start mb-2">
       <div className={`p-2 rounded-lg ${bgClass} ${colorClass} group-hover:scale-110 transition-transform`}>
@@ -114,7 +122,7 @@ interface CaixaViewProps {
 }
 
 export default function CaixaView({ data, transactions: initialTransactions = [] }: CaixaViewProps) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   // Estados do CFO Engine
   const [analyzing, setAnalyzing] = useState(false)
@@ -130,11 +138,13 @@ export default function CaixaView({ data, transactions: initialTransactions = []
   const [txType, setTxType] = useState<'receita' | 'despesa_variavel'>('receita')
   const [newTx, setNewTx] = useState({ description: '', amount: '', category: 'Serviço' })
 
-  const safeData = data || { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] }
+  const safeData = useMemo(
+    () => data || { currentBalance: 0, monthlyGoal: 0, taxRate: 0, reserveRate: 0, entries: [] },
+    [data],
+  )
 
   // 0. BUSCA REAL-TIME DAS TRANSAÇÕES
-  const fetchTransactions = async () => {
-    setIsTxLoading(true)
+  const fetchTransactions = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const now = new Date()
@@ -155,11 +165,11 @@ export default function CaixaView({ data, transactions: initialTransactions = []
       }
     }
     setIsTxLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchTransactions()
-  }, [])
+    void fetchTransactions()
+  }, [fetchTransactions])
 
   // 1. CONSTRUÇÃO DO DOMÍNIO (Data Prep)
   const metrics: BusinessMetrics = useMemo(() => {
@@ -177,8 +187,8 @@ export default function CaixaView({ data, transactions: initialTransactions = []
         expenses,
         cashReserve: realBalance > 0 ? realBalance : 0, // Garante que não fica negativo visualmente no CFO
         taxRate: safeData.taxRate,
-        activeClients: 1, 
-        totalHoursWorked: 160 
+        activeClients: 0,
+        totalHoursWorked: 0,
     }
   }, [liveTransactions, safeData])
 
@@ -186,7 +196,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
   const { score, alerts } = useMemo(() => cfoRulesEngine.evaluateHealth(metrics), [metrics])
   const safeDraw = useMemo(() => cfoRulesEngine.calculateSafeDraw(metrics), [metrics])
   const taxReserve = useMemo(() => cfoEngine.calculateTaxReserve(metrics.revenue, metrics.taxRate), [metrics])
-  const runway = useMemo(() => cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses || 2000), [metrics])
+  const runway = useMemo(() => cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses), [metrics])
 
   const criticalAlerts = alerts.filter(a => a.severity === 'critical').length
   const status = criticalAlerts > 0 ? 'critical' : score < 50 ? 'warning' : 'healthy'
@@ -213,7 +223,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
       if (!response.ok) throw new Error(result.error || 'Falha ao consultar o CFO Virtual.')
       setCfoAnalysis(result.analysis)
       toast.success("Análise estratégica concluída!")
-    } catch (error) {
+    } catch {
       toast.error("Erro ao consultar o CFO Virtual.")
     } finally {
       setAnalyzing(false)

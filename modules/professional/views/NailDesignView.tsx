@@ -2,11 +2,7 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Sparkles, Link as LinkIcon, Share2, Calendar as CalendarIcon, 
-  Users, LayoutGrid, Plus, Smartphone, MessageCircle 
-} from 'lucide-react'
-import { toast } from 'sonner'
+import { Sparkles, Calendar as CalendarIcon, Users, LayoutGrid, MessageCircle } from 'lucide-react'
 
 // Importação dos componentes do Mini-ERP do Estúdio
 import NailDashboard from '../components/nail/NailDashboard'
@@ -16,13 +12,6 @@ import NailServiceManager from '../components/nail/NailServiceManager'
 
 export default function NailDesignView() {
   const [activeTab, setActiveTab] = useState('geral')
-
-  const handleCopyLink = () => {
-    // Link dinâmico para agendamento público
-    const link = "https://cerebro.os/agendar/pedro-nail-studio"
-    navigator.clipboard.writeText(link)
-    toast.success("Link de agendamento copiado! Envie para suas clientes.")
-  }
 
   return (
     <div className="p-4 md:p-10 space-y-8 max-w-[1600px] mx-auto pb-32 animate-in fade-in duration-700">
@@ -40,16 +29,6 @@ export default function NailDesignView() {
           <p className="text-sm text-gray-400 font-medium">Controle total da sua agenda, clientes e faturação estratégica.</p>
         </div>
         
-        <div className="flex gap-3 w-full md:w-auto">
-          <button 
-            onClick={handleCopyLink}
-            className="flex-1 md:flex-none group flex items-center justify-center gap-3 bg-pink-500 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-pink-400 active:scale-95 shadow-[0_0_20px_rgba(236,72,153,0.3)]"
-          >
-            <LinkIcon size={16} className="group-hover:rotate-12 transition-transform" />
-            Link de Agendamento
-            <Share2 size={14} className="opacity-50" />
-          </button>
-        </div>
       </header>
 
       {/* NAVEGAÇÃO INTERNA (Segmented Control Estilo Apple) */}
@@ -101,21 +80,7 @@ export default function NailDesignView() {
                        <MessageCircle size={14} className="text-pink-500" /> Lembrete Rápido
                     </h4>
                     <p className="text-sm text-gray-300 leading-relaxed font-medium">
-                      Você tem <span className="text-white font-bold">4 atendimentos</span> confirmados para hoje. 
-                      A receita projetada é de <span className="text-emerald-400 font-bold">R$ 580,00</span>.
-                    </p>
-                    <button className="w-full mt-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-white transition-all">
-                      Enviar Lembretes WhatsApp
-                    </button>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-pink-500/10 to-indigo-500/10 border border-white/5 rounded-3xl p-6 relative overflow-hidden">
-                    <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
-                      <Smartphone size={80} />
-                    </div>
-                    <h4 className="text-white font-bold mb-2 relative z-10">Crescimento</h4>
-                    <p className="text-xs text-pink-200/70 mb-4 relative z-10">
-                      Clientes que agendam pelo link público tendem a retornar 30% mais vezes.
+                      Consulte a agenda para acompanhar os atendimentos registrados. Os indicadores acima usam somente dados salvos na sua conta.
                     </p>
                   </div>
                 </div>

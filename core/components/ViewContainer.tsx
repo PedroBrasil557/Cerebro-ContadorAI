@@ -117,7 +117,7 @@ export default function ViewContainer({
             )}
             
             {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
-              <DebtCenterView user={user} summary={summary} />
+              <DebtCenterView />
             )}
           </>
         )}

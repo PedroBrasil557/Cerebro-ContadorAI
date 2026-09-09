@@ -1,5 +1,5 @@
 import { BusinessMetrics } from './cfoEngine';
-import { cfoRulesEngine, CfoAlert } from './cfoRulesEngine';
+import { cfoRulesEngine } from './cfoRulesEngine';
 import { formatCurrency } from '@/lib/utils'; // Assumindo que você tem um formatador
 
 export const cfoInterpreter = {

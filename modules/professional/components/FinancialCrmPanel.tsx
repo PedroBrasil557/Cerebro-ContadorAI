@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Users, Star, AlertTriangle, Clock, MessageCircle, Sparkles, TrendingUp, Plus, X, Loader2, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
@@ -17,7 +17,7 @@ interface NailClient {
 }
 
 export default function FinancialCrmPanel() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   const [clients, setClients] = useState<NailClient[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -28,11 +28,10 @@ export default function FinancialCrmPanel() {
   const [newClient, setNewClient] = useState({ name: '', phone: '', total_spent: '', visit_count: '', last_visit: '' })
 
   // 🔄 BUSCAR DADOS REAIS DO SUPABASE
-  const fetchClients = async () => {
-    setIsLoading(true)
+  const fetchClients = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('nail_clients')
         .select('*')
         .eq('user_id', user.id)
@@ -41,11 +40,11 @@ export default function FinancialCrmPanel() {
       if (data) setClients(data)
     }
     setIsLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchClients()
-  }, [])
+    void fetchClients()
+  }, [fetchClients])
 
   // 💾 CADASTRAR NOVA CLIENTE
   const handleAddClient = async (e: React.FormEvent) => {
@@ -70,8 +69,8 @@ export default function FinancialCrmPanel() {
       setIsModalOpen(false)
       setNewClient({ name: '', phone: '', total_spent: '', visit_count: '', last_visit: '' })
       fetchClients()
-    } catch (error: any) {
-      alert(`Erro ao salvar cliente: ${error.message}`)
+    } catch (error: unknown) {
+      alert(`Erro ao salvar cliente: ${error instanceof Error ? error.message : 'falha inesperada'}`)
     } finally {
       setIsSubmitting(false)
     }

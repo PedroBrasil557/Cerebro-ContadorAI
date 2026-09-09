@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Calculator, TrendingUp, DollarSign, Loader2 } from 'lucide-react'
+import { Calculator, TrendingUp, Loader2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { getMarketData } from '@/lib/market/api'

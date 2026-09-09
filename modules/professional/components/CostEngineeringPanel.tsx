@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calculator, Package, Sliders, TrendingUp, AlertTriangle, CheckCircle2, Plus, X, Loader2, Trash2 } from 'lucide-react'
+import { Package, Sliders, TrendingUp, AlertTriangle, CheckCircle2, Plus, X, Loader2, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -18,7 +18,7 @@ interface NailProduct {
 }
 
 export default function CostEngineeringPanel() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   const [materials, setMaterials] = useState<NailProduct[]>([])
   const [fixedCostPerService, setFixedCostPerService] = useState<number | null>(null)
@@ -29,8 +29,7 @@ export default function CostEngineeringPanel() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newMat, setNewMat] = useState({ name: '', category: 'gel', purchase_price: '', quantity: '', estimated_yield: '' })
 
-  const fetchMaterials = async () => {
-    setIsLoading(true)
+  const fetchMaterials = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
@@ -55,11 +54,11 @@ export default function CostEngineeringPanel() {
       }
     }
     setIsLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchMaterials()
-  }, [])
+    void fetchMaterials()
+  }, [fetchMaterials])
 
   // 💾 NOVA FUNÇÃO BLINDADA (COM AVISO DE ERROS)
   const handleAddMaterial = async (e: React.FormEvent) => {

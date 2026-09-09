@@ -1,17 +1,18 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { type ReactNode, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { 
   TrendingUp, Wallet, Activity, BrainCircuit, Zap, ChevronRight, 
-  ArrowUpRight, Briefcase, Calendar, ChevronDown, BarChart3, LineChart, 
+  ArrowUpRight, Briefcase, BarChart3,
   Sparkles, Receipt, ArrowDownRight, Lock 
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar
 } from 'recharts'
-import { Transaction, Goal, CreditCard, Investment, ActiveTab } from '@/types_db'
+import { Transaction, Investment, ActiveTab } from '@/types_db'
 import { calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 import UpgradeModal from '@/core/components/UpgradeModal'
 import { useEntitlements } from '@/core/hooks/useEntitlements'
@@ -24,7 +25,15 @@ const formatK = (val: number) => {
     return `R$ ${val}`
 }
 
-const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-blue-500/10", onClick }: any) => (
+interface PremiumCardProps {
+  children: ReactNode
+  className?: string
+  delay?: number
+  glowColor?: string
+  onClick?: () => void
+}
+
+const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-blue-500/10", onClick }: PremiumCardProps) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: delay }}
     onClick={onClick}
@@ -35,8 +44,19 @@ const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-bl
   </motion.div>
 )
 
-const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay }: any) => {
-    const themes: any = {
+type ThemeName = 'blue' | 'emerald' | 'rose' | 'purple'
+
+interface MetricCardProps {
+  title: string
+  value: number
+  icon: LucideIcon
+  colorTheme: ThemeName
+  trend?: string
+  delay?: number
+}
+
+const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay }: MetricCardProps) => {
+    const themes: Record<ThemeName, { icon: string; bg: string; value: string }> = {
         blue: { icon: "text-blue-400", bg: "bg-blue-500/10", value: "text-blue-400" },
         emerald: { icon: "text-emerald-400", bg: "bg-emerald-500/10", value: "text-emerald-400" },
         rose: { icon: "text-rose-400", bg: "bg-rose-500/10", value: "text-rose-400" },
@@ -68,7 +88,7 @@ interface DashboardViewProps {
 
 export default function DashboardView({ summary: initialSummary, onNavigate, transactions: initialTransactions = [], investments = [] }: DashboardViewProps) {
   const [chartType, setChartType] = useState<'area' | 'bar' | 'line'>('area')
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedYear] = useState(new Date().getFullYear())
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const { plan } = useEntitlements()
@@ -94,8 +114,10 @@ export default function DashboardView({ summary: initialSummary, onNavigate, tra
     const expense = calculateExpenses(monthTransactions)
 
     // Soma dos bancos adicionados na aba Carteira (LocalStorage)
-    const localBanks = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('cerebro_banks') || '[]') : []
-    const bankBalance = localBanks.reduce((acc: number, b: any) => acc + b.balance, 0)
+    const localBanks = typeof window !== 'undefined'
+      ? JSON.parse(localStorage.getItem('cerebro_banks') || '[]') as Array<{ balance?: number }>
+      : []
+    const bankBalance = localBanks.reduce((acc, bank) => acc + Number(bank.balance ?? 0), 0)
 
     const totalInvestments = (investments || []).reduce((acc, inv) => acc + Number(inv?.amount_invested || 0), 0)
     

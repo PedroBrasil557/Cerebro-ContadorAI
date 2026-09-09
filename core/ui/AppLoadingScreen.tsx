@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BrainCircuit, CheckCircle2, Sparkles, Cpu, ShieldCheck } from 'lucide-react'
+import { BrainCircuit, CheckCircle2, Cpu, ShieldCheck } from 'lucide-react'
 
 interface AppLoadingScreenProps {
   isLoading: boolean // Estado real de carregamento do pai
@@ -18,17 +18,16 @@ const LOADING_MESSAGES = [
 ]
 
 export default function AppLoadingScreen({ isLoading }: AppLoadingScreenProps) {
+  const sessionId = useId().replaceAll(':', '').toUpperCase()
   const [progress, setProgress] = useState(0)
   const [messageIndex, setMessageIndex] = useState(0)
   const [isComplete, setIsComplete] = useState(false)
 
   // 1. Lógica da Barra de Progresso "Cinemática"
   useEffect(() => {
-    let interval: NodeJS.Timeout
-
     if (isLoading) {
       // Avança rápido até 30%, desacelera até 70%, rasteja até 90% e espera
-      interval = setInterval(() => {
+      const interval = setInterval(() => {
         setProgress((prev) => {
           if (prev < 30) return prev + 2      // Início rápido
           if (prev < 60) return prev + 0.5    // Meio constante
@@ -36,13 +35,16 @@ export default function AppLoadingScreen({ isLoading }: AppLoadingScreenProps) {
           return prev
         })
       }, 50)
-    } else {
-      // Quando os dados reais chegam (isLoading = false), dispara para 100%
-      setProgress(100)
-      setTimeout(() => setIsComplete(true), 800) // Delay visual para o usuário ver o "100%"
+      return () => clearInterval(interval)
     }
 
-    return () => clearInterval(interval)
+    // Agenda as atualizações para preservar a transição sem encadear renderizações no efeito.
+    const progressTimer = setTimeout(() => setProgress(100), 0)
+    const completionTimer = setTimeout(() => setIsComplete(true), 800)
+    return () => {
+      clearTimeout(progressTimer)
+      clearTimeout(completionTimer)
+    }
   }, [isLoading])
 
   // 2. Rotação de Mensagens
@@ -180,7 +182,7 @@ export default function AppLoadingScreen({ isLoading }: AppLoadingScreenProps) {
                     <ShieldCheck size={10} className="text-emerald-500" />
                     <span className="text-[9px] text-white font-mono uppercase tracking-wider">Secure Connection</span>
                  </div>
-                 <span className="text-[9px] text-white font-mono">ID: {Math.random().toString(36).substring(7).toUpperCase()}</span>
+                 <span className="text-[9px] text-white font-mono">ID: {sessionId}</span>
               </div>
 
             </div>

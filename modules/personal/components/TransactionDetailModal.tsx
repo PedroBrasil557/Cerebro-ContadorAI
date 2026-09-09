@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, Save, Trash2, Edit, Calendar, Tag, 
@@ -42,27 +42,12 @@ export default function TransactionDetailModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   
   // Estados do Formulário
-  const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
-  const [category, setCategory] = useState('')
-  const [date, setDate] = useState('')
-  const [type, setType] = useState('')
+  const [description, setDescription] = useState(transaction?.description ?? '')
+  const [amount, setAmount] = useState(transaction ? Math.abs(transaction.amount).toFixed(2) : '')
+  const [category, setCategory] = useState(transaction?.category ?? '')
+  const [date, setDate] = useState(transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : '')
+  const [type] = useState(transaction?.type ?? '')
   const [editReason, setEditReason] = useState('')
-
-  // Sincroniza dados ao abrir
-  useEffect(() => {
-    if (transaction) {
-      setDescription(transaction.description)
-      setAmount(Math.abs(transaction.amount).toFixed(2))
-      setCategory(transaction.category)
-      const safeDate = transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : ''
-      setDate(safeDate)
-      setType(transaction.type)
-      setEditReason('')
-      setIsEditing(false)
-      setShowDeleteConfirm(false)
-    }
-  }, [transaction, isOpen])
 
   if (!isOpen || !transaction) return null
 
@@ -283,7 +268,7 @@ export default function TransactionDetailModal({
                                 <p className="text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
                                     <FileText size={12} /> Nota de Edição
                                 </p>
-                                <p className="text-gray-300 text-sm italic">"{transaction.edit_note}"</p>
+                                <p className="text-gray-300 text-sm italic">&quot;{transaction.edit_note}&quot;</p>
                             </div>
                         )}
 
@@ -329,7 +314,7 @@ export default function TransactionDetailModal({
                         </div>
                         <h3 className="text-xl font-bold text-white mb-2">Tem certeza?</h3>
                         <p className="text-sm text-gray-400">
-                            Você está prestes a excluir <span className="text-white font-bold">"{transaction?.description}"</span>. Esta ação não pode ser desfeita.
+                            Você está prestes a excluir <span className="text-white font-bold">&quot;{transaction?.description}&quot;</span>. Esta ação não pode ser desfeita.
                         </p>
                     </div>
 

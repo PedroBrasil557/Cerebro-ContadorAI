@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { type ReactNode, useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   CreditCard, Plus, ShieldCheck, 
-  TrendingUp, Sparkles, X, ChevronRight, PieChart as PieIcon,
+  TrendingUp, Sparkles, X, PieChart as PieIcon,
   CalendarClock, Loader2, Trash2, Landmark, BrainCircuit, Lock,
   CheckCircle2 
 } from 'lucide-react'
@@ -14,6 +14,7 @@ import { createTransaction } from '@/core/action/transactions' // 🔥 Importado
 import { CreditCard as CreditCardType, Transaction } from '@/types_db'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
+import type { User } from '@supabase/supabase-js'
 
 // --- TIPAGENS ---
 interface CardUI extends CreditCardType {
@@ -30,7 +31,7 @@ interface BankAccount {
 }
 
 interface WalletViewProps {
-  user: any
+  user: User
 }
 
 const CARD_GRADIENTS = [
@@ -42,7 +43,12 @@ const COLORS = ['#818cf8', '#34d399', '#fb7185', '#fbbf24', '#a78bfa', '#f472b6'
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
-const GlassCard = ({ children, className = "", onClick, isLocked = false }: any) => (
+const GlassCard = ({ children, className = "", onClick, isLocked = false }: {
+  children: ReactNode
+  className?: string
+  onClick?: () => void
+  isLocked?: boolean
+}) => (
   <motion.div 
     whileHover={onClick && !isLocked ? { y: -4, scale: 1.01 } : {}}
     transition={{ duration: 0.3 }}
@@ -111,13 +117,15 @@ export default function WalletView({ user }: WalletViewProps) {
       const [dbCards, dbTrans] = await Promise.all([financeService.getCards(), financeService.getTransactions()])
       const currentMonth = new Date().getMonth()
       const formattedCards = dbCards.map((c, index) => {
-          const invoice = dbTrans.filter((t: any) => t.payment_method === c.name && new Date(t.date).getMonth() === currentMonth && t.type !== 'receita').reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount || 0)), 0)
+          const invoice = dbTrans
+            .filter((transaction) => transaction.payment_method === c.name && new Date(transaction.date).getMonth() === currentMonth && transaction.type !== 'receita')
+            .reduce((sum, transaction) => sum + Math.abs(Number(transaction.amount || 0)), 0)
           return { ...c, color: CARD_GRADIENTS[index % CARD_GRADIENTS.length], current_invoice: invoice }
       })
       setCards(formattedCards as CardUI[])
       setTransactions(dbTrans)
       setBankAccounts(JSON.parse(localStorage.getItem('cerebro_banks') || '[]'))
-    } catch (error) { toast.error("Erro ao carregar dados.") } finally { setLoading(false) }
+    } catch { toast.error("Erro ao carregar dados.") } finally { setLoading(false) }
   }
 
   useEffect(() => { loadData() }, [])
@@ -158,7 +166,7 @@ export default function WalletView({ user }: WalletViewProps) {
         toast.success(`Saldo sincronizado com o sistema global!`)
         setIsAddBankOpen(false)
         loadData()
-    } catch (error) { toast.error("Erro ao sincronizar saldo.") }
+    } catch { toast.error("Erro ao sincronizar saldo.") }
   }
 
   const handleAddCard = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -171,7 +179,7 @@ export default function WalletView({ user }: WalletViewProps) {
             color_start: '#6366f1', color_end: '#3b82f6'
         })
         toast.success("Cartão sincronizado!"); setIsAddCardOpen(false); loadData()
-    } catch (error: any) { toast.error("Erro ao salvar.") } finally { setSaving(false) }
+    } catch { toast.error("Erro ao salvar.") } finally { setSaving(false) }
   }
 
   const handleDeleteCard = async (id: string) => {
@@ -189,7 +197,7 @@ export default function WalletView({ user }: WalletViewProps) {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Falha ao consultar a IA.')
         setAiLimitStrategy(data.response)
-    } catch (error) { toast.error("Erro na IA.") } finally { setGeneratingStrategy(false) }
+    } catch { toast.error("Erro na IA.") } finally { setGeneratingStrategy(false) }
   }
 
   const creditSummary = useMemo(() => {
@@ -200,8 +208,15 @@ export default function WalletView({ user }: WalletViewProps) {
 
   const realCategoryData = useMemo(() => {
     const expenses = transactions.filter(t => t.type !== 'receita' && new Date(t.date).getMonth() === new Date().getMonth())
-    const grouped = expenses.reduce((acc: any, t: any) => { const cat = t.category || 'Outros'; acc[cat] = (acc[cat] || 0) + Math.abs(Number(t.amount || 0)); return acc }, {})
-    return Object.entries(grouped).map(([name, value], i) => ({ name, value: value as number, color: COLORS[i % COLORS.length] })).sort((a: any, b: any) => b.value - a.value).slice(0, 5)
+    const grouped = expenses.reduce<Record<string, number>>((acc, transaction) => {
+      const category = transaction.category || 'Outros'
+      acc[category] = (acc[category] || 0) + Math.abs(Number(transaction.amount || 0))
+      return acc
+    }, {})
+    return Object.entries(grouped)
+      .map(([name, value], index) => ({ name, value, color: COLORS[index % COLORS.length] }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
   }, [transactions])
 
   if (loading) return <div className="min-h-screen bg-[#050505] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>
@@ -281,12 +296,12 @@ export default function WalletView({ user }: WalletViewProps) {
                   <ResponsiveContainer width="100%" height="100%">
                      <PieChart>
                         <Pie data={realCategoryData} innerRadius={60} outerRadius={85} paddingAngle={4} dataKey="value" stroke="none">{realCategoryData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie>
-                        <Tooltip formatter={(value: any) => [formatCurrency(Number(value)), 'Gasto']} contentStyle={{ backgroundColor: 'rgba(9, 9, 11, 0.95)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', backdropFilter: 'blur(10px)', color: '#fff' }} itemStyle={{ color: '#fff', fontWeight: 'bold' }}/>
+                        <Tooltip formatter={(value: number | string | undefined) => [formatCurrency(Number(value ?? 0)), 'Gasto']} contentStyle={{ backgroundColor: 'rgba(9, 9, 11, 0.95)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', backdropFilter: 'blur(10px)', color: '#fff' }} itemStyle={{ color: '#fff', fontWeight: 'bold' }}/>
                      </PieChart>
                   </ResponsiveContainer>
                </div>
                <div className="space-y-4">
-                  {realCategoryData.map((cat: any) => (
+                  {realCategoryData.map((cat) => (
                     <div key={cat.name} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
                         <div className="flex items-center gap-3"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} /><span className="text-xs font-bold text-gray-300">{cat.name}</span></div>
                         <span className="text-xs font-black text-white">{formatCurrency(cat.value)}</span>

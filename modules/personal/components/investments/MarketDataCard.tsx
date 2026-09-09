@@ -2,9 +2,15 @@
 
 import React from 'react'
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
 
-export default function MarketDataCard({ marketData }: { marketData: any[] }) {
+interface MarketData {
+  name: string
+  value: number
+  change: number
+  direction: 'up' | 'down'
+}
+
+export default function MarketDataCard({ marketData }: { marketData: MarketData[] }) {
   // Se não houver dados, usa um array vazio para não quebrar
   const data = marketData || [];
 

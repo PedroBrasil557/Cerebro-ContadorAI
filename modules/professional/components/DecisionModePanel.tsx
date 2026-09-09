@@ -183,7 +183,7 @@ export default function DecisionModePanel() {
 
         {activeScenario === 'expansion' && (
           <div className="flex-1 flex items-center justify-center border border-white/5 border-dashed rounded-2xl bg-[#050505]">
-             <p className="text-xs text-gray-500 uppercase font-bold tracking-widest">Selecione "Contratar Auxiliar" para testar o motor.</p>
+             <p className="text-xs text-gray-500 uppercase font-bold tracking-widest">Selecione &quot;Contratar Auxiliar&quot; para testar o motor.</p>
           </div>
         )}
       </div>

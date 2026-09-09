@@ -12,6 +12,31 @@ import { TrendingUp, PieChart as PieIcon } from 'lucide-react'
 // Cores do tema (Dark Mode)
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1']
 
+interface FinancialTooltipProps {
+  active?: boolean
+  payload?: ReadonlyArray<{
+    color?: string
+    name?: string
+    value?: number | string
+  }>
+  label?: string
+}
+
+function FinancialTooltip({ active, payload, label }: FinancialTooltipProps) {
+  if (!active || !payload?.length) return null
+
+  return (
+    <div className="bg-[#1a1a1a] border border-white/10 p-3 rounded-xl shadow-xl">
+      <p className="font-bold text-gray-200 mb-2">{label}</p>
+      {payload.map((entry, index) => (
+        <p key={`${entry.name ?? 'valor'}-${index}`} style={{ color: entry.color }} className="text-sm font-medium">
+          {entry.name}: {formatCurrency(entry.value ?? 0)}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 export default function FinancialCharts({ transactions }: { transactions: Transaction[] }) {
   
   // 1. Processar dados para o Gráfico de Categorias (Pizza)
@@ -56,23 +81,6 @@ export default function FinancialCharts({ transactions }: { transactions: Transa
     })
   }, [transactions])
 
-  // Custom Tooltip para ficar bonito
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-[#1a1a1a] border border-white/10 p-3 rounded-xl shadow-xl">
-          <p className="font-bold text-gray-200 mb-2">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} style={{ color: entry.color }} className="text-sm font-medium">
-              {entry.name}: {formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      )
-    }
-    return null
-  }
-
   if (transactions.length === 0) return null
 
   return (
@@ -89,7 +97,7 @@ export default function FinancialCharts({ transactions }: { transactions: Transa
               <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
               <XAxis dataKey="name" stroke="#666" tickLine={false} axisLine={false} dy={10} />
               <YAxis hide />
-              <Tooltip content={<CustomTooltip />} cursor={{fill: '#ffffff10'}} />
+              <Tooltip content={<FinancialTooltip />} cursor={{fill: '#ffffff10'}} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               <Bar dataKey="Receita" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
               <Bar dataKey="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="b" />
@@ -120,7 +128,7 @@ export default function FinancialCharts({ transactions }: { transactions: Transa
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<FinancialTooltip />} />
               <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{fontSize: '11px'}} />
             </PieChart>
           </ResponsiveContainer>

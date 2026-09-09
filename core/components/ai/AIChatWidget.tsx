@@ -4,16 +4,24 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   MessageSquare, X, Send, Sparkles, Wallet, 
-  TrendingUp, TrendingDown, Bot, User
+  TrendingUp, Bot, User
 } from 'lucide-react'
 import { financeService } from '@/services/financeService'
 import { formatCurrency } from '@/lib/utils'
 import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
+import type { CaixaData, Debt, Goal, Transaction } from '@/types_db'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+}
+
+interface FinancialContext {
+  transactions: Transaction[]
+  debts: Debt[]
+  goals: Goal[]
+  balance: CaixaData | null
 }
 
 export default function AIChatWidget() {
@@ -25,7 +33,7 @@ export default function AIChatWidget() {
   const [isTyping, setIsTyping] = useState(false)
   
   // Contexto Financeiro Global
-  const [contextData, setContextData] = useState<any>({
+  const [contextData, setContextData] = useState<FinancialContext>({
       transactions: [],
       debts: [],
       goals: [],
@@ -80,8 +88,7 @@ export default function AIChatWidget() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                message: userText,
-                context: contextData // Envia os dados financeiros REAIS para a IA
+                message: userText
             })
         })
 
@@ -96,7 +103,7 @@ export default function AIChatWidget() {
         }
         setMessages(prev => [...prev, aiMsg])
 
-    } catch (error) {
+    } catch {
         const errorMsg: Message = { 
             id: (Date.now() + 1).toString(), 
             role: 'assistant', 
@@ -109,7 +116,7 @@ export default function AIChatWidget() {
   }
 
   // Cálculos rápidos para o Widget visual (Mini Dashboard no Chat)
-  const totals = (contextData.transactions || []).reduce((acc: any, t: any) => {
+  const totals = contextData.transactions.reduce((acc, t) => {
     const val = Number(t.amount)
     if (t.type === 'receita') {
         acc.income += val

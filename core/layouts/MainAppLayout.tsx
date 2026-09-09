@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import type { Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
@@ -121,7 +122,7 @@ const TopBar = ({ user, profile, notifications, onMarkAsRead, onToggleMenu, onNa
                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 p-[2px]">
                   <div className="h-full w-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                       {profile?.avatar_url ? (
-                          <img src={profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                          <Image src={profile.avatar_url} alt="Perfil" width={32} height={32} unoptimized className="h-full w-full object-cover" />
                       ) : (
                           <span className="font-bold text-xs text-white">{profile?.full_name?.charAt(0) || user?.email?.charAt(0).toUpperCase()}</span>
                       )}

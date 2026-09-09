@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import { buildInvestmentPayload } from '@/lib/investments/buildPayload'
 import { DataServiceError } from '@/lib/data/errors'
 import { logger } from '@/lib/logger'
 import { 
@@ -40,6 +41,7 @@ interface CreateAppointmentInput {
   value: number
   date: string
   time?: string
+  idempotencyKey: string
 }
 
 export type EditableProfileFields = Pick<
@@ -186,14 +188,17 @@ export const financeService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Usuário não autenticado')
     
-    const { data, error } = await supabase.from('investments').insert({
-        user_id: user.id,
-        ...investment,
-        amount_invested: Number(investment.quantity || 0) * Number(investment.average_price || 0)
-    }).select().single()
+    const payload = buildInvestmentPayload(user.id, investment)
+    const { data, error } = await supabase.from('investments').insert(payload).select().single()
 
     if (error) throw error
     return data
+  },
+
+  deleteInvestment: async (id: string) => {
+    const user = await getAuthenticatedUser('investments')
+    const { error } = await supabase.from('investments').delete().eq('id', id).eq('user_id', user.id)
+    if (error) throw databaseError('investments', user.id, error)
   },
 
   // ============================================================================
@@ -268,7 +273,7 @@ export const financeService = {
         date: datePart,
         time,
         caixaPercentage: 20,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: appt.idempotencyKey,
       }),
     })
     const result = await response.json() as {

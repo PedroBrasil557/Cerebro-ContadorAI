@@ -198,7 +198,7 @@ export async function copyFixedTransactionsToMonth(targetDateStr: string) {
 
   if (!pastFixed || pastFixed.length === 0) return { success: false, message: 'Nada a copiar.' }
 
-  const newTransactions = pastFixed.map((t: any) => {
+  const newTransactions = (pastFixed as Transaction[]).map((t) => {
     const oldDate = new Date(t.date)
     const newTxDate = new Date(Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), oldDate.getUTCDate()))
     return {

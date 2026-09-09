@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, DollarSign, Percent, Bitcoin } from 'lucide-react'
+import { TrendingUp, DollarSign, Percent, Bitcoin } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { getMarketData, type MarketData } from '@/lib/market/api'
 

@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { 
-  TrendingDown, ShieldAlert, Plus, X, 
-  Banknote, CalendarClock, Flame, CheckCircle2, Loader2, BrainCircuit, Sparkles,
-  Crosshair, Swords, AlertTriangle, Layers, PhoneCall
+  ShieldAlert, Plus, X,
+  Banknote, CalendarClock, CheckCircle2, Loader2, BrainCircuit, Sparkles,
+  Crosshair, Swords
 } from 'lucide-react'
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer 
@@ -21,12 +21,6 @@ interface ExtendedDebt extends Omit<Debt, 'interest_rate'> {
     interest_rate?: number;
     total_installments?: number;
 }
-
-interface DebtCenterViewProps {
-  user: any
-  summary: any
-}
-
 // --- FUNÇÕES AUXILIARES ---
 const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
@@ -102,7 +96,7 @@ function NewDebtModal({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose
     )
 }
 
-export default function DebtManagerWarRoom({ user, summary }: DebtCenterViewProps) {
+export default function DebtManagerWarRoom() {
     const [debts, setDebts] = useState<ExtendedDebt[]>([])
     const [loading, setLoading] = useState(true)
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -130,7 +124,7 @@ export default function DebtManagerWarRoom({ user, summary }: DebtCenterViewProp
         try {
             await updateDebt(selectedDebtId, numericAmount)
             await loadDebts(); toast.success("Amortização registrada!"); setPaymentModalOpen(false)
-        } catch (error) { toast.error("Erro no processamento.") } 
+        } catch { toast.error("Erro no processamento.") }
         finally { setIsPaying(false) }
     }
 
@@ -197,7 +191,7 @@ export default function DebtManagerWarRoom({ user, summary }: DebtCenterViewProp
             const data = await response.json()
             setAiStrategyText(data.strategy)
             toast.success("Plano de Guerra Gerado!")
-        } catch (e) { toast.error("Falha neural.") } finally { setAnalyzing(false) }
+        } catch { toast.error("Falha neural.") } finally { setAnalyzing(false) }
     }
 
     if (loading) return <div className="flex justify-center items-center h-screen bg-[#050505]"><Loader2 className="animate-spin text-rose-500" size={40}/></div>
@@ -291,7 +285,7 @@ export default function DebtManagerWarRoom({ user, summary }: DebtCenterViewProp
                                   <RechartsTooltip 
                                     contentStyle={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }} 
                                     // ✅ CORREÇÃO DE TIPAGEM NO FORMATTER (image_503d3e.png)
-                                    formatter={(value: any) => [formatCurrency(Number(value)), 'Saldo Devedor']}
+                                    formatter={(value: number | string | undefined) => [formatCurrency(Number(value ?? 0)), 'Saldo Devedor']}
                                     labelStyle={{ color: '#666', fontWeight: 'bold', marginBottom: '4px' }}
                                   />
                               </AreaChart>
@@ -359,12 +353,4 @@ export default function DebtManagerWarRoom({ user, summary }: DebtCenterViewProp
             )}
         </div>
     )
-}
-
-const triggerAiHelp = (prompt: string) => {
-    navigator.clipboard.writeText(prompt)
-    toast.success("Estratégia Copiada!", {
-        description: "Abra o chat e cole a auditoria neural.",
-        icon: <Sparkles className="text-indigo-400" />
-    })
 }

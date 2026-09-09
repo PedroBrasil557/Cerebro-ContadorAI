@@ -1,19 +1,23 @@
 'use client'
 
 import React, { useState, useMemo, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { 
-  CheckCircle2, BrainCircuit, ArrowUpRight, 
-  Loader2, Calculator, TrendingUp, Layers, Info
+  BrainCircuit, ArrowUpRight,
+  Loader2, Calculator, TrendingUp
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
+interface NailMaterial {
+  cost_per_application: number | string
+  name: string
+}
+
 export default function NailCalendar() {
   const supabase = createClient()
   const [inputValue, setInputValue] = useState('')
-  const [materials, setMaterials] = useState<any[]>([])
+  const [materials, setMaterials] = useState<NailMaterial[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
 
   // Busca de insumos para precisão
@@ -61,7 +65,7 @@ export default function NailCalendar() {
       if (error) throw error
       setInputValue('')
       toast.success("Venda consolidada.")
-    } catch (err) {
+    } catch {
       toast.error("Erro ao registrar.")
     } finally {
       setIsProcessing(false)

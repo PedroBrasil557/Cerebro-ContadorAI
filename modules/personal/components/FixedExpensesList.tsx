@@ -2,12 +2,10 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  CheckCircle2, Circle, AlertTriangle, CalendarClock, 
-  TrendingUp, TrendingDown, Check, ShieldCheck, Copy, Calendar
-} from 'lucide-react'
+import { TrendingUp, TrendingDown, Check, ShieldCheck, Copy, Calendar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { Transaction, toggleBillPayment, copyFixedTransactionsToMonth } from '@/core/action/transactions'
+import { toggleBillPayment, copyFixedTransactionsToMonth } from '@/core/action/transactions'
+import type { Transaction } from '@/types_db'
 
 export default function FixedExpensesList({ 
     transactions, 
@@ -172,7 +170,7 @@ export default function FixedExpensesList({
                                     </div>
                                 </div>
                                 <span className="font-mono font-bold text-lg text-emerald-400">
-                                    + {formatCurrency(t.amount)}
+                                    + {formatCurrency(Number(t.amount))}
                                 </span>
                             </motion.div>
                         ))}
@@ -244,7 +242,7 @@ export default function FixedExpensesList({
                                         <span className={`font-mono text-lg font-black tracking-tight ${
                                             t.is_paid ? 'text-gray-600' : 'text-rose-400'
                                         }`}>
-                                            {formatCurrency(Math.abs(t.amount))}
+                                            {formatCurrency(Math.abs(Number(t.amount)))}
                                         </span>
                                     </div>
                                 </motion.div>

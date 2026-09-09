@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { PieChart, Zap, AlertTriangle, CheckCircle2, ShoppingBag, Home, TrendingUp } from 'lucide-react'
+import React, { type ReactNode, useMemo } from 'react'
+import { Zap, AlertTriangle, CheckCircle2, ShoppingBag, Home, TrendingUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { Transaction } from '@/types_db'
 import { motion } from 'framer-motion'
@@ -49,7 +49,7 @@ export default function BudgetSummary({ income, transactions }: BudgetProps) {
   }, [income, transactions])
 
   // Função auxiliar para renderizar barras de progresso premium
-  const renderBar = (label: string, spent: number, limit: number, icon: any, colorClass: string, bgClass: string) => {
+  const renderBar = (label: string, spent: number, limit: number, icon: ReactNode, colorClass: string, bgClass: string) => {
     const pct = Math.min((limit > 0 ? (spent / limit) * 100 : 0), 100)
     const isOver = spent > limit
     const available = limit - spent

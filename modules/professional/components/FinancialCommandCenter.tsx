@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
-  TrendingUp, Activity, DollarSign, BrainCircuit, 
+  Activity, DollarSign, BrainCircuit,
   ShieldCheck, AlertTriangle, Target, Calculator, Users, Loader2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
@@ -160,7 +160,7 @@ export default function FinancialCommandCenter() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => setActiveSubTab(tab.id as 'visao_geral' | 'custos' | 'crm' | 'decisao')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all duration-300 ${
                 activeSubTab === tab.id 
                   ? 'bg-white/10 text-white shadow-md' 
@@ -274,7 +274,7 @@ export default function FinancialCommandCenter() {
                     <div className="bg-rose-500/10 p-4 rounded-2xl border border-rose-500/20 backdrop-blur-sm flex gap-3 items-start">
                        <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />
                        <p className="text-xs text-rose-200 leading-relaxed">
-                         Alerta: Sua margem está abaixo de 40%. Vá até a aba "Engenharia de Preços" para recalcular seus custos urgemente.
+                         Alerta: Sua margem está abaixo de 40%. Vá até a aba &quot;Engenharia de Preços&quot; para recalcular seus custos urgentemente.
                        </p>
                     </div>
                   )}
