@@ -12,7 +12,6 @@ import {
 } from 'recharts'
 
 import { getDebts, createDebt, updateDebt, deleteDebt, Debt } from '@/core/action/debts'
-import { financeService } from '@/services/financeService' 
 import { toast } from 'sonner'
 
 // --- TIPAGENS ---
@@ -186,9 +185,9 @@ export default function DebtManagerWarRoom() {
         if (debts.length === 0) return toast.info("Sem passivos registrados.")
         setAnalyzing(true)
         try {
-            const tr = await financeService.getTransactions()
-            const response = await fetch('/api/ai/debt-strategy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ debts, transactions: tr }) })
+            const response = await fetch('/api/ai/debt-strategy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
             const data = await response.json()
+            if (!response.ok) throw new Error(data.error?.message ?? 'Falha ao gerar estratégia')
             setAiStrategyText(data.strategy)
             toast.success("Plano de Guerra Gerado!")
         } catch { toast.error("Falha neural.") } finally { setAnalyzing(false) }

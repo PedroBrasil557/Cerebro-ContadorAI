@@ -5,21 +5,11 @@ import { getGroqClient } from '@/lib/ai/groq'
 import { requireUser } from '@/lib/auth/requireUser'
 import { getUserEntitlements } from '@/lib/billing/getEntitlements'
 import { checkUsageLimit } from '@/lib/security/checkUsageLimit'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const requestSchema = z.object({
-  caixaData: z.object({
-    currentBalance: z.coerce.number().finite(),
-    monthlyGoal: z.coerce.number().finite().nonnegative(),
-    taxRate: z.coerce.number().finite().min(0).max(100),
-    reserveRate: z.coerce.number().finite().min(0).max(100),
-  }),
-  recentTransactions: z.array(z.object({
-    amount: z.coerce.number().finite(),
-    type: z.enum(['receita', 'despesa_fixa', 'despesa_variavel', 'transferencia']),
-  })).max(50),
-}).strict()
+const requestSchema = z.object({}).strict()
 
 export async function POST(request: Request) {
   try {
@@ -29,15 +19,40 @@ export async function POST(request: Request) {
       throw new ForbiddenError('A análise CFO requer o plano PREMIUM.')
     }
 
-    const { caixaData, recentTransactions } = requestSchema.parse(await request.json())
+    requestSchema.parse(await request.json())
     const usage = await checkUsageLimit(user.id, 'ai_cfo', billing.plan)
     if (!usage.allowed) throw new RateLimitError()
+
+    const supabase = await createClient()
+    const [settingsResult, transactionsResult] = await Promise.all([
+      supabase
+        .from('business_settings')
+        .select('current_balance, monthly_goal, tax_rate, reserve_rate')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id)
+        .eq('scope', 'business')
+        .order('date', { ascending: false })
+        .limit(50),
+    ])
+    const databaseError = settingsResult.error ?? transactionsResult.error
+    if (databaseError) throw databaseError
+
+    const settings = settingsResult.data
+    const recentTransactions = transactionsResult.data ?? []
+    const currentBalance = Number(settings?.current_balance ?? 0)
+    const monthlyGoal = Number(settings?.monthly_goal ?? 0)
+    const taxRate = Number(settings?.tax_rate ?? 0)
+    const reserveRate = Number(settings?.reserve_rate ?? 0)
 
     const expenses = recentTransactions
       .filter((transaction) => transaction.type === 'despesa_fixa' || transaction.type === 'despesa_variavel')
       .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
-    const runway = expenses > 0 ? caixaData.currentBalance / expenses : null
-    const prompt = `Faça uma análise educativa de CFO em PT-BR sem inventar dados ou scores.\nSaldo: R$ ${caixaData.currentBalance.toFixed(2)}\nMeta mensal: R$ ${caixaData.monthlyGoal.toFixed(2)}\nImposto configurado: ${caixaData.taxRate}%\nReserva alvo: ${caixaData.reserveRate}%\nDespesas observadas: R$ ${expenses.toFixed(2)}\nRunway: ${runway === null ? 'indisponível por falta de despesas observadas' : `${runway.toFixed(1)} meses`}\nDiferencie fatos de recomendações e informe dados insuficientes.`
+    const runway = expenses > 0 ? currentBalance / expenses : null
+    const prompt = `Faça uma análise educativa de CFO em PT-BR sem inventar dados ou scores. Todos os valores abaixo foram consultados no servidor para o usuário autenticado.\nSaldo: R$ ${currentBalance.toFixed(2)}\nMeta mensal: R$ ${monthlyGoal.toFixed(2)}\nImposto configurado: ${taxRate}%\nReserva alvo: ${reserveRate}%\nDespesas observadas: R$ ${expenses.toFixed(2)}\nRunway: ${runway === null ? 'indisponível por falta de despesas observadas' : `${runway.toFixed(1)} meses`}\nDiferencie fatos de recomendações e informe dados insuficientes.`
     const completion = await getGroqClient().chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
       model: 'llama-3.3-70b-versatile',
@@ -49,7 +64,7 @@ export async function POST(request: Request) {
       ?? 'Não foi possível gerar a análise neste momento.'
     return successResponse({
       analysis,
-      dataQuality: 'actual',
+      dataQuality: settings ? 'actual' : 'insufficient',
       remaining: usage.remaining,
       resetAt: usage.resetAt,
     })

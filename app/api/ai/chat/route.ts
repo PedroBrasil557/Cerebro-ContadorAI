@@ -22,17 +22,27 @@ export async function POST(request: Request) {
     if (!usage.allowed) throw new RateLimitError()
 
     const supabase = await createClient()
-    const [transactionsResult, debtsResult, goalsResult, settingsResult] = await Promise.all([
-      supabase.from('transactions').select('description, amount, type, category, date').eq('user_id', user.id).order('date', { ascending: false }).limit(50),
-      supabase.from('debts').select('name, remaining_amount, interest_rate').eq('user_id', user.id).limit(50),
+    const [transactionsResult, goalsResult] = await Promise.all([
+      supabase.from('transactions').select('description, amount, type, category, date').eq('user_id', user.id).eq('scope', 'personal').order('date', { ascending: false }).limit(50),
       supabase.from('goals').select('title, target_amount, current_amount, deadline').eq('user_id', user.id).limit(50),
-      supabase.from('business_settings').select('current_balance, monthly_goal').eq('user_id', user.id).maybeSingle(),
     ])
 
-    const databaseError = transactionsResult.error ?? debtsResult.error ?? goalsResult.error ?? settingsResult.error
+    let debts: Array<{ name: string; remaining_amount: number; interest_rate: number | null }> = []
+    let debtsError = null
+    if (billing.entitlements.debtCenter) {
+      const debtsResult = await supabase
+        .from('debts')
+        .select('name, remaining_amount, interest_rate')
+        .eq('user_id', user.id)
+        .limit(50)
+      debts = debtsResult.data ?? []
+      debtsError = debtsResult.error
+    }
+
+    const databaseError = transactionsResult.error ?? goalsResult.error ?? debtsError
     if (databaseError) throw databaseError
 
-    const systemContent = `Você é o assistente financeiro Cérebro.IA. Responda em PT-BR, de forma concisa e educativa. Baseie-se somente nos dados consultados no servidor e diga claramente quando não houver dados suficientes.\n\nSaldo empresarial: R$ ${settingsResult.data?.current_balance ?? 0}\nMeta mensal: R$ ${settingsResult.data?.monthly_goal ?? 0}\nTransações: ${JSON.stringify(transactionsResult.data ?? [])}\nDívidas: ${JSON.stringify(debtsResult.data ?? [])}\nMetas: ${JSON.stringify(goalsResult.data ?? [])}`
+    const systemContent = `Você é o assistente financeiro Cérebro.IA. Responda em PT-BR, de forma concisa e educativa. Baseie-se somente nos dados consultados no servidor e diga claramente quando não houver dados suficientes.\n\nTransações pessoais: ${JSON.stringify(transactionsResult.data ?? [])}\nDívidas: ${billing.entitlements.debtCenter ? JSON.stringify(debts) : 'módulo indisponível no plano atual'}\nMetas: ${JSON.stringify(goalsResult.data ?? [])}`
 
     const completion = await getGroqClient().chat.completions.create({
       messages: [

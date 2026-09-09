@@ -106,8 +106,8 @@ const SimulatorWidget = ({ metrics }: { metrics: BusinessMetrics }) => {
         <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-black border border-emerald-500/20">
             <p className="text-[10px] text-emerald-200 font-bold mb-1 uppercase tracking-wide">Novo Runway</p>
             <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-white">{simResult.projectedRunway.toFixed(1)}</span>
-            <span className="text-xs font-bold text-gray-500">meses</span>
+            <span className="text-2xl font-black text-white">{simResult.projectedRunway === null ? 'Sem dados' : simResult.projectedRunway.toFixed(1)}</span>
+            {simResult.projectedRunway !== null && <span className="text-xs font-bold text-gray-500">meses</span>}
             </div>
         </div>
       </div>
@@ -208,19 +208,11 @@ export default function CaixaView({ data, transactions: initialTransactions = []
       const response = await fetch('/api/cfo-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          caixaData: {
-            currentBalance: metrics.cashReserve,
-            monthlyGoal: safeData.monthlyGoal,
-            taxRate: safeData.taxRate,
-            reserveRate: safeData.reserveRate ?? 10,
-          },
-          recentTransactions: liveTransactions.slice(0, 50).map(({ amount, type }) => ({ amount, type })),
-        })
+        body: '{}'
       })
 
       const result = await response.json()
-      if (!response.ok) throw new Error(result.error || 'Falha ao consultar o CFO Virtual.')
+      if (!response.ok) throw new Error(result.error?.message ?? 'Falha ao consultar o CFO Virtual.')
       setCfoAnalysis(result.analysis)
       toast.success("Análise estratégica concluída!")
     } catch {
@@ -325,7 +317,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
           </div>
           <KPICard label="Faturamento Real" value={formatCurrency(metrics.revenue)} subtext="No Mês Atual" icon={TrendingUp} />
           <KPICard label="Pró-labore Seguro" value={formatCurrency(safeDraw)} subtext="Teto sugerido para saque" icon={PiggyBank} colorClass="text-purple-400" bgClass="bg-purple-500/10" />
-          <KPICard label="Runway Atual" value={`${runway.toFixed(1)} Meses`} subtext="Sobrevivência do negócio" icon={Activity} colorClass={status === 'healthy' ? 'text-emerald-400' : 'text-rose-400'} bgClass={status === 'healthy' ? 'bg-emerald-500/10' : 'bg-rose-500/10'} />
+          <KPICard label="Runway Atual" value={runway === null ? 'Sem dados' : `${runway.toFixed(1)} Meses`} subtext={runway === null ? 'Registre despesas para calcular' : 'Cobertura pelas despesas observadas'} icon={Activity} colorClass={status === 'healthy' ? 'text-emerald-400' : 'text-rose-400'} bgClass={status === 'healthy' ? 'bg-emerald-500/10' : 'bg-rose-500/10'} />
           <KPICard label="Reserva DAS/MEI" value={formatCurrency(taxReserve)} subtext={`Taxa: ${metrics.taxRate}%`} icon={Calculator} colorClass="text-blue-400" bgClass="bg-blue-500/10" />
       </section>
 

@@ -5,20 +5,11 @@ import { getGroqClient } from '@/lib/ai/groq'
 import { requireUser } from '@/lib/auth/requireUser'
 import { getUserEntitlements } from '@/lib/billing/getEntitlements'
 import { checkUsageLimit } from '@/lib/security/checkUsageLimit'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const requestSchema = z.object({
-  debts: z.array(z.object({
-    name: z.string().trim().min(1).max(200),
-    remaining_amount: z.coerce.number().finite().nonnegative(),
-    interest_rate: z.coerce.number().finite().nonnegative().max(1000),
-  })).max(50),
-  transactions: z.array(z.object({
-    amount: z.coerce.number().finite(),
-    type: z.enum(['receita', 'despesa_fixa', 'despesa_variavel', 'transferencia']),
-  })).max(50),
-}).strict()
+const requestSchema = z.object({}).strict()
 
 export async function POST(request: Request) {
   try {
@@ -26,9 +17,29 @@ export async function POST(request: Request) {
     const billing = await getUserEntitlements(user.id)
     if (!billing.entitlements.debtCenter) throw new ForbiddenError('A Central de Dívidas requer o plano PRO.')
 
-    const { debts, transactions } = requestSchema.parse(await request.json())
+    requestSchema.parse(await request.json())
     const usage = await checkUsageLimit(user.id, 'ai_debt_strategy', billing.plan)
     if (!usage.allowed) throw new RateLimitError()
+
+    const supabase = await createClient()
+    const [debtsResult, transactionsResult] = await Promise.all([
+      supabase
+        .from('debts')
+        .select('name, remaining_amount, interest_rate')
+        .eq('user_id', user.id)
+        .limit(50),
+      supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id)
+        .eq('scope', 'personal')
+        .order('date', { ascending: false })
+        .limit(50),
+    ])
+    const databaseError = debtsResult.error ?? transactionsResult.error
+    if (databaseError) throw databaseError
+    const debts = debtsResult.data ?? []
+    const transactions = transactionsResult.data ?? []
 
     const income = transactions
       .filter((transaction) => transaction.type === 'receita')
@@ -39,7 +50,7 @@ export async function POST(request: Request) {
     const balance = income - expenses
     const totalDebt = debts.reduce((sum, debt) => sum + debt.remaining_amount, 0)
 
-    const prompt = `Crie um plano educativo e objetivo de quitação em PT-BR. Não invente valores.\nRenda: R$ ${income.toFixed(2)}\nDespesas: R$ ${expenses.toFixed(2)}\nSaldo livre: R$ ${balance.toFixed(2)}\nDívida total: R$ ${totalDebt.toFixed(2)}\nDívidas: ${JSON.stringify(debts)}\nEstruture em Diagnóstico, Estratégia, Plano de ação e Pontos para revisar.`
+    const prompt = `Crie um plano educativo e objetivo de quitação em PT-BR. Não invente valores. Todos os valores abaixo foram consultados no servidor para o usuário autenticado.\nRenda: R$ ${income.toFixed(2)}\nDespesas: R$ ${expenses.toFixed(2)}\nSaldo livre: R$ ${balance.toFixed(2)}\nDívida total: R$ ${totalDebt.toFixed(2)}\nDívidas: ${JSON.stringify(debts)}\nEstruture em Diagnóstico, Estratégia, Plano de ação e Pontos para revisar.`
     const completion = await getGroqClient().chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
       model: 'llama-3.3-70b-versatile',
