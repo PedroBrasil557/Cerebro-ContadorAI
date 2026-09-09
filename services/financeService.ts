@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/client'
-import type { User } from '@supabase/supabase-js'
 import { buildInvestmentPayload } from '@/lib/investments/buildPayload'
 import { DataServiceError } from '@/lib/data/errors'
 import { logger } from '@/lib/logger'
@@ -49,24 +48,6 @@ export type EditableProfileFields = Pick<
   'full_name' | 'avatar_url' | 'phone' | 'location' | 'bio' | 'base_currency' | 'timezone'
 >
 
-// --- FUNÇÃO AUXILIAR DE SEGURANÇA ---
-async function ensureProfileAndSettings(user: User) {
-  if (!user) return
-
-  // O perfil é criado pelo trigger do banco; o cliente nunca define papel ou plano.
-  const { data: settings } = await supabase.from('business_settings').select('user_id').eq('user_id', user.id).single()
-  
-  if (!settings) {
-    await supabase.from('business_settings').insert({ 
-        user_id: user.id,
-        current_balance: 0,
-        monthly_goal: 15000,
-        tax_rate: 6,
-        reserve_rate: 20
-    })
-  }
-}
-
 export const financeService = {
   
   // ============================================================================
@@ -80,9 +61,7 @@ export const financeService = {
   },
 
   updateProfile: async (updates: Partial<EditableProfileFields>) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Usuário não logado')
-    await ensureProfileAndSettings(user)
+    const user = await getAuthenticatedUser('profile')
     const { error } = await supabase.from('profiles').update(updates).eq('id', user.id)
     if (error) throw error
   },
@@ -103,10 +82,7 @@ export const financeService = {
   },
 
   createTransaction: async (transaction: Partial<NewTransaction>) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Usuário não autenticado')
-    
-    await ensureProfileAndSettings(user)
+    const user = await getAuthenticatedUser('transactions')
 
     const payload = {
         user_id: user.id,
@@ -138,9 +114,7 @@ export const financeService = {
   },
 
   createCard: async (card: Partial<CreditCard>) => {
-     const { data: { user } } = await supabase.auth.getUser()
-     if (!user) throw new Error('User not found')
-     await ensureProfileAndSettings(user)
+     const user = await getAuthenticatedUser('credit_cards')
 
      const payload = {
          user_id: user.id,
@@ -231,7 +205,13 @@ export const financeService = {
   },
 
   markNotificationAsRead: async (id: string) => {
-      await supabase.from('notifications').update({ read: true }).eq('id', id)
+      const user = await getAuthenticatedUser('notifications')
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id)
+        .eq('user_id', user.id)
+      if (error) throw databaseError('notifications', user.id, error)
   },
 
   createNotification: async (title: string, message: string, type: 'info' | 'success' | 'warning' | 'alert' = 'info') => {
@@ -289,8 +269,13 @@ export const financeService = {
   },
 
   updateAppointmentStatus: async (id: string, status: string) => {
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
-    if (error) throw error
+    const user = await getAuthenticatedUser('appointments')
+    const { error } = await supabase
+      .from('appointments')
+      .update({ status })
+      .eq('id', id)
+      .eq('user_id', user.id)
+    if (error) throw databaseError('appointments', user.id, error)
   },
 
   // ============================================================================
@@ -304,10 +289,7 @@ export const financeService = {
   },
 
   createGoal: async (goal: NewGoal) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Usuário não autenticado')
-    
-    await ensureProfileAndSettings(user)
+    const user = await getAuthenticatedUser('goals')
 
     const payload = {
         user_id: user.id,

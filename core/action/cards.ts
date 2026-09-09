@@ -75,7 +75,9 @@ export async function createCard(formData: FormData) {
 // 3. DELETAR CARTÃO
 export async function deleteCard(id: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from('credit_cards').delete().eq('id', id)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Usuário não logado' }
+  const { error } = await supabase.from('credit_cards').delete().eq('id', id).eq('user_id', user.id)
   if (error) return { error: 'Erro ao deletar.' }
   revalidatePath('/')
   return { success: true }

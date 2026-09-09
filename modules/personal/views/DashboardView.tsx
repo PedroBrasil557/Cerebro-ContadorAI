@@ -196,11 +196,11 @@ export default function DashboardView({ summary: initialSummary, onNavigate, tra
                     </div>
                 </div>
                 <div className="flex-1 space-y-4">
-                   <p className="text-xs text-gray-500 font-medium leading-relaxed">Sua saúde financeira é calculada pelo cruzamento de ativos, passivos e previsibilidade de caixa via IA.</p>
+                   <p className="text-xs text-gray-500 font-medium leading-relaxed">Indicador calculado pela relação entre receitas e despesas registradas no mês.</p>
                    <div className="h-px bg-white/5 w-full" />
                    <div className="flex gap-4">
-                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Status</p><p className={`text-sm font-bold ${scoreVisuals.text}`}>{stats.score > 70 ? 'Excelente' : 'Em Análise'}</p></div>
-                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Confiança</p><p className="text-sm font-bold text-white">98.2%</p></div>
+                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Status</p><p className={`text-sm font-bold ${scoreVisuals.text}`}>{liveTransactions.length === 0 ? 'Sem dados' : stats.score >= 100 ? 'Despesas cobertas' : 'Cobertura parcial'}</p></div>
+                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Base</p><p className="text-sm font-bold text-white">{liveTransactions.length} lançamentos</p></div>
                    </div>
                 </div>
             </div>
@@ -210,8 +210,8 @@ export default function DashboardView({ summary: initialSummary, onNavigate, tra
           <div className="absolute inset-0 lg:col-span-2 z-20 flex items-center justify-center">
             <div className="bg-[#0f0f13]/90 border border-indigo-500/30 p-8 rounded-[2rem] text-center shadow-2xl backdrop-blur-md max-w-sm">
                <Lock size={24} className="mx-auto mb-4 text-indigo-400" />
-               <h4 className="text-white font-black text-lg mb-2 uppercase tracking-tighter">Motor IA Desativado</h4>
-               <p className="text-gray-400 text-xs mb-6">Assine o plano PRO para liberar o score de saúde e análise de perfil cognitivo.</p>
+               <h4 className="text-white font-black text-lg mb-2 uppercase tracking-tighter">Análise avançada indisponível</h4>
+               <p className="text-gray-400 text-xs mb-6">Assine o plano PRO para liberar os indicadores avançados da sua vida financeira.</p>
                <button onClick={() => setShowUpgradeModal(true)} className="w-full bg-white text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-105 transition-transform">Ativar Cérebro IA</button>
             </div>
           </div>
@@ -220,9 +220,9 @@ export default function DashboardView({ summary: initialSummary, onNavigate, tra
         <div className="relative">
             <PremiumCard className={`h-full ${isFreePlan ? 'blur-sm grayscale' : ''}`}>
                 <BrainCircuit size={24} className="text-purple-400 mb-6" />
-                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Perfil Identificado</p>
-                <h3 className="text-3xl font-black text-white">{isFreePlan ? '*******' : 'Estratégico'}</h3>
-                <p className="text-[10px] text-gray-500 mt-4 leading-relaxed">Baseado no seu histórico de consumo e taxa de poupança mensal.</p>
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Histórico disponível</p>
+                <h3 className="text-3xl font-black text-white">{isFreePlan ? '*******' : `${liveTransactions.length} lançamentos`}</h3>
+                <p className="text-[10px] text-gray-500 mt-4 leading-relaxed">Quantidade real de transações usada nos indicadores desta tela.</p>
             </PremiumCard>
             {isFreePlan && (
                 <div className="absolute inset-0 flex items-center justify-center cursor-pointer" onClick={() => setShowUpgradeModal(true)}>

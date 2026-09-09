@@ -170,7 +170,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
   const [goals, setGoals] = useState<Goal[]>([])
   const [investments, setInvestments] = useState<Investment[]>([]) 
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [caixa, setCaixa] = useState<CaixaData>({ currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] })
+  const [caixa, setCaixa] = useState<CaixaData>({ currentBalance: 0, monthlyGoal: 0, taxRate: 0, reserveRate: 0, entries: [] })
 
   useEffect(() => {
     async function loadData() {
@@ -199,7 +199,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
 
         } catch (error) {
             console.error("Erro crítico de sincronização:", error)
-            toast.error("Conexão instável. Usando dados cacheados.")
+            toast.error("Não foi possível carregar todos os dados.")
         } finally {
             setIsLoading(false)
         }

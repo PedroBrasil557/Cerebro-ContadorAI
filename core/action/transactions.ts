@@ -139,12 +139,17 @@ export async function createTransaction(formData: FormData) {
 // 4. ATUALIZAR
 export async function updateTransaction(data: Transaction, reason: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Auth required' }
   if (!reason || reason.trim().length < 3) return { error: 'Motivo obrigatório.' }
 
   const { error } = await supabase.from('transactions').update({
       description: data.description, amount: data.amount, type: data.type, 
       category: data.category, date: data.date, edit_note: reason, payment_method: data.payment_method
-    }).eq('id', data.id)
+    })
+    .eq('id', data.id)
+    .eq('user_id', user.id)
+    .eq('scope', 'personal')
 
   if (error) return { error: 'Erro ao atualizar.' }
   
@@ -155,6 +160,8 @@ export async function updateTransaction(data: Transaction, reason: string) {
 // 5. TOGGLE (MARCAR COMO PAGO)
 export async function toggleBillPayment(id: string, isPaid: boolean) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Auth required' }
     
     const { error } = await supabase.from('transactions')
         .update({ 
@@ -162,6 +169,8 @@ export async function toggleBillPayment(id: string, isPaid: boolean) {
             status: isPaid ? 'concluido' : 'pendente'
         })
         .eq('id', id)
+        .eq('user_id', user.id)
+        .eq('scope', 'personal')
         
     if (error) return { error: 'Erro ao atualizar.' }
     
@@ -176,7 +185,14 @@ export async function toggleBillPayment(id: string, isPaid: boolean) {
 // 6. DELETAR
 export async function deleteTransaction(id: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from('transactions').delete().eq('id', id)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Auth required' }
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .eq('scope', 'personal')
   if (error) return { error: 'Erro ao excluir.' }
   
   revalidatePath('/', 'layout')

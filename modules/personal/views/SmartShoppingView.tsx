@@ -225,7 +225,7 @@ export default function SmartShoppingView() {
   // ============================================================================
   // 🧠 CÁLCULOS
   // ============================================================================
-  const budget = session?.estimated_total || 1500
+  const budget = session?.estimated_total ?? 0
   const totals = useMemo(() => {
     const estimatedTotal = items.reduce((acc, item) => acc + Number(item.estimated_price), 0)
     const actualTotal = items.reduce((acc, item) => acc + Number(item.actual_price || 0), 0)

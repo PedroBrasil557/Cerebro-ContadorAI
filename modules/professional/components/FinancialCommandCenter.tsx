@@ -232,7 +232,7 @@ export default function FinancialCommandCenter() {
             </div>
           </div>
 
-          {/* COLUNA DIREITA: IA & Índice de Estabilidade */}
+          {/* COLUNA DIREITA: indicadores determinísticos */}
           <div className="space-y-6 flex flex-col">
             
             <div className={`relative bg-[#0a0a0c] border rounded-3xl p-6 flex flex-col items-center justify-center text-center overflow-hidden transition-colors ${getIndexColor(health.stability_index)}`}>
@@ -248,7 +248,7 @@ export default function FinancialCommandCenter() {
                   </svg>
                   <div className="absolute flex flex-col items-center justify-center">
                     <span className="text-4xl font-black text-white tracking-tighter">{health.stability_index}</span>
-                    <span className="text-[9px] text-gray-400 font-bold uppercase mt-1">Score Real</span>
+                    <span className="text-[9px] text-gray-400 font-bold uppercase mt-1">Regra local</span>
                   </div>
                </div>
                <p className="text-xs font-bold text-white relative z-10">
@@ -259,15 +259,15 @@ export default function FinancialCommandCenter() {
             <div className="flex-1 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 border border-indigo-500/20 rounded-3xl p-6 relative overflow-hidden">
                <div className="flex items-center gap-2 mb-4">
                  <BrainCircuit className="text-indigo-400 animate-pulse" size={18} />
-                 <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest">CFO Virtual</h4>
+                 <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Resumo por regras</h4>
                </div>
                
                <div className="space-y-4 relative z-10">
                   <div className="bg-black/20 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
                      <p className="text-sm text-gray-300 leading-relaxed font-medium">
                        {health.gross_revenue === 0 
-                         ? "Olá! Eu sou a sua IA CFO. Registre suas primeiras receitas no Caixa para eu começar a analisar o seu negócio."
-                         : `Seu ticket médio atual é de R$ ${health.average_ticket.toFixed(2)}. Continue registrando suas clientes para que eu possa projetar seu fechamento de mês.`}
+                         ? "Registre suas primeiras receitas no Caixa para calcular os indicadores do negócio."
+                         : `O ticket médio estimado por lançamento de receita é R$ ${health.average_ticket.toFixed(2)}. Continue registrando as movimentações para melhorar a base do cálculo.`}
                      </p>
                   </div>
                   {health.profit_margin_pct < 40 && health.gross_revenue > 0 && (

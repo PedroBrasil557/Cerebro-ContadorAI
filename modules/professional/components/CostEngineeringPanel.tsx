@@ -105,7 +105,9 @@ export default function CostEngineeringPanel() {
   }
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('nail_products').delete().eq('id', id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase.from('nail_products').delete().eq('id', id).eq('user_id', user.id)
     if (error) {
        alert(`Erro ao deletar: ${error.message}`)
     } else {
