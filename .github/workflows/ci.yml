@@ -26,14 +26,6 @@ jobs:
       STRIPE_WEBHOOK_SECRET: whsec_placeholder
       STRIPE_PRICE_PRO: price_pro_placeholder
       STRIPE_PRICE_PREMIUM: price_premium_placeholder
-      SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
-      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
-      SUPABASE_TEST_USER_A_EMAIL: ${{ secrets.SUPABASE_TEST_USER_A_EMAIL }}
-      SUPABASE_TEST_USER_A_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_A_PASSWORD }}
-      SUPABASE_TEST_USER_B_EMAIL: ${{ secrets.SUPABASE_TEST_USER_B_EMAIL }}
-      SUPABASE_TEST_USER_B_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_B_PASSWORD }}
-      SUPABASE_TEST_USER_C_EMAIL: ${{ secrets.SUPABASE_TEST_USER_C_EMAIL }}
-      SUPABASE_TEST_USER_C_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_C_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -61,7 +53,7 @@ jobs:
         run: npm run build
 
   release-rls:
-    if: github.ref == 'refs/heads/release/v1-hardening' || github.base_ref == 'release/v1-hardening'
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -85,7 +77,7 @@ jobs:
         run: npm run test:rls
 
   release-e2e:
-    if: github.ref == 'refs/heads/release/v1-hardening' || github.base_ref == 'release/v1-hardening'
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
