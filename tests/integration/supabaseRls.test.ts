@@ -3,17 +3,20 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const testUrl = process.env.SUPABASE_TEST_URL
 const testAnonKey = process.env.SUPABASE_TEST_ANON_KEY
-const freeEmail = process.env.SUPABASE_TEST_USER_A_EMAIL
-const freePassword = process.env.SUPABASE_TEST_USER_A_PASSWORD
-const proEmail = process.env.SUPABASE_TEST_USER_B_EMAIL
-const proPassword = process.env.SUPABASE_TEST_USER_B_PASSWORD
-const premiumEmail = process.env.SUPABASE_TEST_USER_C_EMAIL
-const premiumPassword = process.env.SUPABASE_TEST_USER_C_PASSWORD
-const hasCredentials = Boolean(testUrl && testAnonKey && freeEmail && freePassword && proEmail && proPassword && premiumEmail && premiumPassword)
+const testServiceRoleKey = process.env.SUPABASE_TEST_SERVICE_ROLE_KEY
+let freeEmail = process.env.SUPABASE_TEST_USER_A_EMAIL
+let freePassword = process.env.SUPABASE_TEST_USER_A_PASSWORD
+let proEmail = process.env.SUPABASE_TEST_USER_B_EMAIL
+let proPassword = process.env.SUPABASE_TEST_USER_B_PASSWORD
+let premiumEmail = process.env.SUPABASE_TEST_USER_C_EMAIL
+let premiumPassword = process.env.SUPABASE_TEST_USER_C_PASSWORD
+const hasConfiguredUsers = Boolean(freeEmail && freePassword && proEmail && proPassword && premiumEmail && premiumPassword)
+const canProvisionUsers = Boolean(testUrl && testAnonKey && testServiceRoleKey)
+const hasTestEnvironment = Boolean(testUrl && testAnonKey && (hasConfiguredUsers || canProvisionUsers))
 const releaseRlsRequired = process.env.RELEASE_RLS_REQUIRED === 'true'
 
-if (releaseRlsRequired && !hasCredentials) {
-  throw new Error('Release RLS tests require the Supabase URL/key and dedicated FREE, PRO and PREMIUM test-user credentials.')
+if (releaseRlsRequired && !hasTestEnvironment) {
+  throw new Error('Release RLS tests require a Supabase URL/key plus either a Service Role key for ephemeral users or dedicated FREE, PRO and PREMIUM credentials.')
 }
 
 function client() {
@@ -44,7 +47,7 @@ async function requirePlan(instance: SupabaseClient, user: User, expectedPlan: '
   }
 }
 
-describe.skipIf(!hasCredentials)('Supabase RLS release matrix', () => {
+describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
   let free: SupabaseClient
   let pro: SupabaseClient
   let premium: SupabaseClient
@@ -61,8 +64,45 @@ describe.skipIf(!hasCredentials)('Supabase RLS release matrix', () => {
   let professionalTransactionId = ''
   let originalPlan: string | null = null
   let originalRole: string | null = null
+  let admin: SupabaseClient | null = null
+  const provisionedUserIds: string[] = []
 
   beforeAll(async () => {
+    if (!hasConfiguredUsers) {
+      admin = createClient(testUrl!, testServiceRoleKey!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+
+      const suffix = crypto.randomUUID()
+      const password = `Rls-${crypto.randomUUID()}-Aa1!`
+      freeEmail = `rls-free-${suffix}@example.test`
+      proEmail = `rls-pro-${suffix}@example.test`
+      premiumEmail = `rls-premium-${suffix}@example.test`
+      freePassword = password
+      proPassword = password
+      premiumPassword = password
+
+      const createdUsers: User[] = []
+      for (const email of [freeEmail, proEmail, premiumEmail]) {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        })
+        if (error) throw error
+        if (!data.user) throw new Error(`Supabase did not return the ephemeral user for ${email}.`)
+        createdUsers.push(data.user)
+        provisionedUserIds.push(data.user.id)
+      }
+
+      const periodEnd = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      const { error: subscriptionError } = await admin.from('subscriptions').insert([
+        { user_id: createdUsers[1].id, plan: 'pro', status: 'active', current_period_end: periodEnd },
+        { user_id: createdUsers[2].id, plan: 'premium', status: 'active', current_period_end: periodEnd },
+      ])
+      if (subscriptionError) throw subscriptionError
+    }
+
     free = client()
     pro = client()
     premium = client()
@@ -156,6 +196,9 @@ describe.skipIf(!hasCredentials)('Supabase RLS release matrix', () => {
     if (debtId) await pro.from('debts').delete().eq('id', debtId)
     if (transactionId) await pro.from('transactions').delete().eq('id', transactionId)
     await Promise.all([free.auth.signOut(), pro.auth.signOut(), premium.auth.signOut()])
+    if (admin) {
+      await Promise.all(provisionedUserIds.map((id) => admin!.auth.admin.deleteUser(id)))
+    }
   })
 
   it.each([
