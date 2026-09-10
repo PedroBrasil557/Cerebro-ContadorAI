@@ -60,6 +60,7 @@ export default function AppLoadingScreen({ isLoading }: AppLoadingScreenProps) {
     <AnimatePresence>
       {!isComplete && (
         <motion.div
+          data-testid="app-loading-screen"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, filter: "blur(15px)", scale: 1.02 }} // Saída cinematográfica
           transition={{ duration: 0.8, ease: "easeInOut" }}

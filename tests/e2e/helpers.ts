@@ -14,4 +14,5 @@ export async function login(page: Page) {
   await page.getByPlaceholder('••••••••').fill(e2ePassword!)
   await page.getByRole('button', { name: 'Desbloquear Cofre' }).click()
   await expect(page).toHaveURL(/\/$/, { timeout: 20_000 })
+  await page.getByTestId('app-loading-screen').waitFor({ state: 'detached', timeout: 20_000 })
 }

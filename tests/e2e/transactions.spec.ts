@@ -19,6 +19,7 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
   await page.getByText(description, { exact: true }).click()
   await page.getByRole('button', { name: 'Editar' }).click()
   await page.locator('input[name="description"]').fill(updatedDescription)
+  await page.getByPlaceholder('Ex: Digitei o valor errado...').fill('Correção validada pelo teste E2E')
   await page.getByRole('button', { name: 'Salvar' }).click()
   await expect(page.getByText(updatedDescription, { exact: true })).toBeVisible()
 

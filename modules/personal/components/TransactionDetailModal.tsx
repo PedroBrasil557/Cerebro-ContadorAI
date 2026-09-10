@@ -146,9 +146,9 @@ export default function TransactionDetailModal({
                       
                       {/* Descrição */}
                       <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Descrição</label>
+                        <label htmlFor="edit-transaction-description" className="text-xs font-bold text-gray-500 uppercase mb-1 block">Descrição</label>
                         <input
-                          type="text" required value={description}
+                          id="edit-transaction-description" name="description" type="text" required value={description}
                           onChange={(e) => setDescription(e.target.value)}
                           className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 focus:outline-none transition"
                         />

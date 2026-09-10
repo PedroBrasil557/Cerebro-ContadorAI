@@ -118,7 +118,7 @@ const TopBar = ({ user, profile, notifications, onMarkAsRead, onToggleMenu, onNa
          </div>
          
          <div className="relative" ref={menuRef}>
-            <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-white/5 transition-all group border border-white/5">
+            <button aria-label="Abrir menu do perfil" onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-white/5 transition-all group border border-white/5">
                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 p-[2px]">
                   <div className="h-full w-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                       {profile?.avatar_url ? (
