@@ -198,6 +198,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
             if (dbCaixaData) setCaixa(dbCaixaData)
 
         } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') return
             console.error("Erro crítico de sincronização:", error)
             toast.error("Não foi possível carregar todos os dados.")
         } finally {

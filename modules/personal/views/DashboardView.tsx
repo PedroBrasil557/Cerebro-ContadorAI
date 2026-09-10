@@ -242,7 +242,7 @@ export default function DashboardView({ summary: initialSummary, onNavigate, tra
            </div>
         </div>
         <div className="w-full h-[320px]">
-           <ResponsiveContainer width="100%" height="100%">
+           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 320 }}>
               {chartType === 'area' ? (
                   <AreaChart data={flowData}>
                     <defs>
