@@ -1,28 +1,52 @@
 'use client'
 
-import React, { useMemo, useState, useEffect, useRef } from 'react'
-import { 
-  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, 
-  Search, Wallet, Plus, X, Loader2,
-  ChevronLeft, ChevronRight, CheckCircle2, Download, Landmark, Lock, ChevronDown
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Landmark,
+  Loader2,
+  Lock,
+  Plus,
+  Search,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  X,
 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useRouter } from 'next/navigation' 
-import { getTransactions, createTransaction, updateTransaction, deleteTransaction, Transaction } from '@/core/action/transactions'
-import { financeService } from '@/services/financeService'
-import TransactionDetailModal from '@/modules/personal/components/TransactionDetailModal'
-import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
-import { toast } from 'sonner'
-import UpgradeModal from '@/core/components/UpgradeModal'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
+import {
+  createTransaction,
+  deleteTransaction,
+  getTransactions,
+  type Transaction,
+  updateTransaction,
+} from '@/core/action/transactions'
 import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
-import type { User } from '@supabase/supabase-js'
+import UpgradeModal from '@/core/components/UpgradeModal'
+import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
+import TransactionDetailModal from '@/modules/personal/components/TransactionDetailModal'
+import { financeService } from '@/services/financeService'
 import type { CreditCard as CreditCardRecord } from '@/types_db'
+import type { User } from '@supabase/supabase-js'
+import { toast } from 'sonner'
 
 interface TransactionsViewProps {
   user: User
 }
 
-interface FilterOption<T extends string> { id: T; label: string }
+interface FilterOption<T extends string> {
+  id: T
+  label: string
+}
+
 interface CustomFilterProps<T extends string> {
   label: string
   value: T
@@ -32,58 +56,6 @@ interface CustomFilterProps<T extends string> {
   onProClick?: () => void
 }
 
-// --- COMPONENTE: CUSTOM DROPDOWN (Design Elite) ---
-function CustomFilter<T extends string>({ label, value, options, onChange, isPro = false, onProClick }: CustomFilterProps<T>) {
-    const [isOpen, setIsOpen] = useState(false)
-    const containerRef = useRef<HTMLDivElement>(null)
-
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false)
-        }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [])
-
-    const activeOption = options.find((option) => option.id === value)
-
-    return (
-        <div className="relative" ref={containerRef}>
-            <button 
-                onClick={() => isPro ? onProClick?.() : setIsOpen(!isOpen)}
-                className={`flex items-center justify-between gap-3 bg-white/5 border border-white/5 px-4 py-3 rounded-xl min-w-[160px] transition-all hover:bg-white/10 group ${isOpen ? 'ring-2 ring-indigo-500/50' : ''}`}
-            >
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">
-                    {isPro ? `${label} (PRO)` : activeOption?.label || label}
-                </span>
-                {isPro ? <Lock size={12} className="text-indigo-500" /> : <ChevronDown size={14} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
-            </button>
-
-            <AnimatePresence>
-                {isOpen && !isPro && (
-                    <motion.div 
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }} 
-                        animate={{ opacity: 1, y: 0, scale: 1 }} 
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 md:left-0 mt-2 w-full min-w-[180px] bg-[#0f0f13] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden p-1 backdrop-blur-xl"
-                    >
-                        {options.map((opt) => (
-                            <button
-                                key={opt.id}
-                                onClick={() => { onChange(opt.id); setIsOpen(false); }}
-                                className={`w-full text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors rounded-xl ${value === opt.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    )
-}
-
-// --- NOVO COMPONENTE: CUSTOM SELECT PARA O MODAL (Sem visual nativo) ---
 interface CustomSelectProps {
   label: string
   value: string
@@ -92,53 +64,228 @@ interface CustomSelectProps {
   name: string
 }
 
-function CustomSelect({ label, value, options, onChange, name }: CustomSelectProps) {
+interface SummaryCardProps {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string
+  tone: 'balance' | 'income' | 'expense'
+  isNegative?: boolean
+}
+
+const CATEGORIES = {
+  income: ['Salário', 'Investimentos', 'Freelance', 'Presente', 'Outros'],
+  expense: ['Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros'],
+}
+
+const fieldClassName =
+  'min-h-11 w-full rounded-[11px] border border-white/[0.09] bg-[#111722] px-3.5 text-sm text-[#F4F6F8] outline-none transition-colors duration-150 placeholder:text-[#6F7887] hover:border-white/[0.14] focus:border-[#665CFF]/60 focus:ring-2 focus:ring-[#665CFF]/15 disabled:cursor-not-allowed disabled:opacity-60'
+
+function CustomFilter<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  isPro = false,
+  onProClick,
+}: CustomFilterProps<T>) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const menuId = useId()
+  const activeOption = options.find(option => option.id === value)
 
   useEffect(() => {
-    const clickOut = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false)
     }
-    document.addEventListener('mousedown', clickOut)
-    return () => document.removeEventListener('mousedown', clickOut)
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [])
 
+  const handleButtonClick = () => {
+    if (isPro) {
+      onProClick?.()
+      return
+    }
+    setIsOpen(open => !open)
+  }
+
   return (
-    <div className="space-y-1 relative" ref={containerRef}>
-      <label className="text-[10px] font-black text-gray-500 uppercase ml-1 tracking-widest">{label}</label>
-      <button 
+    <div className="relative min-w-0" ref={containerRef}>
+      <span className="mb-1.5 block text-xs font-medium text-[#A0A8B5]">{label}</span>
+      <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white/5 border border-white/10 rounded-xl p-3.5 text-white text-left text-sm flex justify-between items-center hover:bg-white/10 transition-all"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label={`${label}: ${isPro ? 'recurso PRO' : activeOption?.label || label}`}
+        onClick={handleButtonClick}
+        className="flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-[11px] border border-white/[0.09] bg-[#111722] px-3.5 text-sm font-medium text-[#F4F6F8] outline-none transition-colors duration-150 hover:border-white/[0.15] hover:bg-[#151C29] focus-visible:ring-2 focus-visible:ring-[#665CFF]/50"
       >
-        {value || "Selecione..."}
-        <ChevronDown size={14} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="truncate">{isPro ? `${label} (PRO)` : activeOption?.label || label}</span>
+        {isPro ? (
+          <Lock aria-hidden="true" className="h-4 w-4 shrink-0 text-[#8B84FF]" />
+        ) : (
+          <ChevronDown
+            aria-hidden="true"
+            className={`h-4 w-4 shrink-0 text-[#A0A8B5] transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+          />
+        )}
       </button>
-      <input type="hidden" name={name} value={value} />
-      
+
       <AnimatePresence>
-        {isOpen && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute z-[70] w-full mt-2 bg-[#16161a] border border-white/10 rounded-2xl shadow-2xl p-1 max-h-48 overflow-y-auto custom-scrollbar">
-            {options.map((opt: string) => (
-              <button key={opt} type="button" onClick={() => { onChange(opt); setIsOpen(false); }} className={`w-full text-left px-4 py-3 text-xs font-bold uppercase rounded-xl transition-colors ${value === opt ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-white/5'}`}>
-                {opt}
+        {isOpen && !isPro ? (
+          <motion.div
+            id={menuId}
+            role="listbox"
+            aria-label={label}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 top-full z-50 mt-2 w-full min-w-[168px] overflow-hidden rounded-[12px] border border-white/[0.1] bg-[#111722] p-1 shadow-xl shadow-black/30"
+          >
+            {options.map(option => (
+              <button
+                key={option.id}
+                type="button"
+                role="option"
+                aria-selected={value === option.id}
+                onClick={() => {
+                  onChange(option.id)
+                  setIsOpen(false)
+                }}
+                className={`min-h-10 w-full rounded-[9px] px-3 text-left text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#665CFF]/50 ${value === option.id ? 'bg-[#665CFF]/12 text-white' : 'text-[#A0A8B5] hover:bg-white/[0.05] hover:text-white'}`}
+              >
+                {option.label}
               </button>
             ))}
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   )
 }
 
-const CATEGORIES = {
-  income: ['Salário', 'Investimentos', 'Freelance', 'Presente', 'Outros'],
-  expense: ['Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros']
+function CustomSelect({ label, value, options, onChange, name }: CustomSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const menuId = useId()
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false)
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [])
+
+  return (
+    <div className="relative space-y-1.5" ref={containerRef}>
+      <label className="block text-xs font-medium text-[#A0A8B5]">{label}</label>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label={`${label}: ${value || 'Selecione'}`}
+        onClick={() => setIsOpen(open => !open)}
+        className={`${fieldClassName} flex items-center justify-between gap-3 text-left`}
+      >
+        <span className="truncate">{value || 'Selecione...'}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className={`h-4 w-4 shrink-0 text-[#A0A8B5] transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <input type="hidden" name={name} value={value} />
+
+      <AnimatePresence>
+        {isOpen ? (
+          <motion.div
+            id={menuId}
+            role="listbox"
+            aria-label={label}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-[70] mt-2 max-h-48 w-full overflow-y-auto rounded-[12px] border border-white/[0.1] bg-[#111722] p-1 shadow-xl shadow-black/30 custom-scrollbar"
+          >
+            {options.map(option => (
+              <button
+                key={option}
+                type="button"
+                role="option"
+                aria-selected={value === option}
+                onClick={() => {
+                  onChange(option)
+                  setIsOpen(false)
+                }}
+                className={`min-h-10 w-full rounded-[9px] px-3 text-left text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#665CFF]/50 ${value === option ? 'bg-[#665CFF]/12 text-white' : 'text-[#A0A8B5] hover:bg-white/[0.05] hover:text-white'}`}
+              >
+                {option}
+              </button>
+            ))}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  )
 }
 
-// --- MODAL NOVA TRANSAÇÃO ---
-function NewTransactionModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; onClose: () => void; onSuccess: () => void }) {
+function SummaryCard({ icon: Icon, label, value, tone, isNegative = false }: SummaryCardProps) {
+  const palette = {
+    balance: {
+      icon: 'bg-[#4F8CFF]/12 text-[#69A0FF]',
+      border: 'border-[#4F8CFF]/20',
+      value: isNegative ? 'text-[#FF5876]' : 'text-[#F4F6F8]',
+    },
+    income: {
+      icon: 'bg-[#28D7A1]/10 text-[#28D7A1]',
+      border: 'border-[#28D7A1]/18',
+      value: 'text-[#28D7A1]',
+    },
+    expense: {
+      icon: 'bg-[#FF5876]/10 text-[#FF5876]',
+      border: 'border-[#FF5876]/18',
+      value: 'text-[#FF5876]',
+    },
+  }[tone]
+
+  return (
+    <article className={`flex h-[108px] items-center gap-4 rounded-[16px] border bg-[#0D1118] p-5 ${palette.border}`}>
+      <span aria-hidden="true" className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] ${palette.icon}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium text-[#A0A8B5]">{label}</p>
+        <p className={`mt-1 truncate text-[24px] font-bold tracking-[-0.02em] tabular-nums ${palette.value}`}>{value}</p>
+      </div>
+    </article>
+  )
+}
+
+function NewTransactionModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}) {
   const [loading, setLoading] = useState(false)
   const [type, setType] = useState<'receita' | 'despesa_variavel'>('despesa_variavel')
   const [category, setCategory] = useState('Alimentação')
@@ -147,13 +294,25 @@ function NewTransactionModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; 
 
   useEffect(() => {
     async function fetchCards() {
-      const dbCards = await financeService.getCards()
-      setUserCards(dbCards || [])
+      const databaseCards = await financeService.getCards()
+      setUserCards(databaseCards || [])
     }
-    if (isOpen) fetchCards()
+    if (isOpen) void fetchCards()
   }, [isOpen])
 
-  const paymentOptions = useMemo(() => ["Dinheiro / Pix", ...userCards.map(c => c.name)], [userCards])
+  useEffect(() => {
+    if (!isOpen) return
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onClose])
+
+  const paymentOptions = useMemo(
+    () => ['Dinheiro / Pix', ...userCards.map(card => card.name)],
+    [userCards],
+  )
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -162,68 +321,139 @@ function NewTransactionModal({ isOpen, onClose, onSuccess }: { isOpen: boolean; 
     formData.set('type', type)
     const isFixed = (event.currentTarget.elements.namedItem('is_fixed') as HTMLInputElement).checked
     formData.set('is_fixed', isFixed ? 'true' : 'false')
-    
+
     const result = await createTransaction(formData)
     setLoading(false)
-    if (result.success) { toast.success("Sincronizado!"); onSuccess(); onClose() } 
-    else { toast.error("Falha: " + result.error) }
+    if (result.success) {
+      toast.success('Sincronizado!')
+      onSuccess()
+      onClose()
+    } else {
+      toast.error(`Falha: ${result.error}`)
+    }
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-      <motion.div role="dialog" aria-modal="true" aria-labelledby="new-transaction-title" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-lg bg-[#09090b] border border-white/10 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
-        <div className={`h-28 w-full flex items-center justify-center relative ${type === 'receita' ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
-             <button aria-label="Fechar nova transação" onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-white/5 rounded-full text-gray-500 hover:text-white transition"><X size={20} /></button>
-             <h3 id="new-transaction-title" className={`text-sm font-black uppercase tracking-[0.3em] ${type === 'receita' ? 'text-emerald-500' : 'text-rose-500'}`}>Registrar Fluxo</h3>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          <div className="grid grid-cols-2 gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/5">
-             <button type="button" onClick={() => { setType('despesa_variavel'); setCategory('Alimentação'); }} className={`py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${type !== 'receita' ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20' : 'text-gray-500 hover:text-gray-300'}`}><ArrowDownLeft size={14} /> Despesa</button>
-             <button type="button" onClick={() => { setType('receita'); setCategory('Salário'); }} className={`py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'receita' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-gray-500 hover:text-gray-300'}`}><ArrowUpRight size={14} /> Receita</button>
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[3px]"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-transaction-title"
+        aria-describedby="new-transaction-description"
+        initial={{ opacity: 0, scale: 0.98, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: 8 }}
+        transition={{ duration: 0.18 }}
+        className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[16px] border border-white/[0.09] bg-[#0D1118] shadow-2xl shadow-black/40 custom-scrollbar"
+      >
+        <header className="flex items-start justify-between border-b border-white/[0.075] px-5 py-4 sm:px-6">
+          <div>
+            <h2 id="new-transaction-title" className="text-lg font-semibold text-[#F4F6F8]">Nova transação</h2>
+            <p id="new-transaction-description" className="mt-1 text-sm text-[#A0A8B5]">
+              Registre uma receita ou despesa no seu fluxo.
+            </p>
           </div>
-
-          <div className="grid grid-cols-2 gap-6">
-             <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase ml-1 tracking-widest">Montante</label><input name="amount" required type="number" step="0.01" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-lg font-black focus:border-indigo-500/50 outline-none" /></div>
-             <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase ml-1 tracking-widest">Identificação</label><input name="description" required type="text" placeholder="Ex: Aluguel" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm focus:border-indigo-500/50 outline-none" /></div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-             <CustomSelect label="Categoria" value={category} options={CATEGORIES[type === 'receita' ? 'income' : 'expense']} onChange={setCategory} name="category" />
-             <CustomSelect label="Forma / Cartão" value={paymentMethod} options={paymentOptions} onChange={setPaymentMethod} name="payment_method" />
-          </div>
-
-          <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase ml-1 tracking-widest">Data Efetiva</label><input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm outline-none [color-scheme:dark]" /></div>
-
-          <div className="flex items-center gap-4 p-5 rounded-2xl bg-white/[0.02] border border-white/5 group cursor-pointer">
-             <input type="checkbox" name="is_fixed" id="is_fixed" className="peer hidden" />
-             <div onClick={() => { const el = document.getElementById('is_fixed') as HTMLInputElement; el.checked = !el.checked; }} className="h-6 w-6 rounded-lg border-2 border-white/10 peer-checked:bg-indigo-600 peer-checked:border-indigo-600 flex items-center justify-center transition-all"><CheckCircle2 size={14} className="text-white" /></div>
-             <label htmlFor="is_fixed" className="flex-1 cursor-pointer select-none text-[10px] font-black text-gray-500 uppercase tracking-[0.1em] group-hover:text-gray-300">Fixar no cronograma mensal</label>
-          </div>
-
-          <button disabled={loading} type="submit" className="w-full bg-white text-black font-black uppercase tracking-[0.2em] text-xs py-5 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 disabled:opacity-50">
-            {loading ? <Loader2 className="animate-spin" size={18} /> : <><CheckCircle2 size={18} /> Processar Agora</>}
+          <button
+            type="button"
+            aria-label="Fechar nova transação"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus-visible:ring-2 focus-visible:ring-[#665CFF]/50"
+          >
+            <X aria-hidden="true" className="h-5 w-5" />
           </button>
+        </header>
+
+        <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
+          <fieldset>
+            <legend className="mb-2 text-xs font-medium text-[#A0A8B5]">Tipo da transação</legend>
+            <div className="grid grid-cols-2 rounded-[12px] border border-white/[0.075] bg-[#080B11] p-1">
+              <button
+                type="button"
+                aria-pressed={type !== 'receita'}
+                onClick={() => {
+                  setType('despesa_variavel')
+                  setCategory('Alimentação')
+                }}
+                className={`flex min-h-10 items-center justify-center gap-2 rounded-[9px] text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#FF5876]/50 ${type !== 'receita' ? 'bg-[#FF5876]/12 text-[#FF7890]' : 'text-[#A0A8B5] hover:text-white'}`}
+              >
+                <ArrowDownLeft aria-hidden="true" className="h-4 w-4" />
+                Despesa
+              </button>
+              <button
+                type="button"
+                aria-pressed={type === 'receita'}
+                onClick={() => {
+                  setType('receita')
+                  setCategory('Salário')
+                }}
+                className={`flex min-h-10 items-center justify-center gap-2 rounded-[9px] text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#28D7A1]/50 ${type === 'receita' ? 'bg-[#28D7A1]/10 text-[#28D7A1]' : 'text-[#A0A8B5] hover:text-white'}`}
+              >
+                <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+                Receita
+              </button>
+            </div>
+          </fieldset>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="new-transaction-amount" className="block text-xs font-medium text-[#A0A8B5]">Valor</label>
+              <input id="new-transaction-amount" name="amount" required type="number" step="0.01" placeholder="0,00" className={`${fieldClassName} text-base font-semibold tabular-nums`} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="new-transaction-description-field" className="block text-xs font-medium text-[#A0A8B5]">Descrição</label>
+              <input id="new-transaction-description-field" name="description" required type="text" placeholder="Ex.: Aluguel" className={fieldClassName} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CustomSelect label="Categoria" value={category} options={CATEGORIES[type === 'receita' ? 'income' : 'expense']} onChange={setCategory} name="category" />
+            <CustomSelect label="Forma / Cartão" value={paymentMethod} options={paymentOptions} onChange={setPaymentMethod} name="payment_method" />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="new-transaction-date" className="block text-xs font-medium text-[#A0A8B5]">Data</label>
+            <input id="new-transaction-date" name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className={`${fieldClassName} [color-scheme:dark]`} />
+          </div>
+
+          <label htmlFor="is_fixed" className="flex min-h-14 cursor-pointer items-center gap-3 rounded-[12px] border border-white/[0.075] bg-[#080B11] px-4 transition-colors duration-150 hover:border-white/[0.13]">
+            <input id="is_fixed" name="is_fixed" type="checkbox" className="peer sr-only" />
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-white/[0.18] text-transparent transition-colors peer-checked:border-[#665CFF] peer-checked:bg-[#665CFF] peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-[#665CFF]/50">
+              <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-sm font-medium text-[#A0A8B5]">Adicionar ao cronograma mensal</span>
+          </label>
+
+          <div className="flex justify-end gap-3 border-t border-white/[0.075] pt-5">
+            <button type="button" onClick={onClose} disabled={loading} className="min-h-11 rounded-[10px] border border-white/[0.09] px-4 text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:bg-white/[0.05] hover:text-white disabled:opacity-50">
+              Cancelar
+            </button>
+            <button disabled={loading} type="submit" className="flex min-h-11 min-w-[154px] items-center justify-center gap-2 rounded-[10px] bg-[#665CFF] px-5 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#756CFF] focus-visible:ring-2 focus-visible:ring-[#8B84FF]/60 disabled:cursor-not-allowed disabled:opacity-50">
+              {loading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <CheckCircle2 aria-hidden="true" className="h-4 w-4" />}
+              {loading ? 'Salvando...' : 'Salvar transação'}
+            </button>
+          </div>
         </form>
       </motion.div>
     </div>
   )
 }
 
-// --- TRANSACTIONS VIEW ---
 export default function TransactionsView({ user }: TransactionsViewProps) {
-  const router = useRouter() 
+  const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  
   const [filterType, setFilterType] = useState<'all' | 'receita' | 'despesa'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'pago' | 'pendente'>('all')
   const [searchTerm, setSearchTerm] = useState('')
-
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -231,192 +461,272 @@ export default function TransactionsView({ user }: TransactionsViewProps) {
 
   const userPlan = user?.user_metadata?.plan_tier || 'free'
   const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
-
-  const loadData = async () => {
-    const data = await getTransactions()
-    setTransactions(data); setLoadingData(false)
-  }
-  useEffect(() => { loadData() }, [])
-
-  const handleSuccessAction = async () => { await loadData(); router.refresh() }
-  const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
-  const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
-  
   const currentMonthLabel = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
   const currentMonthStr = currentDate.toISOString().slice(0, 7)
 
-  const filteredData = useMemo(() => {
-    const safe = Array.isArray(transactions) ? transactions : []
-    return safe.filter(t => {
-      if (!t.date.startsWith(currentMonthStr)) return false
-      const matchesType = filterType === 'all' ? true : filterType === 'receita' ? t.type === 'receita' : (t.type !== 'receita')
-      const matchesStatus = filterStatus === 'all' ? true : filterStatus === 'pago' ? t.is_paid : !t.is_paid
-      const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = searchTerm === '' || t.description.toLowerCase().includes(searchLower) || t.category.toLowerCase().includes(searchLower)
-      return matchesType && matchesStatus && matchesSearch
-    })
-  }, [transactions, filterType, filterStatus, searchTerm, currentMonthStr])
+  const loadData = async () => {
+    const data = await getTransactions()
+    setTransactions(data)
+    setLoadingData(false)
+  }
 
-  const totals = useMemo(() => {
-      const monthData = transactions.filter(t => t.date.startsWith(currentMonthStr))
-      return {
-        income: calculateIncome(monthData),
-        expense: calculateExpenses(monthData),
-        balance: calculateBalance(monthData),
-      }
+  useEffect(() => {
+    void loadData()
+  }, [])
+
+  const monthTransactions = useMemo(() => {
+    const safeTransactions = Array.isArray(transactions) ? transactions : []
+    return safeTransactions.filter(transaction => transaction.date.startsWith(currentMonthStr))
   }, [transactions, currentMonthStr])
 
-  const format = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+  const filteredData = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLocaleLowerCase('pt-BR')
+    return monthTransactions.filter(transaction => {
+      const matchesType =
+        filterType === 'all'
+          ? true
+          : filterType === 'receita'
+            ? transaction.type === 'receita'
+            : transaction.type !== 'receita'
+      const matchesStatus =
+        filterStatus === 'all' ? true : filterStatus === 'pago' ? transaction.is_paid : !transaction.is_paid
+      const matchesSearch =
+        normalizedSearch === '' ||
+        transaction.description.toLocaleLowerCase('pt-BR').includes(normalizedSearch) ||
+        transaction.category.toLocaleLowerCase('pt-BR').includes(normalizedSearch)
+      return matchesType && matchesStatus && matchesSearch
+    })
+  }, [monthTransactions, filterType, filterStatus, searchTerm])
+
+  const totals = useMemo(
+    () => ({
+      income: calculateIncome(monthTransactions),
+      expense: calculateExpenses(monthTransactions),
+      balance: calculateBalance(monthTransactions),
+    }),
+    [monthTransactions],
+  )
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+
+  const handleSuccessAction = async () => {
+    await loadData()
+    router.refresh()
+  }
+
+  const handlePrevMonth = () =>
+    setCurrentDate(date => new Date(date.getFullYear(), date.getMonth() - 1, 1))
+
+  const handleNextMonth = () =>
+    setCurrentDate(date => new Date(date.getFullYear(), date.getMonth() + 1, 1))
 
   const generatePDF = async () => {
-    if (isFreePlan) { setShowUpgradeModal(true); return }
+    if (isFreePlan) {
+      setShowUpgradeModal(true)
+      return
+    }
     const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
       import('jspdf'),
       import('jspdf-autotable'),
     ])
     const doc = new jsPDF()
-    doc.setFillColor(10, 10, 15); doc.rect(0, 0, 210, 45, 'F')
-    doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(24); doc.text("CÉREBRO.OS", 15, 25)
-    doc.setFillColor(30, 30, 40); doc.roundedRect(140, 10, 55, 25, 3, 3, 'F')
-    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text(format(totals.balance), 145, 28)
-    const rows = filteredData.map(t => [new Date(t.date).toLocaleDateString('pt-BR'), t.description.toUpperCase(), t.category, t.payment_method || 'CONTA', t.is_paid ? 'OK' : 'PEND', format(t.amount)])
-    autoTable(doc, { head: [['DATA', 'DESCRIÇÃO', 'CATEGORIA', 'CONTA', 'STATUS', 'VALOR']], body: rows, startY: 55, headStyles: { fillColor: [79, 70, 229] } })
+    doc.setFillColor(10, 10, 15)
+    doc.rect(0, 0, 210, 45, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(24)
+    doc.text('CÉREBRO.OS', 15, 25)
+    doc.setFillColor(30, 30, 40)
+    doc.roundedRect(140, 10, 55, 25, 3, 3, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(14)
+    doc.text(formatCurrency(totals.balance), 145, 28)
+    const rows = filteredData.map(transaction => [
+      new Date(transaction.date).toLocaleDateString('pt-BR'),
+      transaction.description.toUpperCase(),
+      transaction.category,
+      transaction.payment_method || 'CONTA',
+      transaction.is_paid ? 'OK' : 'PEND',
+      formatCurrency(transaction.amount),
+    ])
+    autoTable(doc, {
+      head: [['DATA', 'DESCRIÇÃO', 'CATEGORIA', 'CONTA', 'STATUS', 'VALOR']],
+      body: rows,
+      startY: 55,
+      headStyles: { fillColor: [79, 70, 229] },
+    })
     doc.save(`Extrato_${currentMonthStr}.pdf`)
   }
 
-  const handleTransactionClick = (t: Transaction) => { setSelectedTransaction(t); setIsEditModalOpen(true) }
-  const handleUpdate = async (tx: Transaction, reason: string) => { setLoadingAction(true); await updateTransaction(tx, reason); await handleSuccessAction(); setLoadingAction(false); setIsEditModalOpen(false) }
-  const handleDelete = async (id: string) => { setLoadingAction(true); await deleteTransaction(id); await handleSuccessAction(); setLoadingAction(false); setIsEditModalOpen(false) }
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction)
+    setIsEditModalOpen(true)
+  }
 
-  if (loadingData) return <div className="min-h-screen bg-[#09090b] flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={32} /></div>
+  const handleUpdate = async (transaction: Transaction, reason: string) => {
+    setLoadingAction(true)
+    await updateTransaction(transaction, reason)
+    await handleSuccessAction()
+    setLoadingAction(false)
+    setIsEditModalOpen(false)
+  }
+
+  const handleDelete = async (id: string) => {
+    setLoadingAction(true)
+    await deleteTransaction(id)
+    await handleSuccessAction()
+    setLoadingAction(false)
+    setIsEditModalOpen(false)
+  }
+
+  if (loadingData) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center bg-[#07090D] text-[#A0A8B5]">
+        <Loader2 aria-label="Carregando transações" className="h-7 w-7 animate-spin text-[#4F8CFF]" />
+      </div>
+    )
+  }
+
+  const hasActiveFilters = searchTerm.trim() !== '' || filterType !== 'all' || filterStatus !== 'all'
 
   return (
-    <div className="min-h-screen bg-[#09090b]">
-        <div className="space-y-6 px-4 py-6 md:px-8 pb-32 animate-in fade-in duration-500 max-w-7xl mx-auto">
-            
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic">Transações</h2>
-                    <div className="flex items-center gap-4 mt-2 bg-white/5 w-fit px-3 py-1.5 rounded-2xl border border-white/5">
-                        <button aria-label="Mês anterior" onClick={handlePrevMonth} className="p-1 text-gray-400 hover:text-white transition"><ChevronLeft size={18}/></button>
-                        <span className="text-xs font-black text-indigo-400 uppercase tracking-widest min-w-[140px] text-center select-none">{currentMonthLabel}</span>
-                        <button aria-label="Próximo mês" onClick={handleNextMonth} className="p-1 text-gray-400 hover:text-white transition"><ChevronRight size={18}/></button>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={generatePDF} className="flex items-center gap-2 bg-white/5 text-gray-300 px-5 py-3 rounded-xl font-bold hover:bg-white/10 transition border border-white/10 text-[10px] uppercase tracking-widest group">
-                        {isFreePlan ? <Lock size={14} className="text-indigo-500" /> : <Download size={14} />} 
-                        {isFreePlan ? 'Relatório PRO' : 'Exportar PDF'}
+    <div className="-m-4 min-h-[calc(100vh-6rem)] bg-[#07090D] p-4 pb-32 text-[#F4F6F8] md:-m-8 md:p-8 md:pb-32">
+      <div className="mx-auto w-full max-w-[1480px] space-y-4">
+        <header className="flex min-h-[68px] flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <h1 className="text-[26px] font-bold tracking-[-0.03em] text-white">Transações</h1>
+            <p className="mt-1 text-sm text-[#A0A8B5]">Acompanhe, filtre e organize seu fluxo financeiro.</p>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-[auto_auto_1fr] xl:flex xl:items-center">
+            <div className="flex min-h-11 items-center overflow-hidden rounded-[11px] border border-white/[0.09] bg-[#0D1118] sm:col-span-1">
+              <button type="button" aria-label="Mês anterior" onClick={handlePrevMonth} className="flex h-11 w-11 items-center justify-center text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.05] hover:text-white focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#665CFF]/50">
+                <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+              </button>
+              <span className="min-w-[150px] border-x border-white/[0.075] px-3 text-center text-sm font-medium capitalize text-[#F4F6F8] sm:min-w-[176px]">{currentMonthLabel}</span>
+              <button type="button" aria-label="Próximo mês" onClick={handleNextMonth} className="flex h-11 w-11 items-center justify-center text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.05] hover:text-white focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#665CFF]/50">
+                <ChevronRight aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </div>
+            <button type="button" onClick={generatePDF} className="flex min-h-11 items-center justify-center gap-2 rounded-[11px] border border-white/[0.1] bg-[#111722] px-4 text-sm font-medium text-[#F4F6F8] outline-none transition-colors duration-150 hover:border-white/[0.16] hover:bg-[#151C29] focus-visible:ring-2 focus-visible:ring-[#665CFF]/50">
+              {isFreePlan ? <Lock aria-hidden="true" className="h-4 w-4 text-[#8B84FF]" /> : <Download aria-hidden="true" className="h-4 w-4" />}
+              {isFreePlan ? 'Relatório PRO' : 'Exportar PDF'}
+            </button>
+            <button type="button" onClick={() => setIsCreateModalOpen(true)} className="flex min-h-11 items-center justify-center gap-2 rounded-[11px] bg-[#665CFF] px-5 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#756CFF] focus-visible:ring-2 focus-visible:ring-[#8B84FF]/60">
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Nova transação
+            </button>
+          </div>
+        </header>
+
+        <section aria-label="Resumo financeiro" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>article:last-child]:sm:col-span-2 [&>article:last-child]:xl:col-span-1">
+          <SummaryCard icon={Wallet} label="Saldo projetado" value={formatCurrency(totals.balance)} tone="balance" isNegative={totals.balance < 0} />
+          <SummaryCard icon={TrendingUp} label="Entradas" value={formatCurrency(totals.income)} tone="income" />
+          <SummaryCard icon={TrendingDown} label="Saídas" value={formatCurrency(Math.abs(totals.expense))} tone="expense" />
+        </section>
+
+        <FixedExpensesList transactions={transactions} currentDate={currentDate} />
+
+        <section aria-label="Filtros de transações" className="grid gap-3 rounded-[16px] border border-white/[0.075] bg-[#0D1118] p-3 md:grid-cols-2 lg:grid-cols-[minmax(280px,1fr)_180px_180px] lg:items-end">
+          <div className="relative md:col-span-2 lg:col-span-1">
+            <label htmlFor="transaction-search" className="mb-1.5 block text-xs font-medium text-[#A0A8B5]">Buscar</label>
+            <Search aria-hidden="true" className="absolute bottom-3.5 left-3.5 h-4 w-4 text-[#A0A8B5]" />
+            <input id="transaction-search" type="search" placeholder="Buscar por descrição ou categoria" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} className={`${fieldClassName} pl-10`} />
+          </div>
+          <CustomFilter label="Tipo" value={filterType} options={[{ id: 'all', label: 'Todas' }, { id: 'receita', label: 'Receitas' }, { id: 'despesa', label: 'Despesas' }]} onChange={setFilterType} />
+          <CustomFilter label="Status" value={filterStatus} isPro={isFreePlan} onProClick={() => setShowUpgradeModal(true)} options={[{ id: 'all', label: 'Todos' }, { id: 'pago', label: 'Pagos' }, { id: 'pendente', label: 'Pendentes' }]} onChange={setFilterStatus} />
+        </section>
+
+        <section aria-labelledby="transactions-list-title" className="overflow-hidden rounded-[16px] border border-white/[0.075] bg-[#0D1118]">
+          <header className="flex min-h-16 items-center justify-between gap-4 border-b border-white/[0.075] px-4 sm:px-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#665CFF]/10 text-[#8B84FF]">
+                <CalendarDays aria-hidden="true" className="h-[18px] w-[18px]" />
+              </span>
+              <div>
+                <h2 id="transactions-list-title" className="text-base font-semibold">Movimentações do mês</h2>
+                <p className="mt-0.5 text-xs text-[#A0A8B5]">{filteredData.length} {filteredData.length === 1 ? 'transação' : 'transações'}</p>
+              </div>
+            </div>
+          </header>
+
+          {filteredData.length === 0 ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center px-5 text-center">
+              <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-white/[0.04] text-[#A0A8B5]">
+                <CalendarDays aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <h3 className="mt-4 text-sm font-semibold text-[#F4F6F8]">
+                {monthTransactions.length === 0 ? 'Sem transações neste mês' : 'Nenhuma transação encontrada'}
+              </h3>
+              <p className="mt-1 max-w-sm text-sm text-[#A0A8B5]">
+                {monthTransactions.length === 0
+                  ? 'Adicione uma nova transação para começar a acompanhar seu fluxo.'
+                  : 'Tente ajustar os filtros.'}
+              </p>
+              {monthTransactions.length === 0 ? (
+                <button type="button" onClick={() => setIsCreateModalOpen(true)} className="mt-5 min-h-10 rounded-[10px] border border-white/[0.1] bg-[#111722] px-4 text-sm font-medium transition-colors duration-150 hover:bg-[#151C29]">
+                  Nova transação
+                </button>
+              ) : null}
+              {hasActiveFilters ? <span className="sr-only">Existem filtros ativos.</span> : null}
+            </div>
+          ) : (
+            <>
+              <div aria-hidden="true" className="hidden min-h-11 grid-cols-[minmax(180px,1.45fr)_minmax(120px,0.9fr)_minmax(140px,1fr)_110px_105px_minmax(120px,0.8fr)] items-center gap-4 border-b border-white/[0.06] bg-[#080B11]/55 px-5 text-[11px] font-medium text-[#A0A8B5] xl:grid">
+                <span>Descrição</span><span>Categoria</span><span>Conta / forma</span><span>Data</span><span>Status</span><span className="text-right">Valor</span>
+              </div>
+              <div className="divide-y divide-white/[0.06]">
+                {filteredData.map(transaction => {
+                  const isIncome = transaction.type === 'receita'
+                  const formattedDate = new Date(transaction.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+                  return (
+                    <button
+                      key={transaction.id}
+                      type="button"
+                      onClick={() => handleTransactionClick(transaction)}
+                      aria-label={`Abrir detalhes de ${transaction.description}, ${formatCurrency(Math.abs(Number(transaction.amount)))}`}
+                      className="group block min-h-[84px] w-full px-4 py-4 text-left outline-none transition-colors duration-150 hover:bg-white/[0.025] focus-visible:bg-[#665CFF]/[0.06] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#665CFF]/45 xl:grid xl:min-h-[64px] xl:grid-cols-[minmax(180px,1.45fr)_minmax(120px,0.9fr)_minmax(140px,1fr)_110px_105px_minmax(120px,0.8fr)] xl:items-center xl:gap-4 xl:px-5 xl:py-0"
+                    >
+                      <span className="flex min-w-0 items-center justify-between gap-3 overflow-hidden xl:block">
+                        <span className="min-w-0 truncate text-sm font-semibold text-[#F4F6F8]">{transaction.description}</span>
+                        <span className={`shrink-0 text-sm font-semibold tabular-nums xl:hidden ${isIncome ? 'text-[#28D7A1]' : 'text-[#FF5876]'}`}>
+                          {isIncome ? '+' : '−'} {formatCurrency(Math.abs(Number(transaction.amount)))}
+                        </span>
+                      </span>
+                      <span className="mt-1 block min-w-0 truncate text-xs text-[#A0A8B5] xl:mt-0 xl:text-sm">{transaction.category}</span>
+                      <span className="mt-2 flex min-w-0 items-center gap-1.5 truncate text-xs text-[#A0A8B5] xl:mt-0 xl:text-sm">
+                        <Landmark aria-hidden="true" className="h-3.5 w-3.5 shrink-0 xl:hidden" />
+                        {transaction.payment_method || 'Conta'}
+                      </span>
+                      <span className="mt-1 block text-xs tabular-nums text-[#A0A8B5] xl:mt-0 xl:text-sm">{formattedDate}</span>
+                      <span className={`mt-2 inline-flex min-h-6 w-fit items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium xl:mt-0 ${transaction.is_paid ? 'border-[#28D7A1]/20 bg-[#28D7A1]/8 text-[#28D7A1]' : 'border-[#F5B942]/20 bg-[#F5B942]/8 text-[#F5B942]'}`}>
+                        <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${transaction.is_paid ? 'bg-[#28D7A1]' : 'bg-[#F5B942]'}`} />
+                        {transaction.is_paid ? 'Pago' : 'Pendente'}
+                      </span>
+                      <span className={`hidden text-right text-sm font-semibold tabular-nums xl:block ${isIncome ? 'text-[#28D7A1]' : 'text-[#FF5876]'}`}>
+                        {isIncome ? '+' : '−'} {formatCurrency(Math.abs(Number(transaction.amount)))}
+                      </span>
                     </button>
-                    <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-xl font-black hover:bg-gray-200 transition shadow-lg text-[10px] uppercase tracking-widest">
-                        <Plus size={16} /> Nova
-                    </button>
-                </div>
-            </header>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
 
-            <FixedExpensesList transactions={transactions} currentDate={currentDate} />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-[#0a0a0c] border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group">
-                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1 relative z-10">Projeção Saldo</p>
-                    <h3 className={`text-2xl font-black relative z-10 ${totals.balance >= 0 ? 'text-white' : 'text-rose-400'}`}>{format(totals.balance)}</h3>
-                    <Wallet className="absolute -right-2 -bottom-2 text-white/5 h-20 w-20 transition-transform group-hover:scale-110" />
-                </div>
-                <div className="bg-[#0a0a0c] border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group">
-                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1 relative z-10">Entradas</p>
-                    <h3 className="text-2xl font-black text-emerald-400 relative z-10">{format(totals.income)}</h3>
-                    <TrendingUp className="absolute -right-2 -bottom-2 text-emerald-500/5 h-20 w-20 transition-transform group-hover:scale-110" />
-                </div>
-                <div className="bg-[#0a0a0c] border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group">
-                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1 relative z-10">Saídas</p>
-                    <h3 className="text-2xl font-black text-rose-400 relative z-10">{format(Math.abs(totals.expense))}</h3>
-                    <TrendingDown className="absolute -right-2 -bottom-2 text-rose-500/5 h-20 w-20 transition-transform group-hover:scale-110" />
-                </div>
-            </div>
-
-            <div className="bg-[#0f0f11] border border-white/5 p-3 rounded-2xl flex flex-col md:flex-row gap-3 items-center sticky top-4 z-20 shadow-2xl backdrop-blur-xl">
-                 <div className="relative w-full md:flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 h-4 w-4" />
-                    <input type="text" placeholder="Filtrar por descrição..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-white/5 border border-transparent rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:border-indigo-500/30 outline-none transition-all" />
-                </div>
-                
-                <div className="flex w-full md:w-auto gap-2">
-                    <CustomFilter 
-                        label="Operações" 
-                        value={filterType} 
-                        options={[
-                            { id: 'all', label: 'Todas' },
-                            { id: 'receita', label: 'Receitas' },
-                            { id: 'despesa', label: 'Despesas' },
-                        ]} 
-                        onChange={setFilterType} 
-                    />
-
-                    <CustomFilter 
-                        label="Status" 
-                        value={filterStatus} 
-                        isPro={isFreePlan}
-                        onProClick={() => setShowUpgradeModal(true)}
-                        options={[
-                            { id: 'all', label: 'Tudo' },
-                            { id: 'pago', label: 'Liquidado' },
-                            { id: 'pendente', label: 'Em Aberto' },
-                        ]} 
-                        onChange={setFilterStatus} 
-                    />
-                </div>
-            </div>
-
-            <div className="space-y-2">
-                {filteredData.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-gray-700 border border-dashed border-white/5 rounded-[2rem] bg-white/[0.01]">
-                        <p className="text-xs font-black uppercase tracking-widest italic opacity-50 text-white">Silêncio no Fluxo...</p>
-                    </div>
-                ) : (
-                    filteredData.map((t) => (
-                        <motion.div 
-                            initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} 
-                            key={t.id} 
-                            onClick={() => handleTransactionClick(t)} 
-                            className="group grid grid-cols-12 gap-4 items-center p-5 bg-[#0a0a0c] border border-white/5 hover:border-white/20 rounded-2xl transition-all cursor-pointer"
-                        >
-                            <div className="col-span-2 md:col-span-1 flex flex-col items-center justify-center bg-white/5 rounded-xl h-12 w-12 border border-white/5 group-hover:border-indigo-500/30 transition-colors">
-                                <span className="text-[8px] font-black text-gray-600 uppercase tracking-tighter">{new Date(t.date).toLocaleString('default', { month: 'short' })}</span>
-                                <span className="text-base font-black text-white">{new Date(t.date).getUTCDate()}</span>
-                            </div>
-
-                            <div className="col-span-6 md:col-span-6 flex flex-col justify-center">
-                                <p className="font-bold text-white text-sm truncate group-hover:text-indigo-400 transition-colors uppercase italic">{t.description}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-500 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">{t.category}</span>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-600 flex items-center gap-1">
-                                        <Landmark size={10} /> {t.payment_method || 'Conta'}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="col-span-4 md:col-span-3 flex flex-col items-end md:items-start justify-center">
-                                <div className={`text-[8px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md border ${t.is_paid ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                    {t.is_paid ? 'LIQUIDADO' : 'ABERTO'}
-                                </div>
-                            </div>
-
-                            <div className="col-span-12 md:col-span-2 flex justify-end border-t border-white/5 md:border-t-0 pt-2 md:pt-0 mt-2 md:mt-0">
-                                <p className={`font-black text-base ${t.type === 'receita' ? 'text-emerald-400' : 'text-white'}`}>
-                                    {t.type === 'receita' ? '+' : '-'} {format(Math.abs(Number(t.amount)))}
-                                </p>
-                            </div>
-                        </motion.div>
-                    ))
-                )}
-            </div>
-        </div>
-
-        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setIsCreateModalOpen(true)} className="fixed bottom-6 right-6 h-14 w-14 bg-indigo-600 rounded-full shadow-2xl shadow-indigo-600/40 flex items-center justify-center text-white z-40 md:hidden"><Plus size={28} /></motion.button>
-
-        <AnimatePresence>{isCreateModalOpen && <NewTransactionModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={handleSuccessAction} />}</AnimatePresence>
-        <AnimatePresence>{isEditModalOpen && selectedTransaction && <TransactionDetailModal key={selectedTransaction.id} isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} transaction={selectedTransaction} onUpdate={handleUpdate} onDelete={handleDelete} loading={loadingAction} />}</AnimatePresence>
-        <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
+      <AnimatePresence>
+        {isCreateModalOpen ? (
+          <NewTransactionModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={handleSuccessAction} />
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isEditModalOpen && selectedTransaction ? (
+          <TransactionDetailModal key={selectedTransaction.id} isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} transaction={selectedTransaction} onUpdate={handleUpdate} onDelete={handleDelete} loading={loadingAction} />
+        ) : null}
+      </AnimatePresence>
+      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </div>
   )
 }

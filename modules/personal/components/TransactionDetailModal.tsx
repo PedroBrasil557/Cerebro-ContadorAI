@@ -1,28 +1,40 @@
 'use client'
 
-import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  X, Save, Trash2, Edit, Calendar, Tag, 
-  ArrowUpRight, ArrowDownLeft, CheckCircle2, AlertTriangle, FileText, AlertCircle 
+import React, { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Calendar,
+  CheckCircle2,
+  Edit,
+  FileText,
+  Landmark,
+  Save,
+  Tag,
+  Trash2,
+  X,
 } from 'lucide-react'
-import { Transaction } from '@/core/action/transactions'
+import type { Transaction } from '@/core/action/transactions'
 
-// --- CONSTANTES LOCAIS ---
 const CATEGORIES = {
   income: ['Salário', 'Investimentos', 'Freelance', 'Presente', 'Outros'],
-  expense: ['Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros']
+  expense: ['Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros'],
 }
 
-const formatCurrency = (value: number) => 
+const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
-// --- PROPS ---
+const inputClassName =
+  'min-h-11 w-full rounded-[11px] border border-white/[0.09] bg-[#111722] px-3.5 text-sm text-[#F4F6F8] outline-none transition-colors duration-150 placeholder:text-[#6F7887] hover:border-white/[0.14] focus:border-[#665CFF]/60 focus:ring-2 focus:ring-[#665CFF]/15 disabled:cursor-not-allowed disabled:opacity-60'
+
 type TransactionDetailModalProps = {
   isOpen: boolean
   transaction: Transaction | null
   onClose: () => void
-  onUpdate: (tx: Transaction, reason: string) => Promise<void>
+  onUpdate: (transaction: Transaction, reason: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   loading?: boolean
 }
@@ -33,47 +45,59 @@ export default function TransactionDetailModal({
   onClose,
   onUpdate,
   onDelete,
-  loading = false
+  loading = false,
 }: TransactionDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  
-  // Estado para o Modal de Confirmação de Exclusão (Substitui o window.confirm)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  
-  // Estados do Formulário
   const [description, setDescription] = useState(transaction?.description ?? '')
   const [amount, setAmount] = useState(transaction ? Math.abs(transaction.amount).toFixed(2) : '')
   const [category, setCategory] = useState(transaction?.category ?? '')
-  const [date, setDate] = useState(transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : '')
+  const [date, setDate] = useState(
+    transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : '',
+  )
   const [type] = useState(transaction?.type ?? '')
   const [editReason, setEditReason] = useState('')
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (showDeleteConfirm) {
+        setShowDeleteConfirm(false)
+      } else {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onClose, showDeleteConfirm])
 
   if (!isOpen || !transaction) return null
 
   const isIncome = type === 'receita'
   const categoryOptions = isIncome ? CATEGORIES.income : CATEGORIES.expense
+  const toneText = isIncome ? 'text-[#28D7A1]' : 'text-[#FF5876]'
+  const toneSurface = isIncome
+    ? 'border-[#28D7A1]/18 bg-[#28D7A1]/10 text-[#28D7A1]'
+    : 'border-[#FF5876]/18 bg-[#FF5876]/10 text-[#FF7890]'
 
-  // --- AÇÃO: SALVAR ---
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    // Validação de Auditoria
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault()
     if (!editReason || editReason.trim().length < 5) {
-        alert("Por favor, descreva o motivo da edição para manter o histórico auditável.")
-        return
+      alert('Por favor, descreva o motivo da edição para manter o histórico auditável.')
+      return
     }
 
     setIsSaving(true)
-    const numericAmount = parseFloat(amount)
-
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-        alert("O valor deve ser positivo.")
-        setIsSaving(false)
-        return
+    const numericAmount = Number.parseFloat(amount)
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      alert('O valor deve ser positivo.')
+      setIsSaving(false)
+      return
     }
 
-    const updatedTx: Transaction = {
+    const updatedTransaction: Transaction = {
       ...transaction,
       description,
       category,
@@ -81,18 +105,11 @@ export default function TransactionDetailModal({
       amount: isIncome ? numericAmount : -Math.abs(numericAmount),
     }
 
-    await onUpdate(updatedTx, editReason)
-    
+    await onUpdate(updatedTransaction, editReason)
     setIsSaving(false)
     setIsEditing(false)
   }
-  
-  // --- AÇÃO: DELETAR (Inicia o fluxo visual) ---
-  const handleDeleteClick = () => {
-    setShowDeleteConfirm(true)
-  }
 
-  // --- AÇÃO: CONFIRMAR DELEÇÃO ---
   const confirmDelete = async () => {
     setIsSaving(true)
     await onDelete(transaction.id)
@@ -101,242 +118,166 @@ export default function TransactionDetailModal({
     setIsSaving(false)
   }
 
-  // Cores Dinâmicas
-  const headerBg = isIncome ? 'bg-emerald-500/10' : 'bg-rose-500/10'
-  const iconBg = isIncome ? 'bg-emerald-500 text-emerald-950' : 'bg-rose-500 text-white'
-  const textColor = isIncome ? 'text-emerald-500' : 'text-rose-500'
-
   return (
     <>
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          
-          <div className="absolute inset-0" onClick={onClose}></div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="w-full max-w-lg bg-[#09090b] border border-white/10 rounded-3xl shadow-2xl overflow-hidden relative z-10"
+      <AnimatePresence>
+        {isOpen ? (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[3px]"
+            onMouseDown={event => {
+              if (event.target === event.currentTarget) onClose()
+            }}
           >
-            
-            {/* CABEÇALHO */}
-            <div className={`h-32 w-full flex items-center justify-center relative transition-colors duration-300 ${headerBg}`}>
-                <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white transition z-10">
-                    <X size={20} />
-                </button>
-                
-                <div className="flex flex-col items-center animate-in zoom-in duration-300">
-                    <div className={`p-4 rounded-full mb-3 shadow-lg ${iconBg}`}>
-                        {isIncome ? <ArrowUpRight size={32} /> : <ArrowDownLeft size={32} />}
-                    </div>
-                    <span className={`text-xs font-bold uppercase tracking-widest ${textColor}`}>
-                        {isEditing ? 'Editando Transação' : isIncome ? 'Receita Recebida' : 'Despesa Realizada'}
-                    </span>
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="transaction-detail-title"
+              aria-describedby="transaction-detail-description"
+              initial={{ opacity: 0, scale: 0.98, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[16px] border border-white/[0.09] bg-[#0D1118] shadow-2xl shadow-black/40 custom-scrollbar"
+            >
+              <header className="flex items-start justify-between border-b border-white/[0.075] px-5 py-4 sm:px-6">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border ${toneSurface}`}>
+                    {isIncome ? <ArrowUpRight aria-hidden="true" className="h-5 w-5" /> : <ArrowDownLeft aria-hidden="true" className="h-5 w-5" />}
+                  </span>
+                  <div className="min-w-0">
+                    <h2 id="transaction-detail-title" className="text-lg font-semibold text-[#F4F6F8]">
+                      {isEditing ? 'Editar transação' : 'Detalhes da transação'}
+                    </h2>
+                    <p id="transaction-detail-description" className="mt-1 text-sm text-[#A0A8B5]">
+                      {isIncome ? 'Receita' : 'Despesa'} registrada no seu fluxo.
+                    </p>
+                  </div>
                 </div>
-            </div>
-
-            {/* CONTEÚDO */}
-            <div className="p-6">
-                
-                {isEditing ? (
-                   /* === MODO EDIÇÃO === */
-                   <form onSubmit={handleSave} className="space-y-4">
-                      
-                      {/* Descrição */}
-                      <div>
-                        <label htmlFor="edit-transaction-description" className="text-xs font-bold text-gray-500 uppercase mb-1 block">Descrição</label>
-                        <input
-                          id="edit-transaction-description" name="description" type="text" required value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 focus:outline-none transition"
-                        />
-                      </div>
-
-                      {/* Valor e Data */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Valor (R$)</label>
-                            <input
-                              type="number" required step="0.01" value={amount}
-                              onChange={(e) => setAmount(e.target.value)}
-                              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 focus:outline-none transition"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Data</label>
-                            <input
-                              type="date" required value={date}
-                              onChange={(e) => setDate(e.target.value)}
-                              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 focus:outline-none transition [color-scheme:dark]"
-                            />
-                        </div>
-                      </div>
-
-                      {/* Categoria */}
-                      <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Categoria</label>
-                        <select
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 focus:outline-none transition [&>option]:bg-black cursor-pointer appearance-none"
-                        >
-                          {categoryOptions.map((cat) => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* CAMPO DE MOTIVO (AUDITORIA - OBRIGATÓRIO) */}
-                      <div className="pt-2 border-t border-white/10 mt-2">
-                        <label className="text-xs font-bold text-amber-500 uppercase mb-1 flex items-center gap-1">
-                            <AlertTriangle size={12} /> Motivo da Edição (Obrigatório)
-                        </label>
-                        <textarea
-                            value={editReason}
-                            onChange={(e) => setEditReason(e.target.value)}
-                            placeholder="Ex: Digitei o valor errado..."
-                            rows={2}
-                            required
-                            className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 text-white text-sm focus:border-amber-500 focus:outline-none resize-none"
-                        />
-                      </div>
-
-                      {/* Botões */}
-                      <div className="flex gap-3 pt-2">
-                        <button 
-                            type="button" disabled={isSaving} onClick={() => setIsEditing(false)} 
-                            className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 font-bold hover:bg-white/5 hover:text-white transition"
-                        >
-                            Cancelar
-                        </button>
-                        <button 
-                            type="submit" disabled={isSaving}
-                            className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-500 shadow-lg shadow-blue-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                            <Save size={18} /> {isSaving ? 'Salvando...' : 'Salvar'}
-                        </button>
-                      </div>
-                   </form>
-
-                ) : (
-                   /* === MODO VISUALIZAÇÃO === */
-                   <div className="space-y-6">
-                        {/* Valor Grande */}
-                        <div className="text-center border-b border-white/5 pb-6">
-                            <h2 className="text-4xl font-black text-white mb-2 tracking-tight">
-                                {formatCurrency(Math.abs(transaction.amount))}
-                            </h2>
-                            <p className="text-lg text-gray-300 font-medium">{transaction.description}</p>
-                        </div>
-
-                        {/* Grid de Detalhes */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                                <div className="flex items-center gap-2 text-gray-400 mb-2">
-                                    <Tag size={14} /> <span className="text-xs font-bold uppercase">Categoria</span>
-                                </div>
-                                <p className="text-white font-medium">{transaction.category}</p>
-                            </div>
-                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                                <div className="flex items-center gap-2 text-gray-400 mb-2">
-                                    <CheckCircle2 size={14} /> <span className="text-xs font-bold uppercase">Status</span>
-                                </div>
-                                <p className="text-white font-medium capitalize flex items-center gap-2">
-                                    <span className={`h-2 w-2 rounded-full ${transaction.is_paid ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
-                                    {transaction.is_paid ? 'Pago / Recebido' : 'Pendente'}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
-                                <Calendar size={20} />
-                            </div>
-                            <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase mb-1">Data do Lançamento</p>
-                                <p className="text-white capitalize font-medium text-lg">
-                                    {new Date(transaction.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Motivo da última edição (Auditoria) */}
-                        {transaction.edit_note && (
-                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                                <p className="text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
-                                    <FileText size={12} /> Nota de Edição
-                                </p>
-                                <p className="text-gray-300 text-sm italic">&quot;{transaction.edit_note}&quot;</p>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-3 pt-2">
-                             <button 
-                                onClick={() => setIsEditing(true)}
-                                disabled={loading || isSaving}
-                                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold transition border border-white/5 group"
-                             >
-                                <Edit size={18} className="group-hover:text-blue-400 transition-colors" /> Editar
-                             </button>
-                             <button 
-                                onClick={handleDeleteClick}
-                                disabled={loading || isSaving}
-                                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold transition border border-red-500/10 hover:border-red-500/30"
-                             >
-                                <Trash2 size={18} /> Excluir
-                             </button>
-                        </div>
-                   </div>
-                )}
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-
-    {/* --- OVERLAY DE CONFIRMAÇÃO DE EXCLUSÃO (PREMIUM) --- */}
-    <AnimatePresence>
-        {showDeleteConfirm && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-                <motion.div 
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="w-full max-w-sm bg-[#09090b] border border-red-500/30 rounded-3xl p-6 shadow-2xl relative overflow-hidden"
+                <button
+                  type="button"
+                  aria-label="Fechar detalhes da transação"
+                  onClick={onClose}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus-visible:ring-2 focus-visible:ring-[#665CFF]/50"
                 >
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-orange-600"></div>
-                    
-                    <div className="flex flex-col items-center text-center mb-6">
-                        <div className="h-16 w-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500 animate-pulse">
-                            <AlertCircle size={32} />
-                        </div>
-                        <h3 className="text-xl font-bold text-white mb-2">Tem certeza?</h3>
-                        <p className="text-sm text-gray-400">
-                            Você está prestes a excluir <span className="text-white font-bold">&quot;{transaction?.description}&quot;</span>. Esta ação não pode ser desfeita.
-                        </p>
+                  <X aria-hidden="true" className="h-5 w-5" />
+                </button>
+              </header>
+
+              <div className="p-5 sm:p-6">
+                {isEditing ? (
+                  <form onSubmit={handleSave} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label htmlFor="edit-transaction-description" className="block text-xs font-medium text-[#A0A8B5]">Descrição</label>
+                      <input id="edit-transaction-description" name="description" type="text" required value={description} onChange={event => setDescription(event.target.value)} className={inputClassName} />
                     </div>
 
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={() => setShowDeleteConfirm(false)}
-                            className="flex-1 py-3 rounded-xl border border-white/10 text-gray-300 font-bold hover:bg-white/5 transition"
-                        >
-                            Cancelar
-                        </button>
-                        <button 
-                            onClick={confirmDelete}
-                            disabled={isSaving}
-                            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold hover:opacity-90 shadow-lg shadow-red-900/20 transition flex items-center justify-center gap-2"
-                        >
-                            {isSaving ? 'Excluindo...' : 'Sim, Excluir'}
-                        </button>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label htmlFor="edit-transaction-amount" className="block text-xs font-medium text-[#A0A8B5]">Valor (R$)</label>
+                        <input id="edit-transaction-amount" type="number" required step="0.01" value={amount} onChange={event => setAmount(event.target.value)} className={`${inputClassName} tabular-nums`} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label htmlFor="edit-transaction-date" className="block text-xs font-medium text-[#A0A8B5]">Data</label>
+                        <input id="edit-transaction-date" type="date" required value={date} onChange={event => setDate(event.target.value)} className={`${inputClassName} [color-scheme:dark]`} />
+                      </div>
                     </div>
-                </motion.div>
-            </div>
-        )}
-    </AnimatePresence>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="edit-transaction-category" className="block text-xs font-medium text-[#A0A8B5]">Categoria</label>
+                      <select id="edit-transaction-category" value={category} onChange={event => setCategory(event.target.value)} className={`${inputClassName} cursor-pointer appearance-none [&>option]:bg-[#111722]`}>
+                        {categoryOptions.map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5 border-t border-white/[0.075] pt-4">
+                      <label htmlFor="edit-transaction-reason" className="flex items-center gap-1.5 text-xs font-medium text-[#F5B942]">
+                        <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
+                        Motivo da edição (obrigatório)
+                      </label>
+                      <textarea id="edit-transaction-reason" value={editReason} onChange={event => setEditReason(event.target.value)} placeholder="Ex.: Digitei o valor errado..." rows={3} required className={`${inputClassName} min-h-[84px] resize-none py-3`} />
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-3 border-t border-white/[0.075] pt-5 sm:flex-row sm:justify-end">
+                      <button type="button" disabled={isSaving} onClick={() => setIsEditing(false)} className="min-h-11 rounded-[10px] border border-white/[0.09] px-4 text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:bg-white/[0.05] hover:text-white disabled:opacity-50">Cancelar</button>
+                      <button type="submit" disabled={isSaving} className="flex min-h-11 min-w-[132px] items-center justify-center gap-2 rounded-[10px] bg-[#665CFF] px-5 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#756CFF] focus-visible:ring-2 focus-visible:ring-[#8B84FF]/60 disabled:opacity-50">
+                        <Save aria-hidden="true" className="h-4 w-4" />
+                        {isSaving ? 'Salvando...' : 'Salvar alterações'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="border-b border-white/[0.075] pb-5">
+                      <p className={`text-[30px] font-bold tracking-[-0.03em] tabular-nums ${toneText}`}>
+                        {isIncome ? '+' : '−'} {formatCurrency(Math.abs(transaction.amount))}
+                      </p>
+                      <p className="mt-1 break-words text-base font-semibold text-[#F4F6F8]">{transaction.description}</p>
+                    </div>
+
+                    <dl className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
+                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><Tag aria-hidden="true" className="h-4 w-4" />Categoria</dt>
+                        <dd className="mt-2 text-sm font-medium text-[#F4F6F8]">{transaction.category}</dd>
+                      </div>
+                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
+                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><CheckCircle2 aria-hidden="true" className="h-4 w-4" />Status</dt>
+                        <dd className="mt-2 flex items-center gap-2 text-sm font-medium text-[#F4F6F8]">
+                          <span aria-hidden="true" className={`h-2 w-2 rounded-full ${transaction.is_paid ? 'bg-[#28D7A1]' : 'bg-[#F5B942]'}`} />
+                          {transaction.is_paid ? 'Pago / recebido' : 'Pendente'}
+                        </dd>
+                      </div>
+                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
+                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><Calendar aria-hidden="true" className="h-4 w-4" />Data</dt>
+                        <dd className="mt-2 text-sm font-medium tabular-nums text-[#F4F6F8]">{new Date(transaction.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</dd>
+                      </div>
+                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
+                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><Landmark aria-hidden="true" className="h-4 w-4" />Forma / cartão</dt>
+                        <dd className="mt-2 truncate text-sm font-medium text-[#F4F6F8]">{transaction.payment_method || 'Conta'}</dd>
+                      </div>
+                    </dl>
+
+                    {transaction.edit_note ? (
+                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
+                        <p className="flex items-center gap-2 text-xs text-[#A0A8B5]"><FileText aria-hidden="true" className="h-4 w-4" />Nota de edição</p>
+                        <p className="mt-2 text-sm leading-5 text-[#F4F6F8]">&quot;{transaction.edit_note}&quot;</p>
+                      </div>
+                    ) : null}
+
+                    <div className="grid grid-cols-2 gap-3 border-t border-white/[0.075] pt-5">
+                      <button type="button" onClick={() => setIsEditing(true)} disabled={loading || isSaving} className="flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-white/[0.09] bg-[#111722] text-sm font-medium text-white outline-none transition-colors duration-150 hover:bg-[#151C29] focus-visible:ring-2 focus-visible:ring-[#665CFF]/50 disabled:opacity-50">
+                        <Edit aria-hidden="true" className="h-4 w-4" />Editar
+                      </button>
+                      <button type="button" onClick={() => setShowDeleteConfirm(true)} disabled={loading || isSaving} className="flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#FF5876]/18 bg-[#FF5876]/8 text-sm font-medium text-[#FF7890] outline-none transition-colors duration-150 hover:bg-[#FF5876]/14 focus-visible:ring-2 focus-visible:ring-[#FF5876]/50 disabled:opacity-50">
+                        <Trash2 aria-hidden="true" className="h-4 w-4" />Excluir
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showDeleteConfirm ? (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-[3px]">
+            <motion.div role="alertdialog" aria-modal="true" aria-labelledby="delete-transaction-title" aria-describedby="delete-transaction-description" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.16 }} className="w-full max-w-sm rounded-[16px] border border-[#FF5876]/25 bg-[#0D1118] p-6 shadow-2xl shadow-black/45">
+              <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#FF5876]/10 text-[#FF5876]">
+                <AlertCircle aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <h2 id="delete-transaction-title" className="mt-4 text-lg font-semibold text-[#F4F6F8]">Excluir transação?</h2>
+              <p id="delete-transaction-description" className="mt-2 text-sm leading-5 text-[#A0A8B5]">
+                Você está prestes a excluir <strong className="font-semibold text-white">&quot;{transaction.description}&quot;</strong>. Esta ação não pode ser desfeita.
+              </p>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button type="button" onClick={() => setShowDeleteConfirm(false)} disabled={isSaving} className="min-h-11 rounded-[10px] border border-white/[0.09] text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:bg-white/[0.05] hover:text-white disabled:opacity-50">Cancelar</button>
+                <button type="button" onClick={confirmDelete} disabled={isSaving} className="min-h-11 rounded-[10px] bg-[#FF5876] px-4 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#FF6B84] focus-visible:ring-2 focus-visible:ring-[#FF5876]/55 disabled:opacity-50">{isSaving ? 'Excluindo...' : 'Excluir'}</button>
+              </div>
+            </motion.div>
+          </div>
+        ) : null}
+      </AnimatePresence>
     </>
   )
 }
