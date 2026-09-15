@@ -19,11 +19,13 @@ export default function FixedExpensesList({
     const [isCopying, setIsCopying] = useState(false)
 
     // 1. FILTRAGEM PELO MÊS SELECIONADO
-    const currentMonthStr = currentDate.toISOString().slice(0, 7) 
+    const currentMonthStr = currentDate.toISOString().slice(0, 7)
+    const monthItems = transactions.filter(t => t.date.startsWith(currentMonthStr))
+    const monthHasTransactions = monthItems.length > 0
     
     // Pega só as transações FIXAS que pertencem ao MÊS SELECIONADO
-    const fixedItems = transactions
-        .filter(t => t.is_fixed && t.date.startsWith(currentMonthStr))
+    const fixedItems = monthItems
+        .filter(t => t.is_fixed)
         .sort((a, b) => new Date(a.date).getDate() - new Date(b.date).getDate())
 
     // 2. SEPARAÇÃO (Receitas vs Despesas)
@@ -51,23 +53,27 @@ export default function FixedExpensesList({
         if (res.success) {
             router.refresh()
         } else {
-            alert(res.message || "Erro ao iniciar o mês.")
+            alert(res.message || "Erro ao importar recorrências.")
         }
     }
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
     const getDay = (dateStr: string) => new Date(dateStr).getUTCDate()
 
-    // 4. ESTADO VAZIO (BOTÃO DE INICIAR MÊS)
+    // 4. ESTADO SEM RECORRÊNCIAS
     if (fixedItems.length === 0) {
         return (
             <div className="bg-[#121214] border border-white/10 rounded-2xl p-8 mb-6 text-center animate-in fade-in slide-in-from-bottom-4">
                 <div className="h-16 w-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto text-blue-500 mb-4 border border-blue-500/20">
                     <Calendar size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Mês não iniciado</h3>
+                <h3 className="text-xl font-bold text-white mb-2">
+                    {monthHasTransactions ? 'Sem contas recorrentes neste mês' : 'Nenhuma recorrência neste mês'}
+                </h3>
                 <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
-                    Ainda não há contas fixas ou salários registrados para este mês. Deseja importar suas contas recorrentes do mês anterior?
+                    {monthHasTransactions
+                        ? 'Suas transações do mês já estão registradas. Ainda não há contas fixas ou salários recorrentes; se quiser, importe os recorrentes do mês anterior.'
+                        : 'Ainda não há contas fixas ou salários recorrentes neste mês. Você pode importar os recorrentes do mês anterior.'}
                 </p>
                 <button 
                     onClick={handleStartMonth}
@@ -75,9 +81,9 @@ export default function FixedExpensesList({
                     className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 mx-auto disabled:opacity-50 shadow-lg shadow-blue-900/20"
                 >
                     {isCopying ? (
-                        <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Preparando Mês...</span>
+                        <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Importando...</span>
                     ) : (
-                        <><Copy size={18} /> Iniciar Mês e Importar Contas</>
+                        <><Copy size={18} /> Importar contas do mês anterior</>
                     )}
                 </button>
             </div>
