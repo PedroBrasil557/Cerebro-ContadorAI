@@ -2,7 +2,12 @@ import type { Transaction } from '@/types_db'
 
 type FinancialTransaction = Pick<Transaction, 'amount' | 'type' | 'date'>
 
-const amountOf = (transaction: FinancialTransaction) => Math.abs(Number(transaction.amount) || 0)
+export function normalizeTransactionAmount(amount: number) {
+  const parsed = Number(amount)
+  return Number.isFinite(parsed) ? Math.abs(parsed) : 0
+}
+
+const amountOf = (transaction: FinancialTransaction) => normalizeTransactionAmount(transaction.amount)
 
 export function calculateIncome(transactions: FinancialTransaction[]) {
   return transactions
