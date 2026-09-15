@@ -1,13 +1,14 @@
 'use client'
 
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { type ReactNode, useCallback, useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  ShieldCheck, AlertTriangle, TrendingUp, Lock, CalendarClock, 
-  Settings2, AlertOctagon, Landmark, PiggyBank, History, Activity,
-  ArrowRight, Sparkles, Loader2, Briefcase, Calculator, Receipt, 
-  TrendingDown, Target, Wallet, Plus, Search, Filter, ArrowUpRight, ArrowDownRight, CheckCircle2, FileText, X
+  ShieldCheck, AlertTriangle, TrendingUp,
+  Settings2, AlertOctagon, PiggyBank, Activity,
+  Sparkles, Loader2, Briefcase, Calculator, Receipt,
+  Target, Wallet, Plus, Search, Filter, ArrowUpRight, ArrowDownRight, CheckCircle2, FileText, X
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { CaixaData, Transaction } from '@/types_db' 
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -16,11 +17,10 @@ import { createClient } from '@/lib/supabase/client'
 // Importando a Camada de Domínio (O Cérebro do Negócio)
 import { cfoEngine, BusinessMetrics } from '@/modules/cfo/cfoEngine'
 import { cfoRulesEngine } from '@/modules/cfo/cfoRulesEngine'
-import { cfoInterpreter } from '@/modules/cfo/cfoInterpreter'
 import { cfoSimulator } from '@/modules/cfo/cfoSimulator'
 
 // --- COMPONENTES VISUAIS AUXILIARES ---
-const GlassCard = ({ children, className = "", glow = false }: any) => (
+const GlassCard = ({ children, className = "", glow = false }: { children: ReactNode; className?: string; glow?: boolean }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -32,7 +32,14 @@ const GlassCard = ({ children, className = "", glow = false }: any) => (
   </motion.div>
 )
 
-const KPICard = ({ label, value, subtext, icon: Icon, colorClass = "text-emerald-400", bgClass = "bg-emerald-500/10" }: any) => (
+const KPICard = ({ label, value, subtext, icon: Icon, colorClass = "text-emerald-400", bgClass = "bg-emerald-500/10" }: {
+  label: string
+  value: string
+  subtext?: string
+  icon: LucideIcon
+  colorClass?: string
+  bgClass?: string
+}) => (
   <div className="min-w-[160px] md:min-w-0 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all group flex flex-col justify-between h-36">
     <div className="flex justify-between items-start mb-2">
       <div className={`p-2 rounded-lg ${bgClass} ${colorClass} group-hover:scale-110 transition-transform`}>
@@ -99,8 +106,8 @@ const SimulatorWidget = ({ metrics }: { metrics: BusinessMetrics }) => {
         <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-black border border-emerald-500/20">
             <p className="text-[10px] text-emerald-200 font-bold mb-1 uppercase tracking-wide">Novo Runway</p>
             <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-white">{simResult.projectedRunway.toFixed(1)}</span>
-            <span className="text-xs font-bold text-gray-500">meses</span>
+            <span className="text-2xl font-black text-white">{simResult.projectedRunway === null ? 'Sem dados' : simResult.projectedRunway.toFixed(1)}</span>
+            {simResult.projectedRunway !== null && <span className="text-xs font-bold text-gray-500">meses</span>}
             </div>
         </div>
       </div>
@@ -115,7 +122,7 @@ interface CaixaViewProps {
 }
 
 export default function CaixaView({ data, transactions: initialTransactions = [] }: CaixaViewProps) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   // Estados do CFO Engine
   const [analyzing, setAnalyzing] = useState(false)
@@ -131,11 +138,13 @@ export default function CaixaView({ data, transactions: initialTransactions = []
   const [txType, setTxType] = useState<'receita' | 'despesa_variavel'>('receita')
   const [newTx, setNewTx] = useState({ description: '', amount: '', category: 'Serviço' })
 
-  const safeData = data || { currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] }
+  const safeData = useMemo(
+    () => data || { currentBalance: 0, monthlyGoal: 0, taxRate: 0, reserveRate: 0, entries: [] },
+    [data],
+  )
 
   // 0. BUSCA REAL-TIME DAS TRANSAÇÕES
-  const fetchTransactions = async () => {
-    setIsTxLoading(true)
+  const fetchTransactions = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const now = new Date()
@@ -145,6 +154,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
+        .eq('scope', 'business')
         .gte('date', startOfMonth)
         .order('date', { ascending: false })
       
@@ -155,20 +165,19 @@ export default function CaixaView({ data, transactions: initialTransactions = []
       }
     }
     setIsTxLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchTransactions()
-  }, [])
+    void fetchTransactions()
+  }, [fetchTransactions])
 
   // 1. CONSTRUÇÃO DO DOMÍNIO (Data Prep)
   const metrics: BusinessMetrics = useMemo(() => {
-    const today = new Date()
-    const thisMonth = today.getMonth()
-    
     // Calcula com base nas transações reais carregadas do Supabase
     const revenue = liveTransactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    const expenses = liveTransactions.filter(t => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
+    const expenses = liveTransactions
+      .filter(t => t.type === 'despesa_fixa' || t.type === 'despesa_variavel')
+      .reduce((acc, t) => acc + Math.abs(Number(t.amount)), 0)
 
     // O Saldo real atualizado
     const realBalance = (safeData.currentBalance || 0) + revenue - expenses
@@ -178,8 +187,8 @@ export default function CaixaView({ data, transactions: initialTransactions = []
         expenses,
         cashReserve: realBalance > 0 ? realBalance : 0, // Garante que não fica negativo visualmente no CFO
         taxRate: safeData.taxRate,
-        activeClients: 1, 
-        totalHoursWorked: 160 
+        activeClients: 0,
+        totalHoursWorked: 0,
     }
   }, [liveTransactions, safeData])
 
@@ -187,7 +196,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
   const { score, alerts } = useMemo(() => cfoRulesEngine.evaluateHealth(metrics), [metrics])
   const safeDraw = useMemo(() => cfoRulesEngine.calculateSafeDraw(metrics), [metrics])
   const taxReserve = useMemo(() => cfoEngine.calculateTaxReserve(metrics.revenue, metrics.taxRate), [metrics])
-  const runway = useMemo(() => cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses || 2000), [metrics])
+  const runway = useMemo(() => cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses), [metrics])
 
   const criticalAlerts = alerts.filter(a => a.severity === 'critical').length
   const status = criticalAlerts > 0 ? 'critical' : score < 50 ? 'warning' : 'healthy'
@@ -196,18 +205,17 @@ export default function CaixaView({ data, transactions: initialTransactions = []
   const handleAnalyzeCash = async () => {
     setAnalyzing(true)
     try {
-      const prompt = cfoInterpreter.generatePrompt(metrics)
-      
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('/api/cfo-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt })
+        body: '{}'
       })
 
       const result = await response.json()
-      setCfoAnalysis(result.response)
+      if (!response.ok) throw new Error(result.error?.message ?? 'Falha ao consultar o CFO Virtual.')
+      setCfoAnalysis(result.analysis)
       toast.success("Análise estratégica concluída!")
-    } catch (error) {
+    } catch {
       toast.error("Erro ao consultar o CFO Virtual.")
     } finally {
       setAnalyzing(false)
@@ -227,6 +235,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
       description: newTx.description,
       amount: parseFloat(newTx.amount),
       type: txType,
+      scope: 'business',
       category: newTx.category,
       date: new Date().toISOString(),
       status: 'concluido'
@@ -308,7 +317,7 @@ export default function CaixaView({ data, transactions: initialTransactions = []
           </div>
           <KPICard label="Faturamento Real" value={formatCurrency(metrics.revenue)} subtext="No Mês Atual" icon={TrendingUp} />
           <KPICard label="Pró-labore Seguro" value={formatCurrency(safeDraw)} subtext="Teto sugerido para saque" icon={PiggyBank} colorClass="text-purple-400" bgClass="bg-purple-500/10" />
-          <KPICard label="Runway Atual" value={`${runway.toFixed(1)} Meses`} subtext="Sobrevivência do negócio" icon={Activity} colorClass={status === 'healthy' ? 'text-emerald-400' : 'text-rose-400'} bgClass={status === 'healthy' ? 'bg-emerald-500/10' : 'bg-rose-500/10'} />
+          <KPICard label="Runway Atual" value={runway === null ? 'Sem dados' : `${runway.toFixed(1)} Meses`} subtext={runway === null ? 'Registre despesas para calcular' : 'Cobertura pelas despesas observadas'} icon={Activity} colorClass={status === 'healthy' ? 'text-emerald-400' : 'text-rose-400'} bgClass={status === 'healthy' ? 'bg-emerald-500/10' : 'bg-rose-500/10'} />
           <KPICard label="Reserva DAS/MEI" value={formatCurrency(taxReserve)} subtext={`Taxa: ${metrics.taxRate}%`} icon={Calculator} colorClass="text-blue-400" bgClass="bg-blue-500/10" />
       </section>
 

@@ -1,19 +1,21 @@
 'use client'
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { type ReactNode, useCallback, useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Target, ShieldCheck, Wallet, RefreshCw, 
+  Target, Wallet, RefreshCw,
   Lock, Plus, X, BrainCircuit, Sparkles, TrendingUp, CheckCircle2 
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { 
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid 
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
-import { Goal, Investment, PatrimonyHistory } from '@/types_db' 
+import { Goal, Investment, NewGoal, PatrimonyHistory } from '@/types_db'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
+import type { User } from '@supabase/supabase-js'
 
 // Importação dos Componentes Modulares
 import MarketTicker from '@/modules/personal/components/investments/MarketTicker'
@@ -22,7 +24,15 @@ import AllocationChart from '@/modules/personal/components/investments/Allocatio
 import FinancialCalculators from '@/modules/personal/components/investments/FinancialCalculators'
 
 // --- COMPONENTE: GLASS CARD PREMIUM ---
-const GlassCard = ({ children, className = "", glow = false, onClick, isLocked = false }: any) => (
+interface GlassCardProps {
+  children: ReactNode
+  className?: string
+  glow?: boolean
+  onClick?: () => void
+  isLocked?: boolean
+}
+
+const GlassCard = ({ children, className = "", glow = false, onClick, isLocked = false }: GlassCardProps) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -36,7 +46,16 @@ const GlassCard = ({ children, className = "", glow = false, onClick, isLocked =
   </motion.div>
 )
 
-const SectionTitle = ({ icon: Icon, title, subtitle, onAiClick, aiText, isLocked }: any) => (
+interface SectionTitleProps {
+  icon: LucideIcon
+  title: string
+  subtitle?: string
+  onAiClick?: () => void
+  aiText?: string
+  isLocked?: boolean
+}
+
+const SectionTitle = ({ icon: Icon, title, subtitle, onAiClick, aiText, isLocked }: SectionTitleProps) => (
   <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
     <div className="flex items-center gap-4">
         <div className="p-3 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400">
@@ -60,9 +79,9 @@ const SectionTitle = ({ icon: Icon, title, subtitle, onAiClick, aiText, isLocked
 
 // --- VIEW PRINCIPAL ---
 interface InvestmentsViewProps {
-  user: any
+  user: User
   goals: Goal[]
-  onAddGoal: (goal: any) => void
+  onAddGoal: (goal: NewGoal) => void
 }
 
 export default function InvestmentsView({ user, goals, onAddGoal }: InvestmentsViewProps) {
@@ -73,14 +92,13 @@ export default function InvestmentsView({ user, goals, onAddGoal }: InvestmentsV
   const [loading, setLoading] = useState(true)
   const [totalPatrimony, setTotalPatrimony] = useState(0)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   // 🛡️ Lógica de Plano
   const userPlan = user?.user_metadata?.plan_tier || 'free'
   const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = useCallback(async () => {
     const { data: { user: authUser } } = await supabase.auth.getUser()
     
     if (authUser) {
@@ -95,16 +113,16 @@ export default function InvestmentsView({ user, goals, onAddGoal }: InvestmentsV
       if (histData && histData.length > 0) {
         setHistoryData(histData as PatrimonyHistory[])
       } else {
-        setHistoryData([
-            { id: '1', user_id: authUser.id, total_balance: 0, record_date: new Date().toISOString() },
-            { id: '2', user_id: authUser.id, total_balance: 0, record_date: new Date().toISOString() }
-        ])
+        setHistoryData([])
       }
     }
     setLoading(false)
-  }
+  }, [supabase])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    const timer = setTimeout(() => { void fetchData() }, 0)
+    return () => clearTimeout(timer)
+  }, [fetchData])
 
   const chartData = useMemo(() => historyData.map(h => ({
       name: new Date(h.record_date).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }),
@@ -243,7 +261,12 @@ export default function InvestmentsView({ user, goals, onAddGoal }: InvestmentsV
                 <form onSubmit={(e) => {
                    e.preventDefault()
                    const formData = new FormData(e.currentTarget)
-                   onAddGoal({ title: formData.get('title'), target_amount: formData.get('target'), deadline: formData.get('deadline'), color: '#6366f1' })
+                   onAddGoal({
+                     title: String(formData.get('title') ?? ''),
+                     target_amount: Number(formData.get('target') ?? 0),
+                     deadline: String(formData.get('deadline') ?? ''),
+                     color: '#6366f1',
+                   })
                    setIsModalOpen(false)
                 }} className="space-y-6">
                    <div className="space-y-1"><label className="text-[10px] font-black text-gray-500 uppercase ml-1">Identificação</label><input name="title" required className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-indigo-500/50" placeholder="Ex: Liberdade Financeira" /></div>

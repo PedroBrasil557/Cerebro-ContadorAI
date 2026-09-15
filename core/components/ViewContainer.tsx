@@ -1,35 +1,37 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { createClient } from '@/lib/supabase/client'
 import { 
-  Transaction, ClientAppointment, Goal, CaixaData, 
-  CreditCard, UserProfile, NewGoal, Investment 
+  Transaction, Goal, CaixaData, NewGoal, Investment, ActiveTab
 } from '@/types_db'
+import type { User } from '@supabase/supabase-js'
+import dynamic from 'next/dynamic'
 
 // ==========================================
 // 📦 CAMADA 2: MÓDULOS PESSOAIS
 // ==========================================
-import DashboardView from '@/modules/personal/views/DashboardView'
-import TransactionsView from '@/modules/personal/views/TransactionsView'
-import InvestmentsView from '@/modules/personal/views/InvestmentsView'
-import WalletView from '@/modules/personal/views/WalletView'
-import DebtCenterView from '@/modules/personal/views/DebtCenterView'
-import ProfileView from '@/modules/personal/views/ProfileView'
-import SmartShoppingView from '@/modules/personal/views/SmartShoppingView'
+const moduleLoading = () => <div role="status" aria-live="polite" className="p-8 text-sm text-gray-400">Carregando módulo…</div>
+const DashboardView = dynamic(() => import('@/modules/personal/views/DashboardView'), { loading: moduleLoading })
+const TransactionsView = dynamic(() => import('@/modules/personal/views/TransactionsView'), { loading: moduleLoading })
+const InvestmentsView = dynamic(() => import('@/modules/personal/views/InvestmentsView'), { loading: moduleLoading })
+const WalletView = dynamic(() => import('@/modules/personal/views/WalletView'), { loading: moduleLoading })
+const DebtCenterView = dynamic(() => import('@/modules/personal/views/DebtCenterView'), { loading: moduleLoading })
+const ProfileView = dynamic(() => import('@/modules/personal/views/ProfileView'), { loading: moduleLoading })
+const SmartShoppingView = dynamic(() => import('@/modules/personal/views/SmartShoppingView'), { loading: moduleLoading })
 
 // ==========================================
 // 💼 CAMADA 3: MÓDULOS PROFISSIONAIS (B2B)
 // ==========================================
-import CaixaView from '@/modules/professional/views/CaixaView'
-import NailDesignView from '@/modules/professional/views/NailDesignView'
-import FinancialCommandCenter from '@/modules/professional/components/FinancialCommandCenter'
+const CaixaView = dynamic(() => import('@/modules/professional/views/CaixaView'), { loading: moduleLoading })
+const NailDesignView = dynamic(() => import('@/modules/professional/views/NailDesignView'), { loading: moduleLoading })
+const FinancialCommandCenter = dynamic(() => import('@/modules/professional/components/FinancialCommandCenter'), { loading: moduleLoading })
+const FounderDashboard = dynamic(() => import('@/modules/admin/views/FounderDashboard'), { loading: moduleLoading })
 
 interface ViewContainerProps {
-  activeTab: string
-  handleRedirect: (tab: any) => void
-  user: UserProfile | any
+  activeTab: ActiveTab
+  handleRedirect: (tab: ActiveTab) => void
+  user: User
   
   // Resumo Financeiro
   summary: {
@@ -39,68 +41,28 @@ interface ViewContainerProps {
     emergencyTotal: number
   }
   
-  // Gráficos
-  charts: {
-      monthlyBalanceHistory: any[]
-      range: any
-      setRange: (r: any) => void
-  }
-  
   // Dados
-  cards: CreditCard[]
   goals: Goal[]
   transactions: Transaction[]
-  appointments: ClientAppointment[]
   caixaData: CaixaData
   investments: Investment[] 
-  
-  // Props Extras
-  emergencyFund: any 
-  cdiRate: number
-  healthScore: number
+  systemRole?: 'user' | 'admin' | 'founder'
+  accountMode: 'personal' | 'professional'
 
   // Handlers
-  onUpdateEmergencyFund: (val: any) => Promise<void>
   onAddGoal: (goal: NewGoal) => Promise<void>
-  onUpdateGoal: (goal: Goal) => void
-  onUpdateStatus: (id: string, status: string) => void
-  onAddAppointment: (appt: any) => void
 }
 
 export default function ViewContainer({ 
-  activeTab, handleRedirect, user, summary, transactions = [], appointments = [], goals = [], caixaData, cards = [],
-  onAddGoal, onUpdateStatus, onAddAppointment, charts, onUpdateGoal, investments: propsInvestments = []
+  activeTab, handleRedirect, user, summary, transactions = [], goals = [], caixaData,
+  onAddGoal, investments = [], systemRole = 'user', accountMode
 }: ViewContainerProps) {
-
-  const [localInvestments, setLocalInvestments] = useState<Investment[]>([])
-  const supabase = createClient()
-
-  // ✅ BUSCA DINÂMICA DE INVESTIMENTOS
-  const fetchInvestments = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser) {
-      const { data } = await supabase
-        .from('investments')
-        .select('*')
-        .eq('user_id', authUser.id)
-      
-      if (data) setLocalInvestments(data as Investment[])
-    }
-  }
-
-  useEffect(() => {
-    fetchInvestments()
-  }, [activeTab])
 
   // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
   
   // Prioriza investimentos vindo das props, senão usa o local do container
-  const finalInvestments = propsInvestments.length > 0 ? propsInvestments : localInvestments
-
   // 🛡️ CONTROLE DE ACESSO DA CAMADA
-  const accountMode = user?.user_metadata?.account_mode || user?.account_mode || 'personal'
-
   const pageVariants = { 
     initial: { opacity: 0, scale: 0.98 }, 
     enter: { opacity: 1, scale: 1 }, 
@@ -126,17 +88,16 @@ export default function ViewContainer({
           <>
             {currentTab === 'dashboard' && (
               <DashboardView 
-                user={user}
                 summary={summary}
                 recentTransactions={transactions.slice(0, 5)}
                 onNavigate={handleRedirect}
                 transactions={transactions}
-                investments={finalInvestments} 
+                investments={investments} 
               />
             )}
 
             {(currentTab === 'compras inteligentes' || currentTab === 'compras') && (
-              <SmartShoppingView user={user} /> 
+              <SmartShoppingView />
             )}
             
             {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
@@ -156,7 +117,7 @@ export default function ViewContainer({
             )}
             
             {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
-              <DebtCenterView user={user} summary={summary} />
+              <DebtCenterView />
             )}
           </>
         )}
@@ -187,7 +148,11 @@ export default function ViewContainer({
         {/* ⚙️ CAMADA 1: MÓDULOS GLOBAIS (Ambos modos) */}
         {/* ========================================== */}
         {(currentTab === 'meu perfil' || currentTab === 'perfil') && (
-          <ProfileView user={user as any} /> 
+          <ProfileView />
+        )}
+
+        {currentTab === 'admin' && (systemRole === 'founder' || systemRole === 'admin') && (
+          <FounderDashboard />
         )}
 
       </motion.div>

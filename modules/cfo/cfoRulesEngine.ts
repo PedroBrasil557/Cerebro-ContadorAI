@@ -30,11 +30,11 @@ export const cfoRulesEngine = {
     }
 
     // --- RUNWAY ---
-    if (runway < 1) {
+    if (runway !== null && runway < 1) {
       alerts.push({ id: 'runway_1', metric: 'Runway', severity: 'critical', message: 'Caixa cobre menos de 1 mês.', value: runway });
-    } else if (runway < 3) {
+    } else if (runway !== null && runway < 3) {
       alerts.push({ id: 'runway_2', metric: 'Runway', severity: 'medium', message: 'Fôlego financeiro curto.', value: runway });
-    } else if (runway >= 6) {
+    } else if (runway !== null && runway >= 6) {
       alerts.push({ id: 'runway_3', metric: 'Runway', severity: 'success', message: 'Caixa com mais de 6 meses de segurança.', value: runway });
     }
 
@@ -51,7 +51,7 @@ export const cfoRulesEngine = {
     const netProfit = metrics.revenue - metrics.expenses - taxReserve;
     const runway = cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses);
 
-    if (netProfit <= 0 || runway < 1.5) return 0;
+    if (netProfit <= 0 || runway === null || runway < 1.5) return 0;
 
     const drawPercentage = runway >= 4 ? 0.7 : 0.4;
     return netProfit * drawPercentage;

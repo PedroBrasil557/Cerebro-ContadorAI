@@ -61,9 +61,16 @@ export async function createDebt(formData: FormData) {
 
 export async function updateDebt(id: string, amountPaid: number) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Auth required' }
     
     // Busca dívida atual
-    const { data: debt } = await supabase.from('debts').select('remaining_amount').eq('id', id).single()
+    const { data: debt } = await supabase
+      .from('debts')
+      .select('remaining_amount')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
     if(!debt) return { error: 'Dívida não encontrada' }
 
     const newRemaining = Number(debt.remaining_amount) - amountPaid
@@ -72,7 +79,7 @@ export async function updateDebt(id: string, amountPaid: number) {
     const { error } = await supabase.from('debts').update({
         remaining_amount: Math.max(0, newRemaining),
         status: status
-    }).eq('id', id)
+    }).eq('id', id).eq('user_id', user.id)
 
     if (error) return { error: 'Erro ao atualizar' }
     revalidatePath('/')
@@ -81,7 +88,10 @@ export async function updateDebt(id: string, amountPaid: number) {
 
 export async function deleteDebt(id: string) {
     const supabase = await createClient()
-    await supabase.from('debts').delete().eq('id', id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Auth required' }
+    const { error } = await supabase.from('debts').delete().eq('id', id).eq('user_id', user.id)
+    if (error) return { error: 'Erro ao excluir' }
     revalidatePath('/')
     return { success: true }
 }

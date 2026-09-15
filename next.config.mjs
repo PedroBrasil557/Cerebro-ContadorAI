@@ -3,14 +3,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  
-  // SOLUÇÃO: Força o uso do Webpack (compilador mais estável)
-  webpack: (config, { isServer }) => {
-    return config; // Usar a função webpack desativa o Turbopack
+  async headers() {
+    return [{
+      source: '/(.*)',
+      headers: [
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        { key: 'X-Frame-Options', value: 'DENY' },
+      ],
+    }]
   },
-  
-  // Removemos todas as opções problemáticas como swcMinify/experimental.
-
   images: {
     remotePatterns: [
       {

@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Session } from '@supabase/supabase-js'
+import Image from 'next/image'
+import type { Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
 import { CalendarClock, Bell, Menu, LogOut, ChevronDown, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
@@ -15,30 +16,41 @@ import Navigation from '@/core/components/Navigation'
 import AIAssistant from '@/core/components/ai/AIAssistant' 
 
 import { checkAndTriggerSystemNotifications } from '@/core/action/notifications'
+import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 import { ActiveTab } from '@/types'
-import { CreditCard, Goal, Transaction, ClientAppointment, CaixaData, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
+import { Goal, Transaction, CaixaData, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
 
 // ============================================================================
 // COMPONENTE: TOPBAR (CÉREBRO.OS GLOBAL HEADER)
 // ============================================================================
-const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMenu, onNavigate, onLogout }: any) => {
+interface TopBarProps {
+  user: User
+  profile: UserProfile | null
+  notifications: NotificationItem[]
+  onMarkAsRead: (id: string) => void
+  onToggleMenu: () => void
+  onNavigate: (tab: ActiveTab) => void
+  onLogout: () => void
+}
+
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return 'Bom dia'
+  if (hour >= 12 && hour < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+const TopBar = ({ user, profile, notifications, onMarkAsRead, onToggleMenu, onNavigate, onLogout }: TopBarProps) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifMenu, setShowNotifMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
-  const [greeting, setGreeting] = useState('')
+  const [greeting] = useState(getGreeting)
 
   useEffect(() => {
-    const hour = new Date().getHours()
-    if (hour >= 5 && hour < 12) setGreeting('Bom dia')
-    else if (hour >= 12 && hour < 18) setGreeting('Boa tarde')
-    else setGreeting('Boa noite')
-  }, [])
-
-  useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) setShowProfileMenu(false)
-      if (notifRef.current && !notifRef.current.contains(event.target)) setShowNotifMenu(false)
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setShowProfileMenu(false)
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) setShowNotifMenu(false)
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
@@ -58,7 +70,7 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
   return (
     <header className="sticky top-0 z-30 flex h-20 md:h-24 items-center justify-between px-4 md:px-8 bg-[#050505]/70 backdrop-blur-2xl border-b border-white/5">
       <div className="flex items-center gap-3 md:gap-4">
-        <button onClick={onToggleMenu} className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+        <button aria-label="Abrir menu" onClick={onToggleMenu} className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
             <Menu className="h-6 w-6" />
         </button>
         <div className="flex flex-col justify-center">
@@ -106,11 +118,11 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
          </div>
          
          <div className="relative" ref={menuRef}>
-            <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-white/5 transition-all group border border-white/5">
+            <button aria-label="Abrir menu do perfil" onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-white/5 transition-all group border border-white/5">
                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 p-[2px]">
                   <div className="h-full w-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                       {profile?.avatar_url ? (
-                          <img src={profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                          <Image src={profile.avatar_url} alt="Perfil" width={32} height={32} unoptimized className="h-full w-full object-cover" />
                       ) : (
                           <span className="font-bold text-xs text-white">{profile?.full_name?.charAt(0) || user?.email?.charAt(0).toUpperCase()}</span>
                       )}
@@ -122,7 +134,7 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
                 {showProfileMenu && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-4 w-64 rounded-3xl bg-[#0a0a0c] border border-white/10 shadow-2xl z-50 overflow-hidden">
                         <div className="p-5 border-b border-white/5 bg-white/[0.02]">
-                            <p className="text-sm font-bold text-white mb-1">Cérebro.OS Conta</p>
+                            <p className="text-sm font-bold text-white mb-1">Conta Cérebro.IA</p>
                             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                         </div>
                         <div className="p-2">
@@ -146,22 +158,19 @@ const TopBar = ({ title, user, profile, notifications, onMarkAsRead, onToggleMen
 // ============================================================================
 export default function MainAppLayout({ session }: { session: Session }) {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const [accountMode, setAccountMode] = useState<AccountMode>('personal')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [chartRange, setChartRange] = useState<'1M' | '3M' | '6M' | '1A'>('3M')
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [appointments, setAppointments] = useState<ClientAppointment[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
-  const [cards, setCards] = useState<CreditCard[]>([]) 
   const [investments, setInvestments] = useState<Investment[]>([]) 
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [caixa, setCaixa] = useState<CaixaData>({ currentBalance: 0, monthlyGoal: 15000, taxRate: 6, entries: [] })
+  const [caixa, setCaixa] = useState<CaixaData>({ currentBalance: 0, monthlyGoal: 0, taxRate: 0, reserveRate: 0, entries: [] })
 
   useEffect(() => {
     async function loadData() {
@@ -169,13 +178,11 @@ export default function MainAppLayout({ session }: { session: Session }) {
         try {
             await checkAndTriggerSystemNotifications()
 
-            const [dbProfile, dbTrans, dbAppts, dbGoals, dbCaixaData, dbCards, dbNotifs, dbInvests] = await Promise.all([
+            const [dbProfile, dbTrans, dbGoals, dbCaixaData, dbNotifs, dbInvests] = await Promise.all([
                 financeService.getProfile(),
                 financeService.getTransactions(),
-                financeService.getAppointments(),
                 financeService.getGoals(),
                 financeService.getCaixaData(),
-                financeService.getCards(),       
                 financeService.getNotifications(),
                 financeService.getInvestments()
             ])
@@ -185,22 +192,21 @@ export default function MainAppLayout({ session }: { session: Session }) {
                 if (dbProfile.account_mode) setAccountMode(dbProfile.account_mode)
             }
             if (dbTrans) setTransactions(dbTrans)
-            if (dbAppts) setAppointments(dbAppts)
             if (dbGoals) setGoals(dbGoals)
-            if (dbCards) setCards(dbCards)
             if (dbNotifs) setNotifications(dbNotifs)
             if (dbInvests) setInvestments(dbInvests)
             if (dbCaixaData) setCaixa(dbCaixaData)
 
         } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') return
             console.error("Erro crítico de sincronização:", error)
-            toast.error("Conexão instável. Usando dados cacheados.")
+            toast.error("Não foi possível carregar todos os dados.")
         } finally {
             setIsLoading(false)
         }
     }
     loadData()
-  }, [session, activeTab])
+  }, [session?.user])
 
   const handleLogout = async () => {
       await supabase.auth.signOut()
@@ -209,21 +215,10 @@ export default function MainAppLayout({ session }: { session: Session }) {
 
   // ✅ CÁLCULO DO SUMMARY FINANCEIRO (O motor que alimenta a IA)
   const financialSummary = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    const expense = transactions.filter(t => t.type !== 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    return { balance: income - expense, income, expense, emergencyTotal: caixa.currentBalance }
+    const income = calculateIncome(transactions)
+    const expense = calculateExpenses(transactions)
+    return { balance: calculateBalance(transactions), income, expense, emergencyTotal: caixa.currentBalance }
   }, [transactions, caixa])
-
-  const historyChartData = useMemo(() => {
-    if (transactions.length === 0) return []
-    const dataMap = new Map()
-    transactions.slice(-10).forEach(t => {
-        const key = new Date(t.date).toLocaleDateString('pt-BR', { month: 'short' })
-        const currentVal = dataMap.get(key) || 0
-        dataMap.set(key, currentVal + (t.type === 'receita' ? Number(t.amount) : -Number(t.amount)))
-    })
-    return Array.from(dataMap).map(([name, value]) => ({ name, value }))
-  }, [transactions])
 
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden relative font-sans">
@@ -237,11 +232,12 @@ export default function MainAppLayout({ session }: { session: Session }) {
         isOpen={isMenuOpen} 
         onClose={() => setIsMenuOpen(false)} 
         user={session.user} 
+        systemRole={userProfile?.system_role}
+        onAccountModeChange={setAccountMode}
       />
       
       <main className="flex-1 flex flex-col relative h-full">
         <TopBar 
-          title={activeTab} 
           user={session?.user} 
           profile={userProfile} 
           notifications={notifications} 
@@ -249,8 +245,6 @@ export default function MainAppLayout({ session }: { session: Session }) {
           onToggleMenu={() => setIsMenuOpen(!isMenuOpen)} 
           onNavigate={setActiveTab} 
           onLogout={handleLogout}
-          accountMode={accountMode}
-          setAccountMode={setAccountMode} 
         />
         
         <div className="flex-1 overflow-x-hidden overflow-y-auto bg-[url('/bg-grid.svg')] bg-fixed custom-scrollbar">
@@ -259,21 +253,13 @@ export default function MainAppLayout({ session }: { session: Session }) {
               handleRedirect={setActiveTab}
               user={session?.user} 
               summary={financialSummary}
-              charts={{ monthlyBalanceHistory: historyChartData, range: chartRange, setRange: setChartRange }} 
-              cards={cards}
               goals={goals}
               transactions={transactions} 
-              appointments={appointments}
               caixaData={caixa}
               investments={investments} 
-              emergencyFund={{ current_amount: caixa.currentBalance, target_amount: 30000, monthly_expenses: 5000, months_covered: Math.floor(caixa.currentBalance / 5000), target_months: 6, status: 'safe' }}
-              cdiRate={13.65}
-              healthScore={850}
-              onUpdateEmergencyFund={async () => {}}
+              systemRole={userProfile?.system_role}
+              accountMode={accountMode}
               onAddGoal={(g) => financeService.createGoal(g).then(res => setGoals(prev => [...prev, res]))}
-              onUpdateGoal={(g) => setGoals(prev => prev.map(item => item.id === g.id ? g : item))}
-              onUpdateStatus={async (id, status) => financeService.updateAppointmentStatus(id, status).then(() => setAppointments(prev => prev.map(a => a.id === id ? {...a, status: status as any} : a)))}
-              onAddAppointment={(appt: any) => financeService.createAppointment(appt).then(res => setAppointments(prev => [...prev, res]))} 
            />
            <div className="h-24" /> 
         </div>

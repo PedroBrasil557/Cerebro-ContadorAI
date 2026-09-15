@@ -8,12 +8,11 @@ interface ModernSummaryCardProps {
   value: number
   icon: LucideIcon
   color: 'indigo' | 'emerald' | 'red' | 'amber'
-  trend?: 'up' | 'down'
   prefix?: string
 }
 
 export default function ModernSummaryCard({ 
-  title, value, icon: Icon, color, trend, prefix = 'R$' 
+  title, value, icon: Icon, color, prefix = 'R$'
 }: ModernSummaryCardProps) {
   
   const colors = {

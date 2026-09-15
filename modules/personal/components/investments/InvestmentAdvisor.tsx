@@ -4,7 +4,7 @@
 import React from 'react'
 import { Goal, EmergencyFund } from '@/types_db'
 import { ActiveTab } from '@/types'
-import { ArrowUpIcon, ArrowDownIcon } from 'lucide-react'
+import { Landmark } from 'lucide-react'
 
 type InvestmentAdvisorProps = {
   goals: Goal[]
@@ -17,15 +17,10 @@ export default function InvestmentAdvisor({
   goals,
   emergencyFund,
   cdiRate,
-  handleRedirect = () => {},
+  handleRedirect,
 }: InvestmentAdvisorProps) {
-  // Simula sinal de desempenho (positivo/negativo)
-  const cdiPerformance = Math.random() > 0.5
-  const marketPerformance = Math.random() > 0.5
-
-  // Função para ação de investimento
   const handleActionClick = () => {
-    alert('API de consultoria ainda não está pronta. Em breve estará disponível!')
+    handleRedirect?.('investimentos')
   }
 
   return (
@@ -47,39 +42,29 @@ export default function InvestmentAdvisor({
         </p>
       </div>
 
-      {/* Indicadores de performance */}
+      {/* Indicadores com fontes reais disponíveis no produto */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <span className="text-gray-800 dark:text-gray-200">CDI</span>
-          <span
-            className={`flex items-center gap-1 font-medium ${
-              cdiPerformance ? 'text-green-500' : 'text-red-500'
-            }`}
-          >
-            {cdiRate.toFixed(2)}% 
-            {cdiPerformance ? <ArrowUpIcon size={16} /> : <ArrowDownIcon size={16} />}
+          <span className="text-gray-800 dark:text-gray-200">CDI de referência</span>
+          <span className="flex items-center gap-1 font-medium text-blue-500">
+            {cdiRate.toFixed(2)}% a.a.
+            <Landmark size={16} />
           </span>
         </div>
 
         <div className="flex items-center justify-between">
           <span className="text-gray-800 dark:text-gray-200">Mercado Global</span>
-          <span
-            className={`flex items-center gap-1 font-medium ${
-              marketPerformance ? 'text-green-500' : 'text-red-500'
-            }`}
-          >
-            {marketPerformance ? '+2.5%' : '-1.7%'}
-            {marketPerformance ? <ArrowUpIcon size={16} /> : <ArrowDownIcon size={16} />}
-          </span>
+          <span className="text-sm font-medium text-gray-500">Dados indisponíveis</span>
         </div>
       </div>
 
       {/* Botão de ação */}
       <button
         onClick={handleActionClick}
+        disabled={!handleRedirect}
         className="w-full mt-4 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors shadow-md"
       >
-        Ver recomendações
+        {handleRedirect ? 'Ver investimentos' : 'Recomendações em breve'}
       </button>
     </div>
   )

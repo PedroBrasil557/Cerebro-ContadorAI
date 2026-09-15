@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+      GROQ_API_KEY: test-groq-key
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      STRIPE_PRICE_PRO: price_pro_placeholder
+      STRIPE_PRICE_PREMIUM: price_premium_placeholder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Production build
+        run: npm run build
+
+  release-rls:
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_RLS_REQUIRED: 'true'
+      SUPABASE_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start isolated Supabase and apply migrations
+        run: npx supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - name: Rebuild isolated database from migrations
+        run: npx supabase db reset --local --yes --no-seed
+      - name: Mandatory cross-tenant RLS suite
+        shell: bash
+        run: |
+          eval "$(npx supabase status -o env)"
+          export SUPABASE_TEST_URL="$API_URL"
+          export SUPABASE_TEST_ANON_KEY="${PUBLISHABLE_KEY:-$ANON_KEY}"
+          export SUPABASE_TEST_SERVICE_ROLE_KEY="${SECRET_KEY:-$SERVICE_ROLE_KEY}"
+          npm run test:rls
+
+  release-e2e:
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      RELEASE_E2E_REQUIRED: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3100
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      E2E_PROVISION_USER: 'true'
+      GROQ_API_KEY: test-groq-key
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      STRIPE_PRICE_PRO: price_pro_placeholder
+      STRIPE_PRICE_PREMIUM: price_premium_placeholder
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start isolated Supabase and apply migrations
+        run: npx supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - run: npx playwright install --with-deps chromium
+      - name: Mandatory release E2E suite
+        shell: bash
+        run: |
+          eval "$(npx supabase status -o env)"
+          export NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="${PUBLISHABLE_KEY:-$ANON_KEY}"
+          export SUPABASE_SERVICE_ROLE_KEY="${SECRET_KEY:-$SERVICE_ROLE_KEY}"
+          npm run test:e2e

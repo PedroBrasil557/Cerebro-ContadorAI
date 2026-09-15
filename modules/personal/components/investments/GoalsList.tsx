@@ -47,7 +47,7 @@ export default function GoalsList({ goals, onGoalClick, onAddValue }: GoalsListP
       </div>
 
       <div className="custom-scrollbar max-h-[400px] space-y-6 overflow-y-auto pr-2">
-        {goals.map((goal: any) => {
+        {goals.map((goal) => {
           const pct = Math.min((goal.current_amount / goal.target_amount) * 100, 100)
           const isEditingThis = editingId === goal.id
 

@@ -9,9 +9,14 @@ interface Props {
   investments: Investment[]
 }
 
+interface AllocationItem {
+  name: string
+  value: number
+}
+
 export default function AllocationChart({ investments }: Props) {
   // 1. Agrupar investimentos por tipo e somar os valores
-  const data = investments.reduce((acc: any[], curr) => {
+  const data = investments.reduce<AllocationItem[]>((acc, curr) => {
     const existing = acc.find(i => i.name === curr.type)
     // Calcula o valor total deste ativo (Quantidade * Preço Atual)
     const value = curr.quantity * curr.current_price
@@ -65,7 +70,7 @@ export default function AllocationChart({ investments }: Props) {
                <Tooltip 
                   // CORREÇÃO DO ERRO AQUI:
                   // Aceitamos 'any' ou 'number | string' para evitar conflito com a tipagem do Recharts
-                  formatter={(value: any) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                  formatter={(value: number | string | undefined) => `R$ ${Number(value ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                   contentStyle={{ 
                      backgroundColor: '#18181b', 
                      border: '1px solid #27272a', 

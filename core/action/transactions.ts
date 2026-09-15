@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createNotification } from './notifications'
+import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 
 // 🛡️ Definição Completa (Corrigida: 100% compatível com o types_db)
 export interface Transaction {
@@ -12,6 +13,7 @@ export interface Transaction {
   description: string
   amount: number
   type: 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia'
+  scope: 'personal' | 'business'
   category: string
   date: string
   is_fixed: boolean // 🔥 Removida a interrogação (?)
@@ -32,6 +34,7 @@ export async function getTransactions() {
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
+    .eq('scope', 'personal')
     .order('date', { ascending: false })
     .limit(500)
 
@@ -51,25 +54,21 @@ export async function getDashboardSummary() {
     .from('transactions')
     .select('amount, type, date, is_paid')
     .eq('user_id', user.id)
+    .eq('scope', 'personal')
 
   if (!transactions) return { balance: 0, income: 0, expense: 0 }
 
-  const activeTransactions = transactions.filter((t: any) => {
+  const activeTransactions = transactions.filter((t) => {
      const isPaid = t.is_paid === true
      const isPastOrToday = t.date <= today
      return isPaid || isPastOrToday
   })
 
-  // toLowerCase() garante que some mesmo se no banco estiver 'Receita' ou 'receita'
-  const income = activeTransactions
-    .filter((t: any) => t.type?.toLowerCase() === 'receita')
-    .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
+  const typedTransactions = activeTransactions as Pick<Transaction, 'amount' | 'type' | 'date'>[]
+  const income = calculateIncome(typedTransactions)
+  const expense = calculateExpenses(typedTransactions)
 
-  const expense = activeTransactions
-    .filter((t: any) => t.type?.toLowerCase() !== 'receita')
-    .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
-
-  return { balance: income - expense, income, expense }
+  return { balance: calculateBalance(typedTransactions), income, expense }
 }
 
 // 3. CRIAR (COM NOTIFICAÇÃO E CORREÇÃO DE COLUNAS)
@@ -96,6 +95,7 @@ export async function createTransaction(formData: FormData) {
     description: description,
     amount: isNaN(amount) ? 0 : amount,
     type: type,
+    scope: 'personal',
     category: formData.get('category') as string,
     date: date,
     is_fixed: isFixed,
@@ -139,12 +139,17 @@ export async function createTransaction(formData: FormData) {
 // 4. ATUALIZAR
 export async function updateTransaction(data: Transaction, reason: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Auth required' }
   if (!reason || reason.trim().length < 3) return { error: 'Motivo obrigatório.' }
 
   const { error } = await supabase.from('transactions').update({
       description: data.description, amount: data.amount, type: data.type, 
       category: data.category, date: data.date, edit_note: reason, payment_method: data.payment_method
-    }).eq('id', data.id)
+    })
+    .eq('id', data.id)
+    .eq('user_id', user.id)
+    .eq('scope', 'personal')
 
   if (error) return { error: 'Erro ao atualizar.' }
   
@@ -155,6 +160,8 @@ export async function updateTransaction(data: Transaction, reason: string) {
 // 5. TOGGLE (MARCAR COMO PAGO)
 export async function toggleBillPayment(id: string, isPaid: boolean) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Auth required' }
     
     const { error } = await supabase.from('transactions')
         .update({ 
@@ -162,6 +169,8 @@ export async function toggleBillPayment(id: string, isPaid: boolean) {
             status: isPaid ? 'concluido' : 'pendente'
         })
         .eq('id', id)
+        .eq('user_id', user.id)
+        .eq('scope', 'personal')
         
     if (error) return { error: 'Erro ao atualizar.' }
     
@@ -176,7 +185,14 @@ export async function toggleBillPayment(id: string, isPaid: boolean) {
 // 6. DELETAR
 export async function deleteTransaction(id: string) {
   const supabase = await createClient()
-  const { error } = await supabase.from('transactions').delete().eq('id', id)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Auth required' }
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .eq('scope', 'personal')
   if (error) return { error: 'Erro ao excluir.' }
   
   revalidatePath('/', 'layout')
@@ -198,11 +214,11 @@ export async function copyFixedTransactionsToMonth(targetDateStr: string) {
 
   if (!pastFixed || pastFixed.length === 0) return { success: false, message: 'Nada a copiar.' }
 
-  const newTransactions = pastFixed.map((t: any) => {
+  const newTransactions = (pastFixed as Transaction[]).map((t) => {
     const oldDate = new Date(t.date)
     const newTxDate = new Date(Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), oldDate.getUTCDate()))
     return {
-      user_id: user.id, description: t.description, amount: t.amount, type: t.type, category: t.category, is_fixed: true,
+      user_id: user.id, description: t.description, amount: t.amount, type: t.type, scope: 'personal', category: t.category, is_fixed: true,
       is_paid: false, status: 'pendente', date: newTxDate.toISOString().split('T')[0], due_date: newTxDate.toISOString().split('T')[0], 
       payment_method: t.payment_method
     }

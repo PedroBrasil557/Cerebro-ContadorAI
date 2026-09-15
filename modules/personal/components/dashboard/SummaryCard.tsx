@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { LucideIcon, HelpCircle } from 'lucide-react'
 
 interface SummaryCardProps {
   title: string
   value: string | number
   icon?: LucideIcon
-  trend?: 'up' | 'down' | 'neutral' | 'brand'
   trendValue?: string
   color?: string
   onChange?: (value: number) => void
@@ -18,7 +17,6 @@ export default function SummaryCard({
   title, 
   value, 
   icon: IconProp, 
-  trend = 'neutral', 
   trendValue,
   color = 'text-indigo-500',
   onChange,
@@ -32,10 +30,6 @@ export default function SummaryCard({
   
   const [isEditing, setIsEditing] = useState(false)
   const [tempVal, setTempVal] = useState(safeValue.toString())
-
-  useEffect(() => {
-    setTempVal((value ?? 0).toString())
-  }, [value])
 
   const save = () => {
     // 3. PROTEÇÃO CONTRA ONCHANGE INEXISTENTE
@@ -75,7 +69,12 @@ export default function SummaryCard({
               />
             ) : (
               <h3 
-                onClick={() => editable && setIsEditing(true)}
+                onClick={() => {
+                  if (editable) {
+                    setTempVal(safeValue.toString())
+                    setIsEditing(true)
+                  }
+                }}
                 className={`text-3xl font-bold text-white tracking-tight ${editable ? 'cursor-pointer hover:text-indigo-400 transition-colors' : ''}`}
               >
                 {typeof value === 'number' 

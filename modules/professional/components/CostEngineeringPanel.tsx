@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calculator, Package, Sliders, TrendingUp, AlertTriangle, CheckCircle2, Plus, X, Loader2, Trash2 } from 'lucide-react'
+import { Package, Sliders, TrendingUp, AlertTriangle, CheckCircle2, Plus, X, Loader2, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -18,9 +18,10 @@ interface NailProduct {
 }
 
 export default function CostEngineeringPanel() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   const [materials, setMaterials] = useState<NailProduct[]>([])
+  const [fixedCostPerService, setFixedCostPerService] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [currentPrice, setCurrentPrice] = useState<number>(120)
   
@@ -28,28 +29,36 @@ export default function CostEngineeringPanel() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [newMat, setNewMat] = useState({ name: '', category: 'gel', purchase_price: '', quantity: '', estimated_yield: '' })
 
-  const fetchMaterials = async () => {
-    setIsLoading(true)
+  const fetchMaterials = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      const { data, error } = await supabase
-        .from('nail_products')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+      const [{ data, error }, { data: transactions, error: transactionError }] = await Promise.all([
+        supabase.from('nail_products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('scope', 'business').gte('date', monthStart),
+      ])
       
       if (error) {
          console.error("Erro ao buscar insumos:", error)
       } else if (data) {
          setMaterials(data)
       }
+      if (transactionError) {
+        console.error("Erro ao buscar custos fixos:", transactionError)
+      } else {
+        const serviceCount = (transactions ?? []).filter(tx => tx.type === 'receita').length
+        const fixedCosts = (transactions ?? [])
+          .filter(tx => tx.type === 'despesa_fixa')
+          .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
+        setFixedCostPerService(serviceCount > 0 && fixedCosts > 0 ? fixedCosts / serviceCount : null)
+      }
     }
     setIsLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchMaterials()
-  }, [])
+    void fetchMaterials()
+  }, [fetchMaterials])
 
   // 💾 NOVA FUNÇÃO BLINDADA (COM AVISO DE ERROS)
   const handleAddMaterial = async (e: React.FormEvent) => {
@@ -96,7 +105,9 @@ export default function CostEngineeringPanel() {
   }
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('nail_products').delete().eq('id', id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase.from('nail_products').delete().eq('id', id).eq('user_id', user.id)
     if (error) {
        alert(`Erro ao deletar: ${error.message}`)
     } else {
@@ -105,8 +116,10 @@ export default function CostEngineeringPanel() {
   }
 
   const totalMaterialCost = materials.reduce((acc, curr) => acc + Number(curr.cost_per_application || 0), 0)
-  const fixedCostApportionment = 15.00
-  const totalRealCost = totalMaterialCost + fixedCostApportionment
+  const dataState = materials.length === 0
+    ? 'missing_data'
+    : fixedCostPerService === null ? 'estimated' : 'real'
+  const totalRealCost = totalMaterialCost + (fixedCostPerService ?? 0)
   
   const netProfit = currentPrice - totalRealCost
   const profitMarginPct = currentPrice > 0 ? ((netProfit / currentPrice) * 100) : 0
@@ -178,13 +191,13 @@ export default function CostEngineeringPanel() {
             {materials.length > 0 && (
               <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/5 border-dashed">
                 <span className="text-sm font-bold text-gray-500">Rateio Custo Fixo (Aluguel/Energia)</span>
-                <span className="text-sm font-black text-gray-500">{formatCurrency(fixedCostApportionment)}</span>
+                <span className="text-sm font-black text-gray-500">{fixedCostPerService === null ? 'Não informado' : formatCurrency(fixedCostPerService)}</span>
               </div>
             )}
           </div>
 
           <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-center justify-between relative z-10">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-widest">Custo Real Total</span>
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-widest">Custo total <span className="text-amber-400">{dataState === 'real' ? 'REAL' : dataState === 'estimated' ? 'PARCIAL' : 'DADOS AUSENTES'}</span></span>
             <span className="text-xl font-black text-indigo-400">{formatCurrency(totalRealCost)}</span>
           </div>
         </div>

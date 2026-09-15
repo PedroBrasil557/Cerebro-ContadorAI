@@ -25,17 +25,8 @@ export default function CdiCard({ cdiRate }: { cdiRate: number }) {
       </div>
 
       <div className="mt-6 w-full bg-white/5 rounded-lg p-3">
-        <div className="flex justify-between text-xs text-gray-500 mb-1">
-          <span>Poupança</span>
-          <span>CDI (Cérebro)</span>
-        </div>
-        {/* Barra Comparativa */}
-        <div className="relative h-2 w-full bg-gray-700 rounded-full overflow-hidden">
-          <div className="absolute top-0 left-0 h-full w-[60%] bg-gray-500" /> {/* Poupança */}
-          <div className="absolute top-0 left-0 h-full w-[95%] bg-violet-500 mix-blend-overlay" /> {/* CDI */}
-        </div>
-        <p className="text-[10px] text-gray-400 mt-2 text-left">
-          Seu dinheiro rende <strong>30% mais</strong> que a poupança aqui.
+        <p className="text-[10px] text-gray-400 text-left">
+          Taxa de referência informativa. A rentabilidade efetiva depende do produto, prazo, custos e impostos.
         </p>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React from 'react'
 import { CreditCard } from '@/types_db'
 import { motion } from 'framer-motion'
-import { CreditCard as CardIcon, TrendingUp, AlertCircle } from 'lucide-react'
+import { CreditCard as CardIcon } from 'lucide-react'
 
 interface CreditCardSummaryProps {
   cards: CreditCard[]

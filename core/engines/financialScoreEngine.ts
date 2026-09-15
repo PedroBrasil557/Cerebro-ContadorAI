@@ -31,27 +31,33 @@ export function calculatePersonalFinancialScore(data: FinancialScoreInput): Scor
     };
     
     // Trava de segurança: Se a renda for zero, tratamos como 1 para evitar erro matemático de divisão por zero
-    const safeIncome = data.monthlyIncome > 0 ? data.monthlyIncome : 0;
-    const safeFixedExpenses = data.monthlyFixedExpenses > 0 ? data.monthlyFixedExpenses : 1;
+    const nonNegativeFinite = (value: number) => Number.isFinite(value) && value > 0 ? value : 0;
+    const safeIncome = nonNegativeFinite(data.monthlyIncome);
+    const safeSavedAmount = nonNegativeFinite(data.monthlySavedAmount);
+    const safeDebtPayments = nonNegativeFinite(data.monthlyDebtPayments);
+    const safeEmergencyFund = nonNegativeFinite(data.emergencyFundBalance);
+    const safeFixedExpenses = nonNegativeFinite(data.monthlyFixedExpenses);
 
     // 1. Nota de Poupança (Ideal: poupar 20% ou mais da renda)
     // Se não tem renda, a nota de poupança é 0 por padrão.
-    const savingsPct = safeIncome > 0 ? (data.monthlySavedAmount / safeIncome) * 100 : 0;
-    const savingsScore = Math.min((savingsPct / 20) * 100, 100);
+    const savingsPct = safeIncome > 0 ? (safeSavedAmount / safeIncome) * 100 : 0;
+    const savingsScore = Math.min(Math.max((savingsPct / 20) * 100, 0), 100);
 
     // 2. Nota de Emergência (Ideal: cobrir 6 meses de despesas fixas)
-    const monthsCovered = data.emergencyFundBalance / safeFixedExpenses;
-    const emergencyScore = Math.min((monthsCovered / 6) * 100, 100);
+    const monthsCovered = safeFixedExpenses > 0 ? safeEmergencyFund / safeFixedExpenses : 0;
+    const emergencyScore = safeFixedExpenses === 0 && safeEmergencyFund > 0
+        ? 100
+        : Math.min(Math.max((monthsCovered / 6) * 100, 0), 100);
 
     // 3. Nota de Endividamento (Ideal: comprometer menos de 30% da renda)
     // Se não tem renda mas tem dívida, o score cai para zero.
     let debtScore = 0;
     if (safeIncome > 0) {
-        const debtRatio = (data.monthlyDebtPayments / safeIncome) * 100;
+        const debtRatio = (safeDebtPayments / safeIncome) * 100;
         debtScore = Math.max(100 - ((debtRatio / 30) * 100), 0);
     } else {
         // Se não tem renda e tem dívida, nota 0. Se não tem renda e nem dívida, nota 100.
-        debtScore = data.monthlyDebtPayments > 0 ? 0 : 100;
+        debtScore = safeDebtPayments > 0 ? 0 : 100;
     }
 
     // 4. Nota de Fluxo de Caixa (Fidelidade ao dado booleano)

@@ -1,78 +1,67 @@
-import { NextResponse } from "next/server"
-import Groq from "groq-sdk"
+import { z } from 'zod'
+import { ForbiddenError, RateLimitError } from '@/lib/api/errors'
+import { errorResponse, successResponse } from '@/lib/api/response'
+import { getGroqClient } from '@/lib/ai/groq'
+import { requireUser } from '@/lib/auth/requireUser'
+import { getUserEntitlements } from '@/lib/billing/getEntitlements'
+import { checkUsageLimit } from '@/lib/security/checkUsageLimit'
+import { createClient } from '@/lib/supabase/server'
 
-export async function POST(req: Request) {
+export const dynamic = 'force-dynamic'
+
+const requestSchema = z.object({}).strict()
+
+export async function POST(request: Request) {
   try {
-    // 1. Recebe os dados do Frontend
-    const { debts, transactions } = await req.json()
-    
-    // 2. Verifica a Chave
-    const apiKey = process.env.GROQ_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "API Key da Groq não configurada" }, { status: 500 })
-    }
+    const user = await requireUser()
+    const billing = await getUserEntitlements(user.id)
+    if (!billing.entitlements.debtCenter) throw new ForbiddenError('A Central de Dívidas requer o plano PRO.')
 
-    // 3. Inicializa a Groq
-    const groq = new Groq({ apiKey });
+    requestSchema.parse(await request.json())
+    const usage = await checkUsageLimit(user.id, 'ai_debt_strategy', billing.plan)
+    if (!usage.allowed) throw new RateLimitError()
 
-    // 4. Prepara o contexto financeiro (Cálculos rápidos para ajudar a IA)
+    const supabase = await createClient()
+    const [debtsResult, transactionsResult] = await Promise.all([
+      supabase
+        .from('debts')
+        .select('name, remaining_amount, interest_rate')
+        .eq('user_id', user.id)
+        .limit(50),
+      supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id)
+        .eq('scope', 'personal')
+        .order('date', { ascending: false })
+        .limit(50),
+    ])
+    const databaseError = debtsResult.error ?? transactionsResult.error
+    if (databaseError) throw databaseError
+    const debts = debtsResult.data ?? []
+    const transactions = transactionsResult.data ?? []
+
     const income = transactions
-      .filter((t: any) => t.type === 'receita')
-      .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
-      
+      .filter((transaction) => transaction.type === 'receita')
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
     const expenses = transactions
-      .filter((t: any) => t.type !== 'receita')
-      .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
+      .filter((transaction) => transaction.type === 'despesa_fixa' || transaction.type === 'despesa_variavel')
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
+    const balance = income - expenses
+    const totalDebt = debts.reduce((sum, debt) => sum + debt.remaining_amount, 0)
 
-    const balance = income - Math.abs(expenses)
-    const totalDebt = debts.reduce((acc: number, d: any) => acc + Number(d.remaining_amount), 0)
+    const prompt = `Crie um plano educativo e objetivo de quitação em PT-BR. Não invente valores. Todos os valores abaixo foram consultados no servidor para o usuário autenticado.\nRenda: R$ ${income.toFixed(2)}\nDespesas: R$ ${expenses.toFixed(2)}\nSaldo livre: R$ ${balance.toFixed(2)}\nDívida total: R$ ${totalDebt.toFixed(2)}\nDívidas: ${JSON.stringify(debts)}\nEstruture em Diagnóstico, Estratégia, Plano de ação e Pontos para revisar.`
+    const completion = await getGroqClient().chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.3,
+      max_tokens: 1500,
+    })
 
-    // 5. O Prompt (Instruções para a IA)
-    const prompt = `
-      Atue como o Cérebro Financial AI, um especialista em quitação de dívidas.
-      
-      DADOS DO CLIENTE:
-      - Renda Mensal: R$ ${income.toFixed(2)}
-      - Despesas: R$ ${expenses.toFixed(2)}
-      - Saldo Livre: R$ ${balance.toFixed(2)}
-      - Total em Dívidas: R$ ${totalDebt.toFixed(2)}
-      
-      DÍVIDAS CADASTRADAS:
-      ${debts.map((d: any) => `- ${d.name}: R$ ${d.remaining_amount} (Juros: ${d.interest_rate}%)`).join('\n')}
-      
-      TAREFA:
-      Crie um plano estratégico curto e direto para quitar essas dívidas.
-      
-      RESPOSTA EM MARKDOWN (Siga esta estrutura):
-      ### 📊 Diagnóstico
-      (Uma frase sobre a situação atual).
-
-      ### 🎯 A Estratégia
-      (Qual dívida pagar primeiro e por quê? Use matemática).
-
-      ### 💰 Plano de Ação
-      (Quanto pagar por mês em cada uma).
-
-      ### 💡 Dica de Ouro
-      (Uma dica de negociação ou corte de gastos).
-
-      Não use introduções longas. Vá direto ao ponto. Use emojis.
-    `
-
-    // 6. Chama a IA (MODELO ATUALIZADO)
-    const completion = await groq.chat.completions.create({
-        messages: [{ role: "user", content: prompt }],
-        // MODELO CORRIGIDO:
-        model: "llama-3.3-70b-versatile", 
-        temperature: 0.3,
-    });
-
-    const strategy = completion.choices[0]?.message?.content || "Erro ao gerar texto."
-
-    return NextResponse.json({ strategy })
-
+    const strategy = completion.choices[0]?.message?.content
+      ?? 'Não foi possível gerar a estratégia neste momento.'
+    return successResponse({ strategy, remaining: usage.remaining, resetAt: usage.resetAt })
   } catch (error) {
-    console.error("Erro Groq:", error)
-    return NextResponse.json({ error: "Falha na IA" }, { status: 500 })
+    return errorResponse(error, { feature: 'debt-strategy', route: '/api/ai/debt-strategy', provider: 'groq' })
   }
 }

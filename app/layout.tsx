@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner"; 
+import { BRAND } from '@/lib/branding'
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Cérebro.OS | Motor Financeiro",
+  title: `${BRAND.name} | ${BRAND.tagline}`,
   description: "A inteligência financeira definitiva com IA cognitiva integrada.",
   icons: {
     // Truque mestre: Um SVG gerado por código usando um emoji como logo temporária!

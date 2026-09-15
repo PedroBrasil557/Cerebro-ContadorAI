@@ -28,8 +28,8 @@ export const cfoEngine = {
   },
 
   // 4. Fôlego Financeiro (Runway)
-  calculateRunway: (cashReserve: number, monthlyBurn: number): number => {
-    if (monthlyBurn <= 0) return 99; // Infinito
+  calculateRunway: (cashReserve: number, monthlyBurn: number): number | null => {
+    if (monthlyBurn <= 0) return null;
     return cashReserve / monthlyBurn;
   },
 
@@ -64,9 +64,9 @@ export const cfoEngine = {
     else if (netMargin > 0) score += 10;
 
     // Regra 2: Caixa (Max 40)
-    if (runway >= 6) score += 40;
-    else if (runway >= 3) score += 20;
-    else if (runway >= 1) score += 5;
+    if (runway !== null && runway >= 6) score += 40;
+    else if (runway !== null && runway >= 3) score += 20;
+    else if (runway !== null && runway >= 1) score += 5;
 
     // Regra 3: Eficiência (Max 20)
     if (metrics.revenue > metrics.expenses * 1.5) score += 20;

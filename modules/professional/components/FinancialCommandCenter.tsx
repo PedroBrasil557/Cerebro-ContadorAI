@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
-  TrendingUp, Activity, DollarSign, BrainCircuit, 
+  Activity, DollarSign, BrainCircuit,
   ShieldCheck, AlertTriangle, Target, Calculator, Users, Loader2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
@@ -56,6 +56,7 @@ export default function FinancialCommandCenter() {
         .from('transactions')
         .select('amount, type')
         .eq('user_id', user.id)
+        .eq('scope', 'business')
         .gte('date', startOfMonth)
 
       // 3. Buscar Insumos (Custos)
@@ -69,7 +70,7 @@ export default function FinancialCommandCenter() {
       let totalAppointments = 0 // Simulação baseada em número de receitas
 
       if (txs) {
-        txs.forEach(tx => {
+        txs.forEach((tx: { amount: number; type: string }) => {
           if (tx.type === 'receita') {
             grossRev += Number(tx.amount)
             totalAppointments += 1
@@ -78,18 +79,23 @@ export default function FinancialCommandCenter() {
       }
 
       // Custo dos materiais por cada atendimento feito
-      const materialCostPerApp = materials ? materials.reduce((acc, curr) => acc + Number(curr.cost_per_application || 0), 0) : 0
+      const materialCostPerApp = materials
+        ? materials.reduce(
+          (acc: number, curr: { cost_per_application: number | null }) =>
+            acc + Number(curr.cost_per_application || 0),
+          0
+        )
+        : 0
       const totalMaterialCost = materialCostPerApp * totalAppointments
       
-      // Simulação de Despesa Fixa (ex: aluguel) = 30% do faturamento (ajustável no futuro)
-      const estimatedFixedCost = grossRev * 0.30 
-      
-      const netProfit = grossRev - totalMaterialCost - estimatedFixedCost
+      const registeredExpenses = (txs ?? [])
+        .filter((tx: { type: string }) => tx.type === 'despesa_fixa' || tx.type === 'despesa_variavel')
+        .reduce((sum: number, tx: { amount: number }) => sum + Math.abs(Number(tx.amount)), 0)
+      const netProfit = grossRev - totalMaterialCost - registeredExpenses
       const margin = grossRev > 0 ? (netProfit / grossRev) * 100 : 0
       
-      // Algoritmo do Pró-labore (Seguro sacar 60% do lucro, reinvestir 40%)
-      const safeProLabore = netProfit > 0 ? netProfit * 0.6 : 0
-      const reinvestment = netProfit > 0 ? netProfit * 0.4 : 0
+      const safeProLabore = 0
+      const reinvestment = 0
 
       // Algoritmo do Índice de Estabilidade (0 a 100)
       let stability = 0
@@ -154,7 +160,7 @@ export default function FinancialCommandCenter() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => setActiveSubTab(tab.id as 'visao_geral' | 'custos' | 'crm' | 'decisao')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all duration-300 ${
                 activeSubTab === tab.id 
                   ? 'bg-white/10 text-white shadow-md' 
@@ -206,27 +212,27 @@ export default function FinancialCommandCenter() {
                     Margem: {health.profit_margin_pct.toFixed(1)}%
                   </span>
                 </div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Lucro Líquido Real</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Lucro Líquido Estimado</p>
                 <h3 className="text-3xl font-black text-white mt-1 relative z-10">{formatCurrency(health.net_profit)}</h3>
               </div>
             </div>
 
             <div className="bg-[#050505] border border-white/5 rounded-3xl p-6 shadow-inner">
-               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Distribuição de Lucro Recomendada</h4>
+               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Distribuição pendente de configuração <span className="ml-2 text-amber-400">ESTIMATIVA</span></h4>
                <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Pró-Labore Seguro (Saque)</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Pró-Labore não configurado</p>
                      <p className="text-xl font-black text-emerald-400">{formatCurrency(health.safe_pro_labore)}</p>
                   </div>
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Caixa da Empresa (Reinvestir)</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Reinvestimento não configurado</p>
                      <p className="text-xl font-black text-white">{formatCurrency(health.reinvestment_pool)}</p>
                   </div>
                </div>
             </div>
           </div>
 
-          {/* COLUNA DIREITA: IA & Índice de Estabilidade */}
+          {/* COLUNA DIREITA: indicadores determinísticos */}
           <div className="space-y-6 flex flex-col">
             
             <div className={`relative bg-[#0a0a0c] border rounded-3xl p-6 flex flex-col items-center justify-center text-center overflow-hidden transition-colors ${getIndexColor(health.stability_index)}`}>
@@ -242,7 +248,7 @@ export default function FinancialCommandCenter() {
                   </svg>
                   <div className="absolute flex flex-col items-center justify-center">
                     <span className="text-4xl font-black text-white tracking-tighter">{health.stability_index}</span>
-                    <span className="text-[9px] text-gray-400 font-bold uppercase mt-1">Score Real</span>
+                    <span className="text-[9px] text-gray-400 font-bold uppercase mt-1">Regra local</span>
                   </div>
                </div>
                <p className="text-xs font-bold text-white relative z-10">
@@ -253,22 +259,22 @@ export default function FinancialCommandCenter() {
             <div className="flex-1 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 border border-indigo-500/20 rounded-3xl p-6 relative overflow-hidden">
                <div className="flex items-center gap-2 mb-4">
                  <BrainCircuit className="text-indigo-400 animate-pulse" size={18} />
-                 <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest">CFO Virtual</h4>
+                 <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Resumo por regras</h4>
                </div>
                
                <div className="space-y-4 relative z-10">
                   <div className="bg-black/20 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
                      <p className="text-sm text-gray-300 leading-relaxed font-medium">
                        {health.gross_revenue === 0 
-                         ? "Olá! Eu sou a sua IA CFO. Registre suas primeiras receitas no Caixa para eu começar a analisar o seu negócio."
-                         : `Seu ticket médio atual é de R$ ${health.average_ticket.toFixed(2)}. Continue registrando suas clientes para que eu possa projetar seu fechamento de mês.`}
+                         ? "Registre suas primeiras receitas no Caixa para calcular os indicadores do negócio."
+                         : `O ticket médio estimado por lançamento de receita é R$ ${health.average_ticket.toFixed(2)}. Continue registrando as movimentações para melhorar a base do cálculo.`}
                      </p>
                   </div>
                   {health.profit_margin_pct < 40 && health.gross_revenue > 0 && (
                     <div className="bg-rose-500/10 p-4 rounded-2xl border border-rose-500/20 backdrop-blur-sm flex gap-3 items-start">
                        <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />
                        <p className="text-xs text-rose-200 leading-relaxed">
-                         Alerta: Sua margem está abaixo de 40%. Vá até a aba "Engenharia de Preços" para recalcular seus custos urgemente.
+                         Alerta: Sua margem está abaixo de 40%. Vá até a aba &quot;Engenharia de Preços&quot; para recalcular seus custos urgentemente.
                        </p>
                     </div>
                   )}

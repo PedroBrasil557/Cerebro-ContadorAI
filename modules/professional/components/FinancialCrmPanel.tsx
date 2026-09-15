@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Users, Star, AlertTriangle, Clock, MessageCircle, Sparkles, TrendingUp, Plus, X, Loader2, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
@@ -17,7 +17,7 @@ interface NailClient {
 }
 
 export default function FinancialCrmPanel() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   
   const [clients, setClients] = useState<NailClient[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -28,11 +28,10 @@ export default function FinancialCrmPanel() {
   const [newClient, setNewClient] = useState({ name: '', phone: '', total_spent: '', visit_count: '', last_visit: '' })
 
   // 🔄 BUSCAR DADOS REAIS DO SUPABASE
-  const fetchClients = async () => {
-    setIsLoading(true)
+  const fetchClients = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('nail_clients')
         .select('*')
         .eq('user_id', user.id)
@@ -41,11 +40,11 @@ export default function FinancialCrmPanel() {
       if (data) setClients(data)
     }
     setIsLoading(false)
-  }
+  }, [supabase])
 
   useEffect(() => {
-    fetchClients()
-  }, [])
+    void fetchClients()
+  }, [fetchClients])
 
   // 💾 CADASTRAR NOVA CLIENTE
   const handleAddClient = async (e: React.FormEvent) => {
@@ -70,19 +69,21 @@ export default function FinancialCrmPanel() {
       setIsModalOpen(false)
       setNewClient({ name: '', phone: '', total_spent: '', visit_count: '', last_visit: '' })
       fetchClients()
-    } catch (error: any) {
-      alert(`Erro ao salvar cliente: ${error.message}`)
+    } catch (error: unknown) {
+      alert(`Erro ao salvar cliente: ${error instanceof Error ? error.message : 'falha inesperada'}`)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    await supabase.from('nail_clients').delete().eq('id', id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('nail_clients').delete().eq('id', id).eq('user_id', user.id)
     fetchClients()
   }
 
-  // 🧠 MOTOR DE INTELIGÊNCIA ARTIFICIAL (Classificação Dinâmica)
+  // Classificação determinística baseada em recência e gasto registrado.
   const analyzeClient = (client: NailClient) => {
     const today = new Date()
     const lastVisitDate = new Date(client.last_visit)
@@ -96,10 +97,10 @@ export default function FinancialCrmPanel() {
       ai_action = 'Pesquisa de satisfação e resgate'
     } else if (daysSinceVisit > 25) {
       status = 'risco'
-      ai_action = 'Enviar voucher de R$ 20'
+      ai_action = 'Entrar em contato para entender a ausência'
     } else if (client.total_spent > 1500) {
       status = 'vip'
-      ai_action = 'Oferecer upgrade cortesia (Nail Art)'
+      ai_action = 'Revisar opções de fidelização'
     }
 
     return { status, ai_action, daysSinceVisit }
@@ -154,7 +155,7 @@ export default function FinancialCrmPanel() {
               <Sparkles size={24} />
            </div>
            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">LTV Médio (Retenção)</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Gasto médio acumulado</p>
               <h3 className="text-2xl font-black text-white">{formatCurrency(averageLTV)}</h3>
            </div>
         </div>
@@ -165,7 +166,7 @@ export default function FinancialCrmPanel() {
               <AlertTriangle size={24} />
            </div>
            <div>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Risco de Evasão</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Sem visita recente</p>
               <h3 className="text-2xl font-black text-rose-400">{riskPercentage.toFixed(1)}% <span className="text-xs font-medium text-gray-500">da base</span></h3>
            </div>
         </div>
@@ -176,7 +177,7 @@ export default function FinancialCrmPanel() {
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
            <div>
              <h3 className="text-lg font-black text-white tracking-tight">Matriz de Rentabilidade</h3>
-             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">IA analisando histórico de consumo</p>
+             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Classificação por regras de recência e gasto</p>
            </div>
            <button 
               onClick={() => setIsModalOpen(true)}
@@ -195,7 +196,7 @@ export default function FinancialCrmPanel() {
              <div className="h-full flex flex-col items-center justify-center text-center p-10 min-h-[200px]">
                 <Users size={32} className="text-gray-600 mb-3" />
                 <p className="text-sm font-bold text-gray-400">Sua base está limpa</p>
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Adicione clientes para a IA calcular o Lifetime Value.</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Adicione clientes para calcular indicadores a partir do histórico registrado.</p>
              </div>
           ) : (
             <table className="w-full text-left border-collapse">
@@ -205,7 +206,7 @@ export default function FinancialCrmPanel() {
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Classificação</th>
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500 text-right">LTV (Gasto Total)</th>
                   <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500 text-center">Última Visita</th>
-                  <th className="p-4 text-[10px] font-black uppercase tracking-widest text-indigo-400">Ação Recomendada (IA)</th>
+                  <th className="p-4 text-[10px] font-black uppercase tracking-widest text-indigo-400">Sugestão baseada em regras</th>
                   <th className="p-4"></th>
                 </tr>
               </thead>
@@ -290,7 +291,7 @@ export default function FinancialCrmPanel() {
 
                 <div className="pt-2">
                    <button disabled={isSubmitting} type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Processar Cliente na IA'}
+                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Salvar cliente'}
                    </button>
                 </div>
               </form>

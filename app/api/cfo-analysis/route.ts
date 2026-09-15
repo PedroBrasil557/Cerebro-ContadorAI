@@ -1,72 +1,74 @@
-// app/api/ai/cfo-analysis/route.ts
-import { NextResponse } from "next/server"
-import Groq from "groq-sdk"
+import { z } from 'zod'
+import { ForbiddenError, RateLimitError } from '@/lib/api/errors'
+import { errorResponse, successResponse } from '@/lib/api/response'
+import { getGroqClient } from '@/lib/ai/groq'
+import { requireUser } from '@/lib/auth/requireUser'
+import { getUserEntitlements } from '@/lib/billing/getEntitlements'
+import { checkUsageLimit } from '@/lib/security/checkUsageLimit'
+import { createClient } from '@/lib/supabase/server'
 
-export async function POST(req: Request) {
+export const dynamic = 'force-dynamic'
+
+const requestSchema = z.object({}).strict()
+
+export async function POST(request: Request) {
   try {
-    const { caixaData, recentTransactions } = await req.json()
-    
-    const apiKey = process.env.GROQ_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "API Key não configurada" }, { status: 500 })
+    const user = await requireUser()
+    const billing = await getUserEntitlements(user.id)
+    if (!billing.entitlements.professional) {
+      throw new ForbiddenError('A análise CFO requer o plano PREMIUM.')
     }
 
-    const groq = new Groq({ apiKey });
+    requestSchema.parse(await request.json())
+    const usage = await checkUsageLimit(user.id, 'ai_cfo', billing.plan)
+    if (!usage.allowed) throw new RateLimitError()
 
-    // 1. Cálculos de Inteligência de Negócio
-    // Pega média de despesas dos últimos lançamentos (ou usa um valor fixo se não tiver histórico suficiente)
+    const supabase = await createClient()
+    const [settingsResult, transactionsResult] = await Promise.all([
+      supabase
+        .from('business_settings')
+        .select('current_balance, monthly_goal, tax_rate, reserve_rate')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id)
+        .eq('scope', 'business')
+        .order('date', { ascending: false })
+        .limit(50),
+    ])
+    const databaseError = settingsResult.error ?? transactionsResult.error
+    if (databaseError) throw databaseError
+
+    const settings = settingsResult.data
+    const recentTransactions = transactionsResult.data ?? []
+    const currentBalance = Number(settings?.current_balance ?? 0)
+    const monthlyGoal = Number(settings?.monthly_goal ?? 0)
+    const taxRate = Number(settings?.tax_rate ?? 0)
+    const reserveRate = Number(settings?.reserve_rate ?? 0)
+
     const expenses = recentTransactions
-        .filter((t: any) => t.type !== 'receita')
-        .reduce((acc: number, t: any) => acc + Number(t.amount), 0)
-    
-    // Se não tiver despesas registradas, assume 50% da meta para não quebrar a conta
-    const estimatedMonthlyBurn = expenses > 0 ? expenses : (caixaData.monthlyGoal * 0.6)
-    
-    // Runway: Quantos meses o dinheiro dura
-    const runway = (caixaData.currentBalance / (estimatedMonthlyBurn || 1)).toFixed(1)
+      .filter((transaction) => transaction.type === 'despesa_fixa' || transaction.type === 'despesa_variavel')
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
+    const runway = expenses > 0 ? currentBalance / expenses : null
+    const prompt = `Faça uma análise educativa de CFO em PT-BR sem inventar dados ou scores. Todos os valores abaixo foram consultados no servidor para o usuário autenticado.\nSaldo: R$ ${currentBalance.toFixed(2)}\nMeta mensal: R$ ${monthlyGoal.toFixed(2)}\nImposto configurado: ${taxRate}%\nReserva alvo: ${reserveRate}%\nDespesas observadas: R$ ${expenses.toFixed(2)}\nRunway: ${runway === null ? 'indisponível por falta de despesas observadas' : `${runway.toFixed(1)} meses`}\nDiferencie fatos de recomendações e informe dados insuficientes.`
+    const completion = await getGroqClient().chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.3,
+      max_tokens: 1500,
+    })
 
-    const prompt = `
-      Atue como um CFO (Diretor Financeiro) Sênior de uma empresa de tecnologia.
-      
-      DADOS DA EMPRESA:
-      - Saldo em Caixa (Hoje): R$ ${caixaData.currentBalance}
-      - Meta de Faturamento Mensal: R$ ${caixaData.monthlyGoal}
-      - Taxa de Imposto Configurada: ${caixaData.taxRate}%
-      - Reserva de Emergência Alvo: ${caixaData.reserveRate}%
-      - Burn Rate (Gasto Estimado Recente): R$ ${estimatedMonthlyBurn.toFixed(2)}
-      - Runway Estimado (Sobrevivência): ${runway} meses
-      
-      TAREFA:
-      Faça uma análise executiva da saúde financeira.
-      
-      FORMATO DE RESPOSTA (Markdown):
-      ### 🏥 Diagnóstico de Saúde (Nota 0-100)
-      (Dê uma nota baseada no Runway e na proximidade da meta. Seja rigoroso).
-
-      ### 📉 Runway & Sobrevivência
-      (Comente sobre o Runway de ${runway} meses. Isso é perigoso (<3 meses), ok (6 meses) ou excelente (>12 meses)?).
-
-      ### 🚀 Próximos Passos
-      (3 bullet points táticos: Devemos cortar custos? É hora de investir em tráfego pago? Aumentar a reserva?).
-
-      ### 💡 Insight do CFO
-      (Uma frase de efeito sobre a gestão atual).
-
-      Seja profissional, direto e use emojis de negócios (barchart, rocket, warning).
-    `
-
-    const completion = await groq.chat.completions.create({
-        messages: [{ role: "user", content: prompt }],
-        model: "llama-3.3-70b-versatile",
-        temperature: 0.4,
-    });
-
-    const analysis = completion.choices[0]?.message?.content || "Erro ao gerar análise."
-
-    return NextResponse.json({ analysis })
-
+    const analysis = completion.choices[0]?.message?.content
+      ?? 'Não foi possível gerar a análise neste momento.'
+    return successResponse({
+      analysis,
+      dataQuality: settings ? 'actual' : 'insufficient',
+      remaining: usage.remaining,
+      resetAt: usage.resetAt,
+    })
   } catch (error) {
-    console.error("Erro CFO AI:", error)
-    return NextResponse.json({ error: "Falha na análise" }, { status: 500 })
+    return errorResponse(error, { feature: 'cfo-analysis', route: '/api/cfo-analysis', provider: 'groq' })
   }
 }

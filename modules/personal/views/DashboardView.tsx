@@ -1,19 +1,21 @@
 'use client'
 
-import React, { useMemo, useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { type ReactNode, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { 
   TrendingUp, Wallet, Activity, BrainCircuit, Zap, ChevronRight, 
-  ArrowUpRight, Briefcase, Calendar, ChevronDown, BarChart3, LineChart, 
+  ArrowUpRight, Briefcase, BarChart3,
   Sparkles, Receipt, ArrowDownRight, Lock 
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar
 } from 'recharts'
-import { Transaction, Goal, CreditCard, Investment } from '@/types_db'
-import { getDashboardSummary, getTransactions } from '@/core/action/transactions'
+import { Transaction, Investment, ActiveTab } from '@/types_db'
+import { calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 import UpgradeModal from '@/core/components/UpgradeModal'
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 // --- COMPONENTES AUXILIARES ---
 const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
@@ -23,7 +25,15 @@ const formatK = (val: number) => {
     return `R$ ${val}`
 }
 
-const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-blue-500/10", onClick }: any) => (
+interface PremiumCardProps {
+  children: ReactNode
+  className?: string
+  delay?: number
+  glowColor?: string
+  onClick?: () => void
+}
+
+const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-blue-500/10", onClick }: PremiumCardProps) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: delay }}
     onClick={onClick}
@@ -34,8 +44,19 @@ const PremiumCard = ({ children, className = "", delay = 0, glowColor = "from-bl
   </motion.div>
 )
 
-const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay }: any) => {
-    const themes: any = {
+type ThemeName = 'blue' | 'emerald' | 'rose' | 'purple'
+
+interface MetricCardProps {
+  title: string
+  value: number
+  icon: LucideIcon
+  colorTheme: ThemeName
+  trend?: string
+  delay?: number
+}
+
+const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay }: MetricCardProps) => {
+    const themes: Record<ThemeName, { icon: string; bg: string; value: string }> = {
         blue: { icon: "text-blue-400", bg: "bg-blue-500/10", value: "text-blue-400" },
         emerald: { icon: "text-emerald-400", bg: "bg-emerald-500/10", value: "text-emerald-400" },
         rose: { icon: "text-rose-400", bg: "bg-rose-500/10", value: "text-rose-400" },
@@ -58,39 +79,23 @@ const MetricCard = ({ title, value, icon: Icon, colorTheme, trend, delay }: any)
 }
 
 interface DashboardViewProps {
-  user: any
   summary: { balance: number; income: number; expense: number; emergencyTotal: number }
   recentTransactions: Transaction[]
-  onNavigate: (tab: string) => void
+  onNavigate: (tab: ActiveTab) => void
   transactions: Transaction[] 
   investments: Investment[]
 }
 
-export default function DashboardView({ user, summary: initialSummary, onNavigate, transactions: initialTransactions = [], investments = [] }: DashboardViewProps) {
+export default function DashboardView({ summary: initialSummary, onNavigate, transactions: initialTransactions = [], investments = [] }: DashboardViewProps) {
   const [chartType, setChartType] = useState<'area' | 'bar' | 'line'>('area')
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedYear] = useState(new Date().getFullYear())
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
-  const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
+  const { plan } = useEntitlements()
+  const isFreePlan = plan === 'free'
 
-  const [liveTransactions, setLiveTransactions] = useState<Transaction[]>(initialTransactions)
-  const [liveSummary, setLiveSummary] = useState(initialSummary)
-
-  useEffect(() => {
-    const fetchFreshData = async () => {
-      try {
-        const freshTransactions = await getTransactions()
-        const freshSummary = await getDashboardSummary()
-        setLiveTransactions(freshTransactions)
-        setLiveSummary({
-          ...freshSummary,
-          emergencyTotal: initialSummary?.emergencyTotal || 0
-        })
-      } catch (error) { console.error("Erro ao sincronizar:", error) }
-    }
-    fetchFreshData()
-  }, [initialSummary?.emergencyTotal])
+  const liveTransactions = initialTransactions
+  const liveSummary = initialSummary
 
   // --- LÓGICA DE CÁLCULO NORMALIZADA (SÓ O MÊS ATUAL) ---
   const stats = useMemo(() => {
@@ -105,22 +110,18 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
         return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
     
-    const income = monthTransactions
-      .filter(t => t?.type?.toLowerCase() === 'receita')
-      .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0)
-
-    const expense = monthTransactions
-      .filter(t => t?.type?.toLowerCase() === 'despesa' || t?.type?.toLowerCase() === 'saída' || t?.type?.toLowerCase() === 'saida')
-      .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0)
+    const income = calculateIncome(monthTransactions)
+    const expense = calculateExpenses(monthTransactions)
 
     // Soma dos bancos adicionados na aba Carteira (LocalStorage)
-    const localBanks = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('cerebro_banks') || '[]') : []
-    const bankBalance = localBanks.reduce((acc: number, b: any) => acc + b.balance, 0)
+    const localBanks = typeof window !== 'undefined'
+      ? JSON.parse(localStorage.getItem('cerebro_banks') || '[]') as Array<{ balance?: number }>
+      : []
+    const bankBalance = localBanks.reduce((acc, bank) => acc + Number(bank.balance ?? 0), 0)
 
     const totalInvestments = (investments || []).reduce((acc, inv) => acc + Number(inv?.amount_invested || 0), 0)
     
-    // IA Score Calculado dinamicamente para o Gauge
-    const score = income > 0 ? Math.min(Math.round((income / (expense || 1)) * 40), 100) : 0
+    const score = expense > 0 ? Math.min(Math.round((income / expense) * 100), 100) : income > 0 ? 100 : 0
 
     return { 
         income, 
@@ -144,8 +145,8 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
       if (d.getFullYear() === selectedYear) {
         const m = d.getMonth()
         const amt = Math.abs(Number(t.amount || 0))
-        if (t.type?.toLowerCase() === 'receita') months[m].receita += amt
-        else months[m].despesa += amt
+        if (t.type === 'receita') months[m].receita += amt
+        else if (t.type === 'despesa_fixa' || t.type === 'despesa_variavel') months[m].despesa += amt
       }
     })
     return months
@@ -161,7 +162,7 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
       {/* HEADER */}
       <div className="flex justify-between items-end">
         <div>
-            <h1 className="text-3xl font-black tracking-tight">Dashboard <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-500/20 font-bold uppercase ml-2">Cérebro.OS</span></h1>
+            <h1 className="text-3xl font-black tracking-tight">Dashboard <span className="text-xs bg-indigo-500/20 text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-500/20 font-bold uppercase ml-2">Cérebro.IA</span></h1>
             <p className="text-gray-400 mt-2 text-sm font-medium">Motor cognitivo e visão patrimonial.</p>
         </div>
       </div>
@@ -177,7 +178,7 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
       {/* MOTOR COGNITIVO COM PAYWALL */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
         <PremiumCard className={`lg:col-span-2 relative transition-all duration-500 ${isFreePlan ? 'blur-md grayscale pointer-events-none' : ''}`}>
-            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6"><Activity size={16}/> Score de Saúde IA</h3>
+            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2 mb-6"><Activity size={16}/> Cobertura de despesas do mês</h3>
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 h-full">
                 <div className="relative w-64 h-36">
                     <svg viewBox="0 0 200 120" className="w-full h-full overflow-visible">
@@ -195,11 +196,11 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
                     </div>
                 </div>
                 <div className="flex-1 space-y-4">
-                   <p className="text-xs text-gray-500 font-medium leading-relaxed">Sua saúde financeira é calculada pelo cruzamento de ativos, passivos e previsibilidade de caixa via IA.</p>
+                   <p className="text-xs text-gray-500 font-medium leading-relaxed">Indicador calculado pela relação entre receitas e despesas registradas no mês.</p>
                    <div className="h-px bg-white/5 w-full" />
                    <div className="flex gap-4">
-                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Status</p><p className={`text-sm font-bold ${scoreVisuals.text}`}>{stats.score > 70 ? 'Excelente' : 'Em Análise'}</p></div>
-                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Confiança</p><p className="text-sm font-bold text-white">98.2%</p></div>
+                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Status</p><p className={`text-sm font-bold ${scoreVisuals.text}`}>{liveTransactions.length === 0 ? 'Sem dados' : stats.score >= 100 ? 'Despesas cobertas' : 'Cobertura parcial'}</p></div>
+                      <div><p className="text-[10px] text-gray-500 uppercase font-bold">Base</p><p className="text-sm font-bold text-white">{liveTransactions.length} lançamentos</p></div>
                    </div>
                 </div>
             </div>
@@ -209,8 +210,8 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
           <div className="absolute inset-0 lg:col-span-2 z-20 flex items-center justify-center">
             <div className="bg-[#0f0f13]/90 border border-indigo-500/30 p-8 rounded-[2rem] text-center shadow-2xl backdrop-blur-md max-w-sm">
                <Lock size={24} className="mx-auto mb-4 text-indigo-400" />
-               <h4 className="text-white font-black text-lg mb-2 uppercase tracking-tighter">Motor IA Desativado</h4>
-               <p className="text-gray-400 text-xs mb-6">Assine o plano PRO para liberar o score de saúde e análise de perfil cognitivo.</p>
+               <h4 className="text-white font-black text-lg mb-2 uppercase tracking-tighter">Análise avançada indisponível</h4>
+               <p className="text-gray-400 text-xs mb-6">Assine o plano PRO para liberar os indicadores avançados da sua vida financeira.</p>
                <button onClick={() => setShowUpgradeModal(true)} className="w-full bg-white text-black font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:scale-105 transition-transform">Ativar Cérebro IA</button>
             </div>
           </div>
@@ -219,9 +220,9 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
         <div className="relative">
             <PremiumCard className={`h-full ${isFreePlan ? 'blur-sm grayscale' : ''}`}>
                 <BrainCircuit size={24} className="text-purple-400 mb-6" />
-                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Perfil Identificado</p>
-                <h3 className="text-3xl font-black text-white">{isFreePlan ? '*******' : 'Estratégico'}</h3>
-                <p className="text-[10px] text-gray-500 mt-4 leading-relaxed">Baseado no seu histórico de consumo e taxa de poupança mensal.</p>
+                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Histórico disponível</p>
+                <h3 className="text-3xl font-black text-white">{isFreePlan ? '*******' : `${liveTransactions.length} lançamentos`}</h3>
+                <p className="text-[10px] text-gray-500 mt-4 leading-relaxed">Quantidade real de transações usada nos indicadores desta tela.</p>
             </PremiumCard>
             {isFreePlan && (
                 <div className="absolute inset-0 flex items-center justify-center cursor-pointer" onClick={() => setShowUpgradeModal(true)}>
@@ -241,7 +242,7 @@ export default function DashboardView({ user, summary: initialSummary, onNavigat
            </div>
         </div>
         <div className="w-full h-[320px]">
-           <ResponsiveContainer width="100%" height="100%">
+           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 320 }}>
               {chartType === 'area' ? (
                   <AreaChart data={flowData}>
                     <defs>

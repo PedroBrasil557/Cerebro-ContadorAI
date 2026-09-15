@@ -17,13 +17,21 @@ import { formatCurrency } from '@/lib/utils'
 const BRAND_COLOR = '#8B5CF6'
 
 // Tooltip personalizado para o gráfico
-const CustomTooltip = ({ active, payload, label }: any) => {
+type ChartPoint = { name: string; value: number }
+
+type CustomTooltipProps = {
+  active?: boolean
+  payload?: ReadonlyArray<{ value?: number | string }>
+  label?: string
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="rounded-xl border border-white/10 bg-[#151515]/90 p-3 shadow-xl backdrop-blur-sm">
         <p className="mb-1 text-xs font-medium text-gray-400">{label}</p>
         <p className="text-sm font-bold text-white">
-          {formatCurrency(payload[0].value)}
+          {formatCurrency(payload[0].value ?? 0)}
         </p>
       </div>
     )
@@ -33,24 +41,25 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 type ChartsProps = {
   // Dados dinâmicos esperados: [{ name: 'Jan', value: 2000 }, { name: 'Fev', value: 2500 }, ...]
-  balanceData: { name: string; value: number }[]
-  // Ignoramos categoryData pois não vamos usar pizza aqui
-  categoryData?: any 
+  balanceData: ChartPoint[]
 }
 
 export default function ChartsComponent({ balanceData }: ChartsProps) {
-  // Se não vier dados, usa um mock para não quebrar o layout
-  const data =
-    balanceData && balanceData.length > 0
-      ? balanceData
-      : [
-          { name: 'Jan', value: 15000 },
-          { name: 'Fev', value: 18200 },
-          { name: 'Mar', value: 17500 },
-          { name: 'Abr', value: 21000 },
-          { name: 'Mai', value: 19800 },
-          { name: 'Jun', value: 24500 },
-        ]
+  const data = balanceData ?? []
+
+  if (data.length === 0) {
+    return (
+      <div className="glass-panel flex h-full min-h-[420px] flex-col rounded-2xl border border-white/5 bg-[#111] p-6">
+        <h3 className="flex items-center gap-2 text-xl font-bold text-white">
+          <TrendingUp className="h-5 w-5 text-violet-400" />
+          Evolução Patrimonial
+        </h3>
+        <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
+          Adicione movimentações para visualizar seu histórico.
+        </div>
+      </div>
+    )
+  }
 
   const latestValue = data[data.length - 1].value
   const previousValue = data[data.length - 2]?.value || latestValue
