@@ -1,262 +1,228 @@
 'use client'
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, TrendingDown, Check, ShieldCheck, Copy, Calendar } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { CalendarDays, Check, Copy, Loader2, TrendingDown, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { toggleBillPayment, copyFixedTransactionsToMonth } from '@/core/action/transactions'
+import { copyFixedTransactionsToMonth, toggleBillPayment } from '@/core/action/transactions'
 import type { Transaction } from '@/types_db'
 
-export default function FixedExpensesList({ 
-    transactions, 
-    currentDate 
-}: { 
-    transactions: Transaction[], 
-    currentDate: Date 
-}) {
-    const router = useRouter()
-    const [loadingId, setLoadingId] = useState<string | null>(null)
-    const [isCopying, setIsCopying] = useState(false)
+interface FixedExpensesListProps {
+  transactions: Transaction[]
+  currentDate: Date
+}
 
-    // 1. FILTRAGEM PELO MÊS SELECIONADO
-    const currentMonthStr = currentDate.toISOString().slice(0, 7)
-    const monthItems = transactions.filter(t => t.date.startsWith(currentMonthStr))
-    const monthHasTransactions = monthItems.length > 0
-    
-    // Pega só as transações FIXAS que pertencem ao MÊS SELECIONADO
-    const fixedItems = monthItems
-        .filter(t => t.is_fixed)
-        .sort((a, b) => new Date(a.date).getDate() - new Date(b.date).getDate())
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 
-    // 2. SEPARAÇÃO (Receitas vs Despesas)
-    const fixedIncomes = fixedItems.filter(t => t.type === 'receita')
-    const fixedExpenses = fixedItems.filter(t => t.type !== 'receita')
+const getDay = (date: string) => new Date(date).getUTCDate()
 
-    // 3. ACTIONS
-    const handleToggle = async (t: Transaction) => {
-        setLoadingId(t.id)
-        // Inverte o status: Se estava pago, vira pendente
-        await toggleBillPayment(t.id, !t.is_paid)
-        setLoadingId(null)
-        router.refresh()
+export default function FixedExpensesList({ transactions, currentDate }: FixedExpensesListProps) {
+  const router = useRouter()
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [isCopying, setIsCopying] = useState(false)
+
+  const currentMonthStr = currentDate.toISOString().slice(0, 7)
+  const monthItems = transactions.filter(transaction => transaction.date.startsWith(currentMonthStr))
+  const monthHasTransactions = monthItems.length > 0
+  const fixedItems = monthItems
+    .filter(transaction => transaction.is_fixed)
+    .sort((first, second) => new Date(first.date).getDate() - new Date(second.date).getDate())
+  const fixedIncomes = fixedItems.filter(transaction => transaction.type === 'receita')
+  const fixedExpenses = fixedItems.filter(transaction => transaction.type !== 'receita')
+
+  const handleToggle = async (transaction: Transaction) => {
+    setLoadingId(transaction.id)
+    await toggleBillPayment(transaction.id, !transaction.is_paid)
+    setLoadingId(null)
+    router.refresh()
+  }
+
+  const handleStartMonth = async () => {
+    const confirmationMessage = `Deseja copiar as contas fixas e salário do mês anterior para ${currentDate.toLocaleDateString('pt-BR', { month: 'long' })}?`
+    if (!confirm(confirmationMessage)) return
+
+    setIsCopying(true)
+    const targetDate = currentDate.toISOString().split('T')[0]
+    const result = await copyFixedTransactionsToMonth(targetDate)
+    setIsCopying(false)
+
+    if (result.success) {
+      router.refresh()
+    } else {
+      alert(result.message || 'Erro ao importar recorrências.')
     }
+  }
 
-    const handleStartMonth = async () => {
-        const confirmMsg = `Deseja copiar as contas fixas e salário do mês anterior para ${currentDate.toLocaleDateString('pt-BR', { month: 'long' })}?`
-        if(!confirm(confirmMsg)) return
-
-        setIsCopying(true)
-        const targetDateStr = currentDate.toISOString().split('T')[0]
-        const res = await copyFixedTransactionsToMonth(targetDateStr)
-        
-        setIsCopying(false)
-        if (res.success) {
-            router.refresh()
-        } else {
-            alert(res.message || "Erro ao importar recorrências.")
-        }
-    }
-
-    const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
-    const getDay = (dateStr: string) => new Date(dateStr).getUTCDate()
-
-    // 4. ESTADO SEM RECORRÊNCIAS
-    if (fixedItems.length === 0) {
-        return (
-            <div className="bg-[#121214] border border-white/10 rounded-2xl p-8 mb-6 text-center animate-in fade-in slide-in-from-bottom-4">
-                <div className="h-16 w-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto text-blue-500 mb-4 border border-blue-500/20">
-                    <Calendar size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">
-                    {monthHasTransactions ? 'Sem contas recorrentes neste mês' : 'Nenhuma recorrência neste mês'}
-                </h3>
-                <p className="text-sm text-gray-400 max-w-md mx-auto mb-6">
-                    {monthHasTransactions
-                        ? 'Suas transações do mês já estão registradas. Ainda não há contas fixas ou salários recorrentes; se quiser, importe os recorrentes do mês anterior.'
-                        : 'Ainda não há contas fixas ou salários recorrentes neste mês. Você pode importar os recorrentes do mês anterior.'}
-                </p>
-                <button 
-                    onClick={handleStartMonth}
-                    disabled={isCopying}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 mx-auto disabled:opacity-50 shadow-lg shadow-blue-900/20"
-                >
-                    {isCopying ? (
-                        <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Importando...</span>
-                    ) : (
-                        <><Copy size={18} /> Importar contas do mês anterior</>
-                    )}
-                </button>
-            </div>
-        )
-    }
-
-    // CÁLCULOS DO RESUMO
-    const totalFixed = fixedExpenses.reduce((acc, t) => acc + Math.abs(Number(t.amount)), 0)
-    const totalPaid = fixedExpenses.filter(t => t.is_paid).reduce((acc, t) => acc + Math.abs(Number(t.amount)), 0)
-    const remaining = totalFixed - totalPaid
-    const progressPercent = totalFixed > 0 ? (totalPaid / totalFixed) * 100 : 0
-
+  if (fixedItems.length === 0) {
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            
-            {/* CARD DE RESUMO (APENAS SE TIVER DESPESAS) */}
-            {fixedExpenses.length > 0 && (
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#121214] to-[#0a0a0a] border border-white/10 p-6 shadow-2xl">
-                    <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-500/10 rounded-full blur-[50px] pointer-events-none" />
-                    
-                    <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6 relative z-10">
-                        <div>
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-1">
-                                <ShieldCheck className="text-blue-500" size={20} /> 
-                                Compromissos Mensais
-                            </h3>
-                            <p className="text-sm text-gray-400">Gerencie suas contas fixas e recorrentes.</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Restante a Pagar</p>
-                            <p className="text-2xl font-black text-white">{formatCurrency(remaining)}</p>
-                        </div>
-                    </div>
-
-                    <div className="relative h-3 w-full bg-black/50 rounded-full overflow-hidden border border-white/5">
-                        <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${progressPercent}%` }}
-                            transition={{ duration: 1, ease: "circOut" }}
-                            className={`h-full rounded-full ${
-                                progressPercent === 100 
-                                    ? 'bg-gradient-to-r from-emerald-500 to-green-400' 
-                                    : 'bg-gradient-to-r from-blue-600 to-purple-500'
-                            }`}
-                        />
-                    </div>
-                    <div className="flex justify-between mt-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        <span>{progressPercent.toFixed(0)}% Pago</span>
-                        <span>Total: {formatCurrency(totalFixed)}</span>
-                    </div>
-                </div>
-            )}
-
-            {/* SEÇÃO 1: SALÁRIO E ENTRADAS */}
-            {fixedIncomes.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-xs font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-2 ml-1">
-                        <TrendingUp size={14} /> Entradas Previstas (Salário)
-                    </h3>
-                    <AnimatePresence>
-                        {fixedIncomes.map(t => (
-                            <motion.div 
-                                key={t.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                                    t.is_paid 
-                                        ? 'bg-emerald-500/10 border-emerald-500/20' 
-                                        : 'bg-[#121214] border-white/10'
-                                }`}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <button 
-                                        onClick={() => handleToggle(t)} 
-                                        disabled={loadingId === t.id}
-                                        className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${
-                                            t.is_paid 
-                                                ? 'bg-emerald-500 text-emerald-950 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
-                                                : 'bg-white/5 text-gray-500 hover:bg-emerald-500 hover:text-white border border-white/10'
-                                        }`}
-                                    >
-                                        {loadingId === t.id ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> : <Check size={18}/>}
-                                    </button>
-                                    <div>
-                                        <p className="font-bold text-white text-base">{t.description}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">
-                                            {t.is_paid 
-                                                ? <span className="text-emerald-400 font-bold">Recebido no sistema ✅</span> 
-                                                : `Previsto para dia ${getDay(t.date)}`
-                                            }
-                                        </p>
-                                    </div>
-                                </div>
-                                <span className="font-mono font-bold text-lg text-emerald-400">
-                                    + {formatCurrency(Number(t.amount))}
-                                </span>
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
-            )}
-
-            {/* SEÇÃO 2: CONTAS A PAGAR */}
-            {fixedExpenses.length > 0 && (
-                <div className="space-y-3 mt-6">
-                    <h3 className="text-xs font-bold text-rose-500 uppercase tracking-widest flex items-center gap-2 ml-1">
-                        <TrendingDown size={14} /> Contas a Pagar
-                    </h3>
-                    <AnimatePresence>
-                        {fixedExpenses.map(t => {
-                            const todayDate = new Date().toISOString().split('T')[0]
-                            const isOverdue = !t.is_paid && t.date < todayDate
-                            
-                            return (
-                                <motion.div 
-                                    key={t.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                    className={`group relative flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${
-                                        t.is_paid 
-                                            ? 'bg-[#09090b]/50 border-white/5 opacity-50 grayscale hover:grayscale-0 hover:opacity-100' 
-                                            : isOverdue 
-                                                ? 'bg-rose-500/5 border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.1)]' 
-                                                : 'bg-[#121214] border-white/10 hover:bg-[#1a1a1c]'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <button 
-                                            onClick={() => handleToggle(t)}
-                                            disabled={loadingId === t.id}
-                                            className={`h-12 w-12 rounded-xl flex items-center justify-center transition-all duration-300 active:scale-90 ${
-                                                t.is_paid 
-                                                    ? 'bg-white/10 text-gray-400' 
-                                                    : isOverdue
-                                                        ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30 animate-pulse'
-                                                        : 'bg-white/5 text-gray-500 hover:bg-blue-600 hover:text-white border border-white/10'
-                                            }`}
-                                        >
-                                            {loadingId === t.id ? (
-                                                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                            ) : t.is_paid ? (
-                                                <Check strokeWidth={3} size={20} />
-                                            ) : (
-                                                <span className="text-sm font-black">{getDay(t.date)}</span>
-                                            )}
-                                        </button>
-                                        
-                                        <div>
-                                            <p className={`font-bold text-base ${t.is_paid ? 'text-gray-500 line-through' : 'text-white'}`}>
-                                                {t.description}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                {isOverdue && !t.is_paid && (
-                                                    <span className="flex items-center gap-1 text-[9px] font-bold bg-rose-500 text-white px-1.5 py-0.5 rounded uppercase">
-                                                        Atrasado
-                                                    </span>
-                                                )}
-                                                <span className="text-xs text-gray-500">
-                                                    {t.is_paid ? 'Pago' : `Vence dia ${getDay(t.date)}`}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="text-right">
-                                        <span className={`font-mono text-lg font-black tracking-tight ${
-                                            t.is_paid ? 'text-gray-600' : 'text-rose-400'
-                                        }`}>
-                                            {formatCurrency(Math.abs(Number(t.amount)))}
-                                        </span>
-                                    </div>
-                                </motion.div>
-                            )
-                        })}
-                    </AnimatePresence>
-                </div>
-            )}
+      <section aria-labelledby="fixed-expenses-title" className="rounded-[16px] border border-white/[0.075] bg-[#0D1118] p-5">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[#4F8CFF]/10 text-[#69A0FF]">
+              <CalendarDays aria-hidden="true" className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 id="fixed-expenses-title" className="text-base font-semibold text-[#F4F6F8]">Despesas fixas</h2>
+              <p className="mt-1 text-sm text-[#A0A8B5]">
+                {monthHasTransactions
+                  ? 'Nenhuma despesa fixa cadastrada neste mês.'
+                  : 'Seus compromissos recorrentes aparecerão aqui.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleStartMonth}
+            disabled={isCopying}
+            className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[10px] border border-white/[0.1] bg-[#111722] px-4 text-sm font-medium text-[#F4F6F8] outline-none transition-colors duration-150 hover:border-white/[0.16] hover:bg-[#151C29] focus-visible:ring-2 focus-visible:ring-[#665CFF]/50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isCopying ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Copy aria-hidden="true" className="h-4 w-4 text-[#8B84FF]" />}
+            {isCopying ? 'Importando...' : 'Importar mês anterior'}
+          </button>
         </div>
+      </section>
     )
+  }
+
+  const totalFixed = fixedExpenses.reduce(
+    (total, transaction) => total + Math.abs(Number(transaction.amount)),
+    0,
+  )
+  const totalPaid = fixedExpenses
+    .filter(transaction => transaction.is_paid)
+    .reduce((total, transaction) => total + Math.abs(Number(transaction.amount)), 0)
+  const remaining = totalFixed - totalPaid
+  const progressPercent = totalFixed > 0 ? (totalPaid / totalFixed) * 100 : 0
+  const today = new Date().toISOString().split('T')[0]
+
+  return (
+    <section aria-labelledby="fixed-expenses-title" className="overflow-hidden rounded-[16px] border border-white/[0.075] bg-[#0D1118]">
+      <header className="flex flex-col gap-4 border-b border-white/[0.075] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#4F8CFF]/10 text-[#69A0FF]">
+            <CalendarDays aria-hidden="true" className="h-[18px] w-[18px]" />
+          </span>
+          <div>
+            <h2 id="fixed-expenses-title" className="text-base font-semibold text-[#F4F6F8]">Despesas fixas</h2>
+            <p className="mt-0.5 text-xs text-[#A0A8B5]">Seus compromissos recorrentes do mês.</p>
+          </div>
+        </div>
+        {fixedExpenses.length > 0 ? (
+          <div className="flex items-center gap-5 text-sm">
+            <div>
+              <span className="block text-xs text-[#A0A8B5]">Restante</span>
+              <strong className="mt-0.5 block font-semibold tabular-nums text-[#F4F6F8]">{formatCurrency(remaining)}</strong>
+            </div>
+            <div className="hidden h-8 w-px bg-white/[0.075] sm:block" />
+            <div>
+              <span className="block text-xs text-[#A0A8B5]">Total</span>
+              <strong className="mt-0.5 block font-semibold tabular-nums text-[#F4F6F8]">{formatCurrency(totalFixed)}</strong>
+            </div>
+          </div>
+        ) : null}
+      </header>
+
+      {fixedExpenses.length > 0 ? (
+        <div className="border-b border-white/[0.06] px-5 py-3">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              transition={{ duration: 0.35 }}
+              className={`h-full rounded-full ${progressPercent === 100 ? 'bg-[#28D7A1]' : 'bg-[#665CFF]'}`}
+            />
+          </div>
+          <p className="mt-2 text-right text-[11px] text-[#A0A8B5]">{progressPercent.toFixed(0)}% pago</p>
+        </div>
+      ) : null}
+
+      <div className={`grid gap-0 ${fixedIncomes.length > 0 && fixedExpenses.length > 0 ? 'lg:grid-cols-2 lg:divide-x lg:divide-white/[0.06]' : 'lg:grid-cols-1'}`}>
+        {fixedIncomes.length > 0 ? (
+          <div className="p-4">
+            <h3 className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-[#28D7A1]">
+              <TrendingUp aria-hidden="true" className="h-4 w-4" />
+              Entradas previstas
+            </h3>
+            <div className="divide-y divide-white/[0.06]">
+              <AnimatePresence initial={false}>
+                {fixedIncomes.map(transaction => (
+                  <motion.div
+                    key={transaction.id}
+                    layout
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex min-h-14 items-center justify-between gap-3 px-1 py-2"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <button
+                        type="button"
+                        aria-label={`${transaction.is_paid ? 'Marcar como pendente' : 'Marcar como recebido'}: ${transaction.description}`}
+                        aria-pressed={transaction.is_paid}
+                        onClick={() => handleToggle(transaction)}
+                        disabled={loadingId === transaction.id}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] border outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#28D7A1]/50 disabled:opacity-50 ${transaction.is_paid ? 'border-[#28D7A1]/20 bg-[#28D7A1]/12 text-[#28D7A1]' : 'border-white/[0.1] bg-[#111722] text-[#A0A8B5] hover:text-[#28D7A1]'}`}
+                      >
+                        {loadingId === transaction.id ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Check aria-hidden="true" className="h-4 w-4" />}
+                      </button>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[#F4F6F8]">{transaction.description}</p>
+                        <p className="mt-0.5 text-xs text-[#A0A8B5]">{transaction.is_paid ? 'Recebido' : `Previsto para o dia ${getDay(transaction.date)}`}</p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-[#28D7A1]">+ {formatCurrency(Math.abs(Number(transaction.amount)))}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        ) : null}
+
+        {fixedExpenses.length > 0 ? (
+          <div className={`p-4 ${fixedIncomes.length > 0 ? 'border-t border-white/[0.06] lg:border-t-0' : ''}`}>
+            <h3 className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-[#FF5876]">
+              <TrendingDown aria-hidden="true" className="h-4 w-4" />
+              Contas a pagar
+            </h3>
+            <div className="divide-y divide-white/[0.06]">
+              <AnimatePresence initial={false}>
+                {fixedExpenses.map(transaction => {
+                  const isOverdue = !transaction.is_paid && transaction.date < today
+                  return (
+                    <motion.div
+                      key={transaction.id}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className={`flex min-h-14 items-center justify-between gap-3 px-1 py-2 ${transaction.is_paid ? 'opacity-65' : ''}`}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <button
+                          type="button"
+                          aria-label={`${transaction.is_paid ? 'Marcar como pendente' : 'Marcar como paga'}: ${transaction.description}`}
+                          aria-pressed={transaction.is_paid}
+                          onClick={() => handleToggle(transaction)}
+                          disabled={loadingId === transaction.id}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] border text-xs font-semibold outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#FF5876]/50 disabled:opacity-50 ${transaction.is_paid ? 'border-white/[0.09] bg-white/[0.04] text-[#A0A8B5]' : isOverdue ? 'border-[#FF5876]/25 bg-[#FF5876]/12 text-[#FF7890]' : 'border-white/[0.1] bg-[#111722] text-[#A0A8B5] hover:text-white'}`}
+                        >
+                          {loadingId === transaction.id ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : transaction.is_paid ? <Check aria-hidden="true" className="h-4 w-4" /> : getDay(transaction.date)}
+                        </button>
+                        <div className="min-w-0">
+                          <p className={`truncate text-sm font-semibold ${transaction.is_paid ? 'text-[#A0A8B5] line-through' : 'text-[#F4F6F8]'}`}>{transaction.description}</p>
+                          <p className={`mt-0.5 text-xs ${isOverdue ? 'text-[#FF7890]' : 'text-[#A0A8B5]'}`}>
+                            {transaction.is_paid ? 'Pago' : isOverdue ? `Atrasado · venceu dia ${getDay(transaction.date)}` : `Vence dia ${getDay(transaction.date)}`}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`shrink-0 text-sm font-semibold tabular-nums ${transaction.is_paid ? 'text-[#A0A8B5]' : 'text-[#FF5876]'}`}>{formatCurrency(Math.abs(Number(transaction.amount)))}</span>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  )
 }
