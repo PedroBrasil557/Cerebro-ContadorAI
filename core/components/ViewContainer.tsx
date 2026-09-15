@@ -7,6 +7,7 @@ import {
 } from '@/types_db'
 import type { User } from '@supabase/supabase-js'
 import dynamic from 'next/dynamic'
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 // ==========================================
 // 📦 CAMADA 2: MÓDULOS PESSOAIS
@@ -57,6 +58,15 @@ export default function ViewContainer({
   activeTab, handleRedirect, user, summary, transactions = [], goals = [], caixaData,
   onAddGoal, investments = [], systemRole = 'user', accountMode
 }: ViewContainerProps) {
+  const { plan } = useEntitlements()
+
+  const billingAwareUser = React.useMemo<User>(() => ({
+    ...user,
+    user_metadata: {
+      ...user.user_metadata,
+      plan_tier: plan,
+    },
+  }), [user, plan])
 
   // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
@@ -101,19 +111,19 @@ export default function ViewContainer({
             )}
             
             {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
-              <TransactionsView user={user} /> 
+              <TransactionsView user={billingAwareUser} /> 
             )}
             
             {currentTab === 'investimentos' && (
               <InvestmentsView 
-                user={user}
+                user={billingAwareUser}
                 goals={goals} 
                 onAddGoal={onAddGoal} 
               />
             )}
             
             {(currentTab === 'minha carteira' || currentTab === 'carteira') && (
-              <WalletView user={user} /> 
+              <WalletView user={billingAwareUser} /> 
             )}
             
             {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
