@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createNotification } from './notifications'
-import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
+import { calculateBalance, calculateExpenses, calculateIncome, normalizeTransactionAmount } from '@/core/finance/transactionMath'
 
 // 🛡️ Definição Completa (Corrigida: 100% compatível com o types_db)
 export interface Transaction {
@@ -77,7 +77,8 @@ export async function createTransaction(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Auth required' }
 
-  const amount = parseFloat(formData.get('amount') as string)
+  const rawAmount = parseFloat(formData.get('amount') as string)
+  const amount = normalizeTransactionAmount(rawAmount)
   const isFixedVal = formData.get('is_fixed')
   const isFixed = isFixedVal === 'true' || isFixedVal === 'on' 
   
@@ -93,7 +94,7 @@ export async function createTransaction(formData: FormData) {
   const { error } = await supabase.from('transactions').insert({
     user_id: user.id,
     description: description,
-    amount: isNaN(amount) ? 0 : amount,
+    amount,
     type: type,
     scope: 'personal',
     category: formData.get('category') as string,
@@ -144,7 +145,7 @@ export async function updateTransaction(data: Transaction, reason: string) {
   if (!reason || reason.trim().length < 3) return { error: 'Motivo obrigatório.' }
 
   const { error } = await supabase.from('transactions').update({
-      description: data.description, amount: data.amount, type: data.type, 
+      description: data.description, amount: normalizeTransactionAmount(data.amount), type: data.type, 
       category: data.category, date: data.date, edit_note: reason, payment_method: data.payment_method
     })
     .eq('id', data.id)
@@ -218,7 +219,7 @@ export async function copyFixedTransactionsToMonth(targetDateStr: string) {
     const oldDate = new Date(t.date)
     const newTxDate = new Date(Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), oldDate.getUTCDate()))
     return {
-      user_id: user.id, description: t.description, amount: t.amount, type: t.type, scope: 'personal', category: t.category, is_fixed: true,
+      user_id: user.id, description: t.description, amount: normalizeTransactionAmount(t.amount), type: t.type, scope: 'personal', category: t.category, is_fixed: true,
       is_paid: false, status: 'pendente', date: newTxDate.toISOString().split('T')[0], due_date: newTxDate.toISOString().split('T')[0], 
       payment_method: t.payment_method
     }
