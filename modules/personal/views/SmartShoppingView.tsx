@@ -234,6 +234,16 @@ export default function SmartShoppingView() {
     return { estimatedTotal, actualTotal, remainingBudget, potentialSavings }
   }, [items, budget])
 
+  const purchaseProgressPct = budget > 0 ? (totals.actualTotal / budget) * 100 : 0
+  const actualProgressWidth = Math.min(Math.max(purchaseProgressPct, 0), 100)
+  const estimatedRemainingPct = budget > 0
+    ? (Math.max(totals.estimatedTotal - totals.actualTotal, 0) / budget) * 100
+    : 0
+  const estimatedProgressWidth = Math.min(
+    Math.max(estimatedRemainingPct, 0),
+    Math.max(100 - actualProgressWidth, 0)
+  )
+
   const insights = useMemo(() => {
     const generated = []
     const highInflationItems = items.filter(i => i.is_purchased && i.price_variation_pct > 15)
@@ -291,10 +301,10 @@ export default function SmartShoppingView() {
             </div>
           </div>
           <div className="mt-8">
-              <div className="flex justify-between text-xs font-bold mb-2"><span className="text-indigo-400">Progresso de Compra</span><span className="text-gray-500">{((totals.actualTotal / budget) * 100).toFixed(0)}% do Orçamento</span></div>
+              <div className="flex justify-between text-xs font-bold mb-2"><span className="text-indigo-400">Progresso de Compra</span><span className="text-gray-500">{purchaseProgressPct.toFixed(0)}% do Orçamento</span></div>
               <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden flex">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${(totals.actualTotal / budget) * 100}%` }} className={`h-full ${totals.actualTotal > budget ? 'bg-rose-500' : 'bg-gradient-to-r from-indigo-600 to-blue-500'}`} />
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${((totals.estimatedTotal - totals.actualTotal) / budget) * 100}%` }} className="h-full bg-white/10" />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${actualProgressWidth}%` }} className={`h-full ${totals.actualTotal > budget && budget > 0 ? 'bg-rose-500' : 'bg-gradient-to-r from-indigo-600 to-blue-500'}`} />
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${estimatedProgressWidth}%` }} className="h-full bg-white/10" />
               </div>
           </div>
       </div>
