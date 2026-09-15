@@ -2,7 +2,7 @@ import type { Transaction } from '@/types_db'
 
 type FinancialTransaction = Pick<Transaction, 'amount' | 'type' | 'date'>
 
-export function normalizeTransactionAmount(amount: number) {
+export function normalizeTransactionAmount(amount: number | string | null | undefined) {
   const parsed = Number(amount)
   return Number.isFinite(parsed) ? Math.abs(parsed) : 0
 }
