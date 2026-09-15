@@ -5,6 +5,7 @@ import {
   calculateIncome,
   calculateTransfers,
   groupTransactionsByMonth,
+  normalizeTransactionAmount,
 } from '../../core/finance/transactionMath'
 import type { Transaction } from '../../types_db'
 
@@ -62,5 +63,11 @@ describe('transactionMath', () => {
       transaction('despesa_fixa', 150),
       transaction('despesa_variavel', -75),
     ])).toBe(225)
+  })
+
+  it('normaliza qualquer valor persistido para magnitude positiva', () => {
+    expect(normalizeTransactionAmount(350)).toBe(350)
+    expect(normalizeTransactionAmount(-350)).toBe(350)
+    expect(normalizeTransactionAmount(Number.NaN)).toBe(0)
   })
 })
