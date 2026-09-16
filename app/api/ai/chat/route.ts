@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     if (!billing.access.canAccessPersonal) {
       throw new ForbiddenError('Este assistente pertence ao produto Pessoal.')
     }
-    const usage = await checkUsageLimit(user.id, 'ai_chat', billing.plan)
+    const usage = await checkUsageLimit(user.id, 'ai_chat', billing.entitlements)
     if (!usage.allowed) throw new RateLimitError()
 
     const supabase = await createClient()

@@ -378,10 +378,87 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
       await signIn(elevated, email, password)
       const personalWrite = await elevated.from('credit_cards').insert({ user_id: created.user.id, name: systemRole, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 }).select('id').single()
       expect(personalWrite.error).toBeNull()
+      for (let index = 0; index < 4; index += 1) {
+        const extraCard = await elevated.from('credit_cards').insert({ user_id: created.user.id, name: `${systemRole}-card-${index}`, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 })
+        expect(extraCard.error).toBeNull()
+        const extraGoal = await elevated.from('goals').insert({ user_id: created.user.id, title: `${systemRole}-goal-${index}`, target_amount: 10, current_amount: 0, deadline: '2099-01-01' })
+        expect(extraGoal.error).toBeNull()
+      }
       const professionalWrite = await elevated.from('business_customers').insert({ workspace_id: workspace.id, name: systemRole }).select('id').single()
       expect(professionalWrite.error).toBeNull()
       await elevated.auth.signOut()
     }
+  })
+
+  it('prevents workspace owners from changing memberships or capabilities through the Data API', async () => {
+    const membershipRead = await premium
+      .from('business_workspace_members')
+      .select('role')
+      .eq('workspace_id', professionalWorkspaceId)
+      .eq('user_id', premiumUser.id)
+      .single()
+    expect(membershipRead.error).toBeNull()
+    expect(membershipRead.data?.role).toBe('owner')
+
+    const membershipInsert = await premium
+      .from('business_workspace_members')
+      .insert({ workspace_id: professionalWorkspaceId, user_id: proUser.id, role: 'member' })
+    expect(membershipInsert.error).not.toBeNull()
+
+    const membershipUpdate = await premium
+      .from('business_workspace_members')
+      .update({ role: 'member' })
+      .eq('workspace_id', professionalWorkspaceId)
+      .eq('user_id', premiumUser.id)
+    expect(membershipUpdate.error).not.toBeNull()
+
+    const membershipDelete = await premium
+      .from('business_workspace_members')
+      .delete()
+      .eq('workspace_id', professionalWorkspaceId)
+      .eq('user_id', premiumUser.id)
+    expect(membershipDelete.error).not.toBeNull()
+
+    const capabilityUpdate = await premium
+      .from('business_workspace_capabilities')
+      .update({ enabled: false })
+      .eq('workspace_id', professionalWorkspaceId)
+      .eq('capability', 'finance')
+    expect(capabilityUpdate.error).not.toBeNull()
+
+    const capabilityInsert = await premium
+      .from('business_workspace_capabilities')
+      .insert({ workspace_id: professionalWorkspaceId, capability: 'inventory', enabled: true })
+    expect(capabilityInsert.error).not.toBeNull()
+
+    const capabilityDelete = await premium
+      .from('business_workspace_capabilities')
+      .delete()
+      .eq('workspace_id', professionalWorkspaceId)
+      .eq('capability', 'finance')
+    expect(capabilityDelete.error).not.toBeNull()
+  })
+
+  it.runIf(canProvisionUsers)('keeps the service-role workspace bootstrap operational', async () => {
+    const { data: workspace, error: bootstrapError } = await admin!.rpc('bootstrap_business_workspace_v2', { p_user_id: premiumUser.id })
+    expect(bootstrapError).toBeNull()
+    expect(workspace.id).toBe(professionalWorkspaceId)
+
+    const { data: membership, error: membershipError } = await admin!
+      .from('business_workspace_members')
+      .select('role')
+      .eq('workspace_id', professionalWorkspaceId)
+      .eq('user_id', premiumUser.id)
+      .single()
+    expect(membershipError).toBeNull()
+    expect(membership?.role).toBe('owner')
+
+    const { data: capabilities, error: capabilitiesError } = await admin!
+      .from('business_workspace_capabilities')
+      .select('capability, enabled')
+      .eq('workspace_id', professionalWorkspaceId)
+    expect(capabilitiesError).toBeNull()
+    expect(capabilities?.some((capability) => capability.capability === 'finance' && capability.enabled)).toBe(true)
   })
 
   it.each([

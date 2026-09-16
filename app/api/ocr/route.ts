@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     if (!billing.access.canAccessPersonal) {
       throw new ForbiddenError('O reconhecimento de cupons pertence ao produto Pessoal.')
     }
-    const usage = await checkUsageLimit(user.id, 'ocr', billing.plan)
+    const usage = await checkUsageLimit(user.id, 'ocr', billing.entitlements)
     if (!usage.allowed) throw new RateLimitError('Limite mensal de OCR atingido.')
 
     const { default: Tesseract } = await import('tesseract.js')

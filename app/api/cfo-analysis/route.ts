@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     requestSchema.parse(await request.json())
-    const usage = await checkUsageLimit(user.id, 'ai_cfo', billing.plan)
+    const usage = await checkUsageLimit(user.id, 'ai_cfo', billing.entitlements)
     if (!usage.allowed) throw new RateLimitError()
 
     const supabase = await createClient()

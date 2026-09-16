@@ -21,7 +21,7 @@ O plano descreve a oferta comercial; `subscriptions.product` define o produto au
 
 ## Limites de dados e IA
 
-Dados pessoais continuam vinculados a `user_id` e as policies exigem também `has_product_access(user_id, 'personal')`. Dados profissionais pertencem a `business_workspaces` e são autorizados pela associação em `business_workspace_members`. Toda consulta profissional deve incluir `workspace_id` e toda transação profissional também exige `scope=business`. Agendamentos profissionais, inclusive replay idempotente e atualização de convite, são sempre limitados ao workspace autorizado.
+Dados pessoais continuam vinculados a `user_id` e as policies exigem também `has_product_access(user_id, 'personal')`. Dados profissionais pertencem a `business_workspaces` e são autorizados pela associação em `business_workspace_members`. Na V1, memberships e capabilities são gerenciadas exclusivamente pelo backend/Service Role: clientes autenticados podem consultá-las, mas não criar, alterar ou apagar membros e capacidades pela Data API. Team Management será habilitado futuramente por uma API própria, com convite, aceitação e auditoria. Toda consulta profissional deve incluir `workspace_id` e toda transação profissional também exige `scope=business`. Agendamentos profissionais, inclusive replay idempotente e atualização de convite, são sempre limitados ao workspace autorizado.
 
 O assistente Pessoal recebe somente uma mensagem do navegador. O servidor autentica, valida o produto e monta o contexto com dados pessoais. A análise Profissional é separada, consulta somente o workspace autorizado e sinaliza dados ausentes. Nenhum fluxo aceita contexto financeiro enviado pelo cliente.
 
@@ -29,7 +29,7 @@ O assistente Pessoal recebe somente uma mensagem do navegador. O servidor autent
 
 `/app` é a rota canônica. `/` permanece como wrapper de compatibilidade enquanto links antigos são migrados. A autenticação inicial é validada no servidor.
 
-As tabelas `nail_clients`, `nail_products`, `businesses`, `clients` e `services` são legadas. A migration V2 copia dados para as tabelas universais sem apagar a origem. A interface ativa usa somente os modelos universais; a agenda permanece fora da navegação até sua generalização visual, mas o backend preservado agora grava e consulta por workspace.
+As tabelas `nail_clients`, `nail_products`, `businesses`, `clients` e `services` são legadas. A migration V2 copia dados para as tabelas universais sem apagar a origem. Para cada proprietário, o workspace novo recebe o nome do `businesses` mais antigo por `created_at` e, em caso de empate, por `id`; sem registro utilizável, usa `Meu negócio`. Um workspace já existente nunca tem seu nome sobrescrito. Clientes genéricos de `clients` são migrados com identidade de origem e UUID determinístico por namespace, evitando colisão com `nail_clients` e mantendo o backfill idempotente. A interface ativa usa somente os modelos universais; a agenda permanece fora da navegação até sua generalização visual, mas o backend preservado agora grava e consulta por workspace.
 
 ## Taxas tributárias legadas
 

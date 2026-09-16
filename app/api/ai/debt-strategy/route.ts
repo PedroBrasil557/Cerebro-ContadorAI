@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     if (!billing.entitlements.debtCenter) throw new ForbiddenError('A Central de Dívidas requer o plano PRO.')
 
     requestSchema.parse(await request.json())
-    const usage = await checkUsageLimit(user.id, 'ai_debt_strategy', billing.plan)
+    const usage = await checkUsageLimit(user.id, 'ai_debt_strategy', billing.entitlements)
     if (!usage.allowed) throw new RateLimitError()
 
     const supabase = await createClient()

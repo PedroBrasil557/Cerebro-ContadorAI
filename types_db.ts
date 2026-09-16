@@ -345,6 +345,8 @@ export interface BusinessWorkspaceCapability {
 export interface BusinessCustomer {
   id: string
   workspace_id: string
+  legacy_source?: 'nail_clients' | 'clients' | null
+  legacy_source_id?: string | null
   name: string
   email?: string | null
   phone?: string | null

@@ -256,7 +256,7 @@ export default function FinancialCommandCenter() {
                     <div className="bg-rose-500/10 p-4 rounded-2xl border border-rose-500/20 backdrop-blur-sm flex gap-3 items-start">
                        <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />
                        <p className="text-xs text-rose-200 leading-relaxed">
-                         Alerta: Sua margem está abaixo de 40%. Vá até a aba &quot;Engenharia de Preços&quot; para recalcular seus custos urgentemente.
+                         Sua margem está abaixo de 40%. Revise seus custos e preços para entender onde ela pode ser melhorada.
                        </p>
                     </div>
                   )}
