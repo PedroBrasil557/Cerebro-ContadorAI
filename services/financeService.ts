@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/client'
 import { buildInvestmentPayload } from '@/lib/investments/buildPayload'
 import { DataServiceError } from '@/lib/data/errors'
 import { logger } from '@/lib/logger'
+import { businessFinanceService } from '@/services/businessFinanceService'
 import { 
   ClientAppointment, 
   Transaction, 
@@ -220,14 +221,16 @@ export const financeService = {
   },
 
   // ============================================================================
-  // AGENDA SMART / NAIL DESIGN
+  // AGENDA PROFISSIONAL
   // ============================================================================
   getAppointments: async (): Promise<ClientAppointment[]> => {
       const user = await getAuthenticatedUser('appointments')
+      const workspace = await businessFinanceService.getWorkspace()
       const { data, error } = await supabase
         .from('appointments')
         .select('*')
         .eq('user_id', user.id)
+        .eq('workspace_id', workspace.id)
         .order('date', { ascending: true })
       if (error) throw databaseError('appointments', user.id, error)
       return (data as ClientAppointment[]) ?? []
@@ -269,11 +272,13 @@ export const financeService = {
 
   updateAppointmentStatus: async (id: string, status: string) => {
     const user = await getAuthenticatedUser('appointments')
+    const workspace = await businessFinanceService.getWorkspace()
     const { error } = await supabase
       .from('appointments')
       .update({ status })
       .eq('id', id)
       .eq('user_id', user.id)
+      .eq('workspace_id', workspace.id)
     if (error) throw databaseError('appointments', user.id, error)
   },
 

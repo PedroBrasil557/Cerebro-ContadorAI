@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const [settingsResult, transactionsResult] = await Promise.all([
       supabase
         .from('business_settings')
-        .select('current_balance, monthly_goal, tax_rate, reserve_rate')
+        .select('current_balance, monthly_goal, tax_rate, tax_rate_confirmed_at, reserve_rate')
         .eq('workspace_id', workspace.id)
         .maybeSingle(),
       supabase
@@ -45,14 +45,20 @@ export async function POST(request: Request) {
 
     const settings = settingsResult.data
     const recentTransactions = transactionsResult.data ?? []
-    const currentBalance = Number(settings?.current_balance ?? 0)
-    const monthlyGoal = Number(settings?.monthly_goal ?? 0)
-    const taxRate = settings?.tax_rate == null ? null : Number(settings.tax_rate)
-    const reserveRate = Number(settings?.reserve_rate ?? 0)
+    const finiteOrZero = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0
+    const currentBalance = finiteOrZero(settings?.current_balance)
+    const monthlyGoal = finiteOrZero(settings?.monthly_goal)
+    const confirmedTax = workspace.tax_rate_confirmed_at
+      ? workspace.tax_rate
+      : settings?.tax_rate_confirmed_at
+        ? settings.tax_rate
+        : null
+    const taxRate = confirmedTax == null || !Number.isFinite(Number(confirmedTax)) ? null : Number(confirmedTax)
+    const reserveRate = finiteOrZero(settings?.reserve_rate)
 
     const expenses = recentTransactions
       .filter((transaction) => transaction.type === 'despesa_fixa' || transaction.type === 'despesa_variavel')
-      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
+      .reduce((sum, transaction) => sum + Math.abs(finiteOrZero(transaction.amount)), 0)
     const runway = expenses > 0 ? currentBalance / expenses : null
     const prompt = `Faça uma análise educativa do negócio em PT-BR, sem inventar dados ou scores. Todos os valores foram consultados no servidor dentro do ambiente profissional autenticado.\nSaldo: R$ ${currentBalance.toFixed(2)}\nMeta mensal: R$ ${monthlyGoal.toFixed(2)}\nImposto configurado: ${taxRate === null ? 'não configurado' : `${taxRate}%`}\nReserva alvo: ${reserveRate}%\nDespesas observadas: R$ ${expenses.toFixed(2)}\nFôlego de caixa: ${runway === null ? 'indisponível por falta de despesas observadas' : `${runway.toFixed(1)} meses`}\nSepare fatos de recomendações, sinalize dados insuficientes e não ofereça orientação tributária definitiva.`
     const completion = await getGroqClient().chat.completions.create({

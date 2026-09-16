@@ -122,7 +122,7 @@ export default function ViewContainer({
         {/* ========================================== */}
         {accountMode === 'professional' && access.canAccessProfessional && (
           <>
-            {(currentTab === 'nail design' || currentTab === 'dashboard') && (
+            {(currentTab === 'visão do negócio' || currentTab === 'dashboard') && (
               <FinancialCommandCenter />
             )}
 

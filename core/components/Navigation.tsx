@@ -152,7 +152,7 @@ export default function Navigation({
 
   const professionalMenuItems: MenuItem[] = [
     {
-      id: "nail design",
+      id: "visão do negócio",
       label: "Visão do Negócio",
       icon: LayoutDashboard,
       isPro: false,
@@ -197,7 +197,7 @@ export default function Navigation({
       toast.success(
         `Cérebro.IA ${newMode === "personal" ? "Pessoal" : "Profissional"} ativado.`,
       );
-      onSelectTab(newMode === "personal" ? "dashboard" : "nail design");
+      onSelectTab(newMode === "personal" ? "dashboard" : "visão do negócio");
       router.refresh();
     } catch {
       toast.error("Erro ao alternar modo.");

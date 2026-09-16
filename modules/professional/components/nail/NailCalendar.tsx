@@ -25,7 +25,11 @@ export default function NailCalendar() {
     const fetchMaterials = async () => {
       const data = await businessFinanceService.getDashboardData()
       setMaterials(data.costs.map((item) => ({ name: item.name, cost_per_application: item.cost_per_use ?? null })))
-      setTaxRate(data.workspace.tax_rate ?? data.settings?.tax_rate ?? null)
+      setTaxRate(data.workspace.tax_rate_confirmed_at
+        ? data.workspace.tax_rate
+        : data.settings?.tax_rate_confirmed_at
+          ? data.settings.tax_rate
+          : null)
     }
     fetchMaterials()
   }, [])

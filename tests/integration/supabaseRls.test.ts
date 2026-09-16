@@ -73,11 +73,12 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
   const provisionedUserIds: string[] = []
 
   beforeAll(async () => {
-    if (!hasConfiguredUsers) {
-      admin = createClient(testUrl!, testServiceRoleKey!, {
+    if (testServiceRoleKey) {
+      admin = createClient(testUrl!, testServiceRoleKey, {
         auth: { autoRefreshToken: false, persistSession: false },
       })
-
+    }
+    if (!hasConfiguredUsers) {
       const suffix = crypto.randomUUID()
       const password = `Rls-${crypto.randomUUID()}-Aa1!`
       freeEmail = `rls-free-${suffix}@example.test`
@@ -89,7 +90,7 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
 
       const createdUsers: User[] = []
       for (const email of [freeEmail, proEmail, premiumEmail]) {
-        const { data, error } = await admin.auth.admin.createUser({
+        const { data, error } = await admin!.auth.admin.createUser({
           email,
           password,
           email_confirm: true,
@@ -101,12 +102,12 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
       }
 
       const periodEnd = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      const { error: subscriptionError } = await admin.from('subscriptions').insert([
+      const { error: subscriptionError } = await admin!.from('subscriptions').insert([
         { user_id: createdUsers[1].id, plan: 'pro', product: 'personal', status: 'active', current_period_end: periodEnd },
         { user_id: createdUsers[2].id, plan: 'premium', product: 'professional', status: 'active', current_period_end: periodEnd },
       ])
       if (subscriptionError) throw subscriptionError
-      const { error: workspaceError } = await admin.rpc('bootstrap_business_workspace_v2', { p_user_id: createdUsers[2].id })
+      const { error: workspaceError } = await admin!.rpc('bootstrap_business_workspace_v2', { p_user_id: createdUsers[2].id })
       if (workspaceError) throw workspaceError
     }
 
@@ -285,6 +286,18 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     expect(professionalAttempt.error).not.toBeNull()
   })
 
+  it('blocks a Professional-only user from Personal cards, goals, shopping, receipts and patrimony', async () => {
+    const marker = `professional-personal-block-${crypto.randomUUID()}`
+    const attempts = await Promise.all([
+      premium.from('credit_cards').insert({ user_id: premiumUser.id, name: marker, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 }),
+      premium.from('goals').insert({ user_id: premiumUser.id, title: marker, target_amount: 10, current_amount: 0, deadline: '2099-01-01' }),
+      premium.from('monthly_shopping_sessions').insert({ user_id: premiumUser.id, month: '2199-01-01', currency_code: 'BRL' }),
+      premium.from('shopping_receipts').insert({ session_id: sessionId, processing_status: 'pending' }),
+      premium.from('patrimony_history').insert({ user_id: premiumUser.id, total_balance: 10, record_date: '2099-01-01' }),
+    ])
+    attempts.forEach(({ error }) => expect(error).not.toBeNull())
+  })
+
   it('allows PREMIUM professional data', async () => {
     const { data, error } = await premium.from('transactions').insert({ user_id: premiumUser.id, workspace_id: professionalWorkspaceId, description: `premium-${crypto.randomUUID()}`, amount: 1, type: 'receita', scope: 'business' }).select('id').single()
     expect(error).toBeNull()
@@ -298,6 +311,77 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     expect(read.data).toEqual([])
     const write = await pro.from('business_customers').insert({ workspace_id: professionalWorkspaceId, name: 'Cross tenant' })
     expect(write.error).not.toBeNull()
+    const costWrite = await pro.from('business_cost_items').insert({ workspace_id: professionalWorkspaceId, name: 'Cross tenant', purchase_price: 1 })
+    expect(costWrite.error).not.toBeNull()
+    const appointmentWrite = await pro.from('appointments').insert({ user_id: proUser.id, workspace_id: professionalWorkspaceId, client_name: 'Cross tenant', service: 'RLS', value: 1, date: '2099-01-01', time: '10:00' })
+    expect(appointmentWrite.error).not.toBeNull()
+  })
+
+  it.runIf(canProvisionUsers)('isolates appointments between two Professional workspaces', async () => {
+    const secondPassword = `Rls-${crypto.randomUUID()}-Aa1!`
+    const secondEmail = `rls-professional-b-${crypto.randomUUID()}@example.test`
+    const { data: created, error: createError } = await admin!.auth.admin.createUser({
+      email: secondEmail,
+      password: secondPassword,
+      email_confirm: true,
+    })
+    if (createError) throw createError
+    if (!created.user) throw new Error('Second Professional test user was not returned.')
+    provisionedUserIds.push(created.user.id)
+
+    const periodEnd = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const { error: subscriptionError } = await admin!.from('subscriptions').insert({
+      user_id: created.user.id,
+      plan: 'premium',
+      product: 'professional',
+      status: 'active',
+      current_period_end: periodEnd,
+    })
+    if (subscriptionError) throw subscriptionError
+    const { data: workspaceB, error: workspaceError } = await admin!.rpc('bootstrap_business_workspace_v2', { p_user_id: created.user.id })
+    if (workspaceError) throw workspaceError
+
+    const professionalB = client()
+    await signIn(professionalB, secondEmail, secondPassword)
+    const { data: appointmentB, error: appointmentError } = await professionalB
+      .from('appointments')
+      .insert({ user_id: created.user.id, workspace_id: workspaceB.id, client_name: 'Workspace B', service: 'RLS', value: 1, date: '2099-01-01', time: '10:00' })
+      .select('id')
+      .single()
+    if (appointmentError) throw appointmentError
+
+    const readFromA = await premium.from('appointments').select('id').eq('id', appointmentB.id)
+    expect(readFromA.error).toBeNull()
+    expect(readFromA.data).toEqual([])
+    const writeFromA = await premium.from('appointments').insert({ user_id: premiumUser.id, workspace_id: workspaceB.id, client_name: 'Cross workspace', service: 'RLS', value: 1, date: '2099-01-01', time: '11:00' })
+    expect(writeFromA.error).not.toBeNull()
+
+    await professionalB.from('appointments').delete().eq('id', appointmentB.id)
+    await professionalB.auth.signOut()
+  })
+
+  it.runIf(canProvisionUsers)('allows admin and founder to use both products in their authorized context', async () => {
+    for (const systemRole of ['admin', 'founder'] as const) {
+      const password = `Rls-${crypto.randomUUID()}-Aa1!`
+      const email = `rls-${systemRole}-${crypto.randomUUID()}@example.test`
+      const { data: created, error: createError } = await admin!.auth.admin.createUser({ email, password, email_confirm: true })
+      if (createError) throw createError
+      if (!created.user) throw new Error(`${systemRole} test user was not returned.`)
+      provisionedUserIds.push(created.user.id)
+
+      const { error: roleError } = await admin!.from('profiles').update({ system_role: systemRole }).eq('id', created.user.id)
+      if (roleError) throw roleError
+      const { data: workspace, error: workspaceError } = await admin!.rpc('bootstrap_business_workspace_v2', { p_user_id: created.user.id })
+      if (workspaceError) throw workspaceError
+
+      const elevated = client()
+      await signIn(elevated, email, password)
+      const personalWrite = await elevated.from('credit_cards').insert({ user_id: created.user.id, name: systemRole, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 }).select('id').single()
+      expect(personalWrite.error).toBeNull()
+      const professionalWrite = await elevated.from('business_customers').insert({ workspace_id: workspace.id, name: systemRole }).select('id').single()
+      expect(professionalWrite.error).toBeNull()
+      await elevated.auth.signOut()
+    }
   })
 
   it.each([

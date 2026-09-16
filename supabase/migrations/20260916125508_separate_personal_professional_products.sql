@@ -25,6 +25,16 @@ comment on column public.subscriptions.product is
 alter table public.business_settings alter column tax_rate drop default;
 alter table public.businesses alter column default_tax_rate drop default;
 
+-- Existing numeric rates are preserved because the database cannot distinguish a
+-- user-confirmed 6% value from the former 6% default. Application code must ignore
+-- a legacy rate until a user confirms it and this timestamp is populated.
+alter table public.business_settings add column if not exists tax_rate_confirmed_at timestamptz;
+alter table public.businesses add column if not exists default_tax_rate_confirmed_at timestamptz;
+comment on column public.business_settings.tax_rate_confirmed_at is
+  'Null means the stored rate is legacy/unverified and must not be used as configured tax data.';
+comment on column public.businesses.default_tax_rate_confirmed_at is
+  'Null means the stored rate is legacy/unverified and must not be used as configured tax data.';
+
 create table if not exists public.business_workspaces (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null references public.profiles(id) on delete cascade,
@@ -35,6 +45,7 @@ create table if not exists public.business_workspaces (
   base_currency text not null default 'BRL',
   timezone text not null default 'America/Sao_Paulo',
   tax_rate numeric check (tax_rate is null or (tax_rate >= 0 and tax_rate <= 100)),
+  tax_rate_confirmed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (owner_user_id)
@@ -126,6 +137,9 @@ create index if not exists business_cost_items_workspace_id_idx on public.busine
 create index if not exists transactions_workspace_id_idx on public.transactions(workspace_id);
 create index if not exists business_settings_workspace_id_idx on public.business_settings(workspace_id);
 create index if not exists appointments_workspace_id_idx on public.appointments(workspace_id);
+create unique index if not exists appointments_workspace_id_idempotency_key_idx
+  on public.appointments(workspace_id, idempotency_key)
+  where workspace_id is not null and idempotency_key is not null;
 
 -- Create a workspace for every existing Professional subscriber or owner of legacy business data.
 with professional_owners as (
@@ -488,6 +502,161 @@ with check (
       and public.has_product_access(user_id, 'professional')
       and private.is_business_workspace_member(workspace_id))
   )
+);
+
+-- Personal resources require both ownership and Personal product access. These
+-- policies replace the earlier owner-only rules without deleting any stored data.
+drop policy if exists "Cards access" on public.credit_cards;
+create policy "Cards access" on public.credit_cards for all to authenticated
+using ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'))
+with check ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'));
+
+drop policy if exists "Goals access" on public.goals;
+create policy "Goals access" on public.goals for all to authenticated
+using ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'))
+with check ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'));
+
+drop policy if exists "Shopping Sessions access" on public.monthly_shopping_sessions;
+create policy "Shopping Sessions access" on public.monthly_shopping_sessions for all to authenticated
+using ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'))
+with check ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'));
+
+drop policy if exists "Shopping Items access" on public.shopping_items;
+create policy "Shopping Items access" on public.shopping_items for all to authenticated
+using (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_items.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+))
+with check (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_items.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+));
+
+drop policy if exists "Shopping insights access" on public.shopping_insights;
+create policy "Shopping insights access" on public.shopping_insights for all to authenticated
+using (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_insights.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+))
+with check (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_insights.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+));
+
+drop policy if exists "Users can read their own receipts" on public.shopping_receipts;
+drop policy if exists "Users can create their own receipts" on public.shopping_receipts;
+drop policy if exists "Users can update their own receipts" on public.shopping_receipts;
+drop policy if exists "Users can delete their own receipts" on public.shopping_receipts;
+create policy "Personal users can read their receipts" on public.shopping_receipts
+for select to authenticated using (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_receipts.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+));
+create policy "Personal users can create their receipts" on public.shopping_receipts
+for insert to authenticated with check (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_receipts.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+));
+create policy "Personal users can update their receipts" on public.shopping_receipts
+for update to authenticated using (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_receipts.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+)) with check (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_receipts.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+));
+create policy "Personal users can delete their receipts" on public.shopping_receipts
+for delete to authenticated using (exists (
+  select 1 from public.monthly_shopping_sessions session
+  where session.id = shopping_receipts.session_id
+    and session.user_id = (select auth.uid())
+    and public.has_product_access(session.user_id, 'personal')
+));
+
+drop policy if exists "Investments access" on public.investments;
+create policy "Investments access" on public.investments for all to authenticated
+using ((select auth.uid()) = user_id
+  and public.has_product_access(user_id, 'personal')
+  and public.has_active_entitlement(user_id, 'investments'))
+with check ((select auth.uid()) = user_id
+  and public.has_product_access(user_id, 'personal')
+  and public.has_active_entitlement(user_id, 'investments'));
+
+drop policy if exists "Patrimony history access" on public.patrimony_history;
+create policy "Patrimony history access" on public.patrimony_history for all to authenticated
+using ((select auth.uid()) = user_id
+  and public.has_product_access(user_id, 'personal')
+  and public.has_active_entitlement(user_id, 'investments'))
+with check ((select auth.uid()) = user_id
+  and public.has_product_access(user_id, 'personal')
+  and public.has_active_entitlement(user_id, 'investments'));
+
+drop policy if exists "Debts access" on public.debts;
+create policy "Debts access" on public.debts for all to authenticated
+using ((select auth.uid()) = user_id
+  and public.has_product_access(user_id, 'personal')
+  and public.has_active_entitlement(user_id, 'debts'))
+with check ((select auth.uid()) = user_id
+  and public.has_product_access(user_id, 'personal')
+  and public.has_active_entitlement(user_id, 'debts'));
+
+drop policy if exists "Financial scores access" on public.personal_financial_scores;
+create policy "Financial scores access" on public.personal_financial_scores for all to authenticated
+using ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'))
+with check ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'));
+
+drop policy if exists "Behavior history access" on public.personal_behavior_history;
+create policy "Behavior history access" on public.personal_behavior_history for all to authenticated
+using ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'))
+with check ((select auth.uid()) = user_id and public.has_product_access(user_id, 'personal'));
+
+drop policy if exists "Users can read their receipt files" on storage.objects;
+drop policy if exists "Users can upload their receipt files" on storage.objects;
+drop policy if exists "Users can update their receipt files" on storage.objects;
+drop policy if exists "Users can delete their receipt files" on storage.objects;
+create policy "Personal users can read receipt files" on storage.objects
+for select to authenticated using (
+  bucket_id = 'receipts'
+  and (storage.foldername(name))[1] = (select auth.uid())::text
+  and public.has_product_access((select auth.uid()), 'personal')
+);
+create policy "Personal users can upload receipt files" on storage.objects
+for insert to authenticated with check (
+  bucket_id = 'receipts'
+  and (storage.foldername(name))[1] = (select auth.uid())::text
+  and public.has_product_access((select auth.uid()), 'personal')
+);
+create policy "Personal users can update receipt files" on storage.objects
+for update to authenticated using (
+  bucket_id = 'receipts'
+  and (storage.foldername(name))[1] = (select auth.uid())::text
+  and public.has_product_access((select auth.uid()), 'personal')
+) with check (
+  bucket_id = 'receipts'
+  and (storage.foldername(name))[1] = (select auth.uid())::text
+  and public.has_product_access((select auth.uid()), 'personal')
+);
+create policy "Personal users can delete receipt files" on storage.objects
+for delete to authenticated using (
+  bucket_id = 'receipts'
+  and (storage.foldername(name))[1] = (select auth.uid())::text
+  and public.has_product_access((select auth.uid()), 'personal')
 );
 
 drop policy if exists "Settings access" on public.business_settings;

@@ -33,6 +33,7 @@ export interface Business {
   name: string
   tax_regime: string
   default_tax_rate: number
+  default_tax_rate_confirmed_at?: string | null
   created_at: string
 }
 
@@ -207,6 +208,7 @@ export interface BusinessSettings {
   current_balance: number
   monthly_goal: number
   tax_rate: number | null
+  tax_rate_confirmed_at?: string | null
   reserve_rate: number
   updated_at?: string
 }
@@ -253,7 +255,7 @@ export type ActiveTab =
   | 'investimentos'
   | 'minha carteira'
   | 'central de dividas'
-  | 'nail design'
+  | 'visão do negócio'
   | 'caixa empresarial'
   | 'agenda smart'
   | 'meu perfil'
@@ -321,6 +323,7 @@ export interface BusinessWorkspace {
   base_currency: string
   timezone: string
   tax_rate: number | null
+  tax_rate_confirmed_at?: string | null
   created_at: string
   updated_at: string
 }

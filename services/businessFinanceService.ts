@@ -58,11 +58,13 @@ export const businessFinanceService = {
 
   async createTransaction(input: Partial<NewTransaction>) {
     const [currentWorkspace, userId] = await Promise.all([workspace(), authenticatedUserId()])
+    const amount = Number(input.amount)
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Informe um valor válido para o lançamento.')
     const payload = {
       user_id: userId,
       workspace_id: currentWorkspace.id,
       description: input.description,
-      amount: Number(input.amount),
+      amount,
       type: input.type,
       scope: 'business',
       category: input.category || 'Geral',
@@ -79,6 +81,11 @@ export const businessFinanceService = {
 
   async createCustomer(input: Pick<BusinessCustomer, 'name'> & Partial<BusinessCustomer>) {
     const [currentWorkspace, userId] = await Promise.all([workspace(), authenticatedUserId()])
+    const totalSpent = Number(input.total_spent) || 0
+    const interactionCount = Number(input.interaction_count) || 0
+    if (!Number.isFinite(totalSpent) || totalSpent < 0 || !Number.isFinite(interactionCount) || interactionCount < 0) {
+      throw new Error('O histórico do cliente contém valores inválidos.')
+    }
     const { data, error } = await supabase.from('business_customers').insert({
       workspace_id: currentWorkspace.id,
       created_by: userId,
@@ -87,6 +94,9 @@ export const businessFinanceService = {
       phone: input.phone || null,
       notes: input.notes || null,
       customer_type: input.customer_type || 'person',
+      total_spent: totalSpent,
+      interaction_count: Math.trunc(interactionCount),
+      last_interaction_at: input.last_interaction_at || null,
     }).select().single()
     if (error) throw error
     return data as BusinessCustomer
@@ -100,13 +110,21 @@ export const businessFinanceService = {
 
   async createCostItem(input: Pick<BusinessCostItem, 'name' | 'purchase_price'> & Partial<BusinessCostItem>) {
     const currentWorkspace = await workspace()
+    const purchasePrice = Number(input.purchase_price)
+    const quantity = input.quantity == null ? null : Number(input.quantity)
+    const estimatedYield = input.estimated_yield == null ? null : Number(input.estimated_yield)
+    if (!Number.isFinite(purchasePrice) || purchasePrice < 0
+      || (quantity !== null && (!Number.isFinite(quantity) || quantity < 0))
+      || (estimatedYield !== null && (!Number.isFinite(estimatedYield) || estimatedYield <= 0))) {
+      throw new Error('O item de custo contém valores inválidos.')
+    }
     const { data, error } = await supabase.from('business_cost_items').insert({
       workspace_id: currentWorkspace.id,
       name: input.name,
       category: input.category || 'Geral',
-      purchase_price: Number(input.purchase_price),
-      quantity: input.quantity ?? null,
-      estimated_yield: input.estimated_yield ?? null,
+      purchase_price: purchasePrice,
+      quantity,
+      estimated_yield: estimatedYield,
     }).select().single()
     if (error) throw error
     return data as BusinessCostItem

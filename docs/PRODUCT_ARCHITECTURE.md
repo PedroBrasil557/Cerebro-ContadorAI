@@ -21,7 +21,7 @@ O plano descreve a oferta comercial; `subscriptions.product` define o produto au
 
 ## Limites de dados e IA
 
-Dados pessoais continuam vinculados a `user_id`. Dados profissionais pertencem a `business_workspaces` e são autorizados pela associação em `business_workspace_members`. Toda consulta profissional deve incluir `workspace_id` e toda transação profissional também exige `scope=business`.
+Dados pessoais continuam vinculados a `user_id` e as policies exigem também `has_product_access(user_id, 'personal')`. Dados profissionais pertencem a `business_workspaces` e são autorizados pela associação em `business_workspace_members`. Toda consulta profissional deve incluir `workspace_id` e toda transação profissional também exige `scope=business`. Agendamentos profissionais, inclusive replay idempotente e atualização de convite, são sempre limitados ao workspace autorizado.
 
 O assistente Pessoal recebe somente uma mensagem do navegador. O servidor autentica, valida o produto e monta o contexto com dados pessoais. A análise Profissional é separada, consulta somente o workspace autorizado e sinaliza dados ausentes. Nenhum fluxo aceita contexto financeiro enviado pelo cliente.
 
@@ -29,6 +29,10 @@ O assistente Pessoal recebe somente uma mensagem do navegador. O servidor autent
 
 `/app` é a rota canônica. `/` permanece como wrapper de compatibilidade enquanto links antigos são migrados. A autenticação inicial é validada no servidor.
 
-As tabelas `nail_clients`, `nail_products`, `businesses`, `clients` e `services` são legadas. A migration V2 copia dados para as tabelas universais sem apagar a origem. A interface ativa usa somente os modelos universais; a agenda antiga foi retirada da navegação e permanece isolada para migração futura.
+As tabelas `nail_clients`, `nail_products`, `businesses`, `clients` e `services` são legadas. A migration V2 copia dados para as tabelas universais sem apagar a origem. A interface ativa usa somente os modelos universais; a agenda permanece fora da navegação até sua generalização visual, mas o backend preservado agora grava e consulta por workspace.
+
+## Taxas tributárias legadas
+
+As versões antigas criavam `business_settings.tax_rate` e `businesses.default_tax_rate` com default de 6%. Não existe histórico confiável para distinguir um 6% confirmado pelo usuário de um valor gerado pelo default. A migration preserva todos os números, remove os defaults e adiciona timestamps de confirmação. Enquanto `tax_rate_confirmed_at`/`default_tax_rate_confirmed_at` estiver nulo, a aplicação trata a taxa como legada e não confirmada, não calcula reserva tributária e solicita configuração futura. Uma tela futura deverá salvar a taxa e o timestamp juntos após confirmação explícita.
 
 Não use `localStorage` como fonte de autorização. Preferências locais antigas podem existir no navegador, mas são ignoradas pelos guards e pelo RLS.

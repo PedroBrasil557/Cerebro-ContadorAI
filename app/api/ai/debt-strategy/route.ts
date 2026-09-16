@@ -15,6 +15,9 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser()
     const billing = await getUserEntitlements(user.id)
+    if (!billing.access.canAccessPersonal) {
+      throw new ForbiddenError('A estratégia de dívidas pertence ao produto Pessoal.')
+    }
     if (!billing.entitlements.debtCenter) throw new ForbiddenError('A Central de Dívidas requer o plano PRO.')
 
     requestSchema.parse(await request.json())

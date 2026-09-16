@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { businessFinanceService } from '@/services/businessFinanceService'
+import { finiteNumber, summarizeBusinessFinance } from '@/lib/business/finance'
+import { cfoRulesEngine } from '@/modules/cfo/cfoRulesEngine'
 
 import CostEngineeringPanel from './CostEngineeringPanel'
 import FinancialCrmPanel from './FinancialCrmPanel'
@@ -21,7 +23,7 @@ interface HealthData {
   profit_margin_pct: number
   stability_index: number
   safe_pro_labore: number
-  reinvestment_pool: number
+  tax_reserve: number | null
 }
 
 export default function FinancialCommandCenter() {
@@ -36,14 +38,14 @@ export default function FinancialCommandCenter() {
     profit_margin_pct: 0,
     stability_index: 0,
     safe_pro_labore: 0,
-    reinvestment_pool: 0,
+    tax_reserve: null,
   })
 
   // 🧠 MOTOR DE CÁLCULO FINANCEIRO (BUSCA NO BANCO)
   useEffect(() => {
     const fetchRealData = async () => {
       setIsLoading(true)
-      const { transactions: txs, costs: materials } = await businessFinanceService.getDashboardData()
+      const { transactions: txs, workspace, settings } = await businessFinanceService.getDashboardData()
 
       // 🧮 MATEMÁTICA
       let grossRev = 0
@@ -52,27 +54,30 @@ export default function FinancialCommandCenter() {
       if (txs) {
         txs.forEach((tx) => {
           if (tx.type === 'receita') {
-            grossRev += Number(tx.amount)
+            grossRev += finiteNumber(tx.amount)
             totalAppointments += 1
           }
         })
       }
 
-      // Custo dos materiais por cada atendimento feito
-      const materialCostPerApp = materials.reduce(
-        (acc, curr) => acc + Number(curr.cost_per_use || 0),
-        0,
-      )
-      const totalMaterialCost = materialCostPerApp * totalAppointments
-      
-      const registeredExpenses = (txs ?? [])
-        .filter((tx) => tx.type === 'despesa_fixa' || tx.type === 'despesa_variavel')
-        .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
-      const netProfit = grossRev - totalMaterialCost - registeredExpenses
+      const confirmedTaxRate = workspace.tax_rate_confirmed_at
+        ? workspace.tax_rate
+        : settings?.tax_rate_confirmed_at
+          ? settings.tax_rate
+          : null
+      const summary = summarizeBusinessFinance(txs, { taxRate: confirmedTaxRate, monthlyGoal: settings?.monthly_goal ?? null })
+      const netProfit = summary.balance - (summary.taxReserve ?? 0)
       const margin = grossRev > 0 ? (netProfit / grossRev) * 100 : 0
-      
-      const safeProLabore = 0
-      const reinvestment = 0
+      const currentBalance = (Number.isFinite(Number(settings?.current_balance)) ? Number(settings?.current_balance) : 0) + summary.balance
+      const metrics = {
+        revenue: summary.revenue,
+        expenses: summary.expenses,
+        cashReserve: Math.max(currentBalance, 0),
+        taxRate: confirmedTaxRate,
+        activeClients: 0,
+        totalHoursWorked: 0,
+      }
+      const safeProLabore = confirmedTaxRate === null ? 0 : cfoRulesEngine.calculateSafeDraw(metrics)
 
       // Algoritmo do Índice de Estabilidade (0 a 100)
       let stability = 0
@@ -89,7 +94,7 @@ export default function FinancialCommandCenter() {
         profit_margin_pct: margin,
         stability_index: stability,
         safe_pro_labore: safeProLabore,
-        reinvestment_pool: reinvestment,
+        tax_reserve: summary.taxReserve,
       })
 
       setIsLoading(false)
@@ -198,12 +203,12 @@ export default function FinancialCommandCenter() {
                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Distribuição pendente de configuração <span className="ml-2 text-amber-400">ESTIMATIVA</span></h4>
                <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Pró-Labore não configurado</p>
-                     <p className="text-xl font-black text-emerald-400">{formatCurrency(health.safe_pro_labore)}</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Retirada estimada</p>
+                     <p className="text-xl font-black text-emerald-400">{health.tax_reserve === null ? 'Dados insuficientes' : formatCurrency(health.safe_pro_labore)}</p>
                   </div>
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Reinvestimento não configurado</p>
-                     <p className="text-xl font-black text-white">{formatCurrency(health.reinvestment_pool)}</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Reserva para impostos</p>
+                     <p className="text-xl font-black text-white">{health.tax_reserve === null ? 'Não configurada' : formatCurrency(health.tax_reserve)}</p>
                   </div>
                </div>
             </div>

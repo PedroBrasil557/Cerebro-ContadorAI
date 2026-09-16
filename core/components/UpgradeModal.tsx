@@ -90,8 +90,8 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
               {isRedirecting ? <Loader2 className="text-white h-10 w-10 animate-spin" /> : <BrainCircuit className="text-white h-10 w-10" />}
             </motion.div>
 
-            <h2 className="text-3xl font-black text-white mb-3 tracking-tighter uppercase italic">
-              Acesso <span className="text-indigo-400">Total</span>
+            <h2 className="text-3xl font-black text-white mb-3 tracking-tighter">
+              Cérebro.IA <span className="text-indigo-400">PRO</span>
             </h2>
             <p className="text-sm text-gray-400 mb-10 leading-relaxed font-medium">
               O Cérebro.IA aguarda ativação. Desbloqueie análises avançadas, central de dívidas e projeções patrimoniais.
@@ -125,7 +125,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                 ) : (
                   <>
                     <Zap size={16} className="fill-black group-hover:animate-pulse" />
-                    Ativar Membrana PRO
+                    Assinar PRO
                   </>
                 )}
             </button>

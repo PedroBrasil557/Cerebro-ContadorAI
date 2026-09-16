@@ -21,7 +21,7 @@ Transações usam `scope = personal | business`. Transferências permanecem regi
 
 Toda tabela exposta pela Data API deve ter RLS habilitada. Políticas de usuário usam `(select auth.uid())` e não confiam em IDs enviados pelo cliente. `profiles` permite ao usuário alterar somente campos de perfil; `plan`, `plan_tier` e `system_role` não fazem parte do grant de atualização. `subscriptions` e `api_usage` são gerenciadas pelo servidor e legíveis apenas pelo proprietário. `audit_logs` e `stripe_events` são internos e exclusivos da Service Role. Tabelas globais de regras, flags, moedas e inflação são referências read-only para usuários autenticados.
 
-`subscriptions` é a única fonte de autorização paga. A coluna `product` separa Pessoal de Profissional. FREE e PRO são Pessoal; PREMIUM é Profissional durante a transição. Um cliente Profissional não herda módulos pessoais. Perfil e metadata do Auth não concedem entitlement.
+`subscriptions` é a única fonte de autorização paga. A coluna `product` separa Pessoal de Profissional. FREE e PRO são Pessoal; PREMIUM é Profissional durante a transição. Um cliente Profissional não herda módulos pessoais. Perfil e metadata do Auth não concedem entitlement. Cartões, metas, investimentos, dívidas, patrimônio, compras, recibos, insights e arquivos do bucket `receipts` exigem produto Pessoal além da propriedade. Workspaces, clientes, custos, transações business e appointments exigem produto Profissional e membership.
 
 ## Funções
 
@@ -43,6 +43,8 @@ Funções privilegiadas devem definir `search_path` explicitamente, receber gran
 7. confirmar rollback lógico ou plano de recuperação.
 
 Para a fundação V2, aplique `20260916125508_separate_personal_professional_products.sql` antes de publicar o código que consulta `subscriptions.product`. A migration é aditiva, faz backfill de produto/workspace e mantém as tabelas legadas. Não execute manualmente contra produção sem backup, janela aprovada e validação prévia em banco local/staging.
+
+Antes da aplicação em produção, audite separadamente os valores 6 em `business_settings.tax_rate` e `businesses.default_tax_rate`. Eles são preservados, mas ficam sem timestamp de confirmação e não são utilizados pelos cálculos atuais. Após disponibilizar uma configuração tributária explícita, grave o valor confirmado junto de `tax_rate_confirmed_at` (ou `default_tax_rate_confirmed_at` no legado). Nunca converta 6 para `NULL` em massa.
 
 ## Reconstrução e validação
 
