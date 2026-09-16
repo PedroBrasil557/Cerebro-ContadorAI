@@ -35,7 +35,7 @@ async function signIn(instance: SupabaseClient, email: string, password: string)
 async function requirePlan(instance: SupabaseClient, user: User, expectedPlan: 'free' | 'pro' | 'premium') {
   const { data, error } = await instance
     .from('subscriptions')
-    .select('plan, status, current_period_end')
+    .select('plan, product, status, current_period_end')
     .eq('user_id', user.id)
     .maybeSingle()
   if (error) throw error
@@ -44,6 +44,10 @@ async function requirePlan(instance: SupabaseClient, user: User, expectedPlan: '
   const activePlan = data && ['active', 'trialing'].includes(data.status) && isCurrent ? data.plan : 'free'
   if (activePlan !== expectedPlan) {
     throw new Error(`RLS test user ${user.id} must have active plan ${expectedPlan}; received ${activePlan}.`)
+  }
+  const expectedProduct = expectedPlan === 'premium' ? 'professional' : 'personal'
+  if (data && data.product !== expectedProduct) {
+    throw new Error(`RLS test user ${user.id} must have product ${expectedProduct}; received ${data.product}.`)
   }
 }
 
@@ -62,6 +66,7 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
   let sessionId = ''
   let receiptId = ''
   let professionalTransactionId = ''
+  let professionalWorkspaceId = ''
   let originalPlan: string | null = null
   let originalRole: string | null = null
   let admin: SupabaseClient | null = null
@@ -97,10 +102,12 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
 
       const periodEnd = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       const { error: subscriptionError } = await admin.from('subscriptions').insert([
-        { user_id: createdUsers[1].id, plan: 'pro', status: 'active', current_period_end: periodEnd },
-        { user_id: createdUsers[2].id, plan: 'premium', status: 'active', current_period_end: periodEnd },
+        { user_id: createdUsers[1].id, plan: 'pro', product: 'personal', status: 'active', current_period_end: periodEnd },
+        { user_id: createdUsers[2].id, plan: 'premium', product: 'professional', status: 'active', current_period_end: periodEnd },
       ])
       if (subscriptionError) throw subscriptionError
+      const { error: workspaceError } = await admin.rpc('bootstrap_business_workspace_v2', { p_user_id: createdUsers[2].id })
+      if (workspaceError) throw workspaceError
     }
 
     free = client()
@@ -117,6 +124,14 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
       requirePlan(pro, proUser, 'pro'),
       requirePlan(premium, premiumUser, 'premium'),
     ])
+
+    const { data: workspace, error: workspaceError } = await premium
+      .from('business_workspaces')
+      .select('id')
+      .eq('owner_user_id', premiumUser.id)
+      .single()
+    if (workspaceError) throw workspaceError
+    professionalWorkspaceId = workspace.id
 
     const { data: profile, error: profileError } = await free
       .from('profiles')
@@ -271,10 +286,18 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
   })
 
   it('allows PREMIUM professional data', async () => {
-    const { data, error } = await premium.from('transactions').insert({ user_id: premiumUser.id, description: `premium-${crypto.randomUUID()}`, amount: 1, type: 'receita', scope: 'business' }).select('id').single()
+    const { data, error } = await premium.from('transactions').insert({ user_id: premiumUser.id, workspace_id: professionalWorkspaceId, description: `premium-${crypto.randomUUID()}`, amount: 1, type: 'receita', scope: 'business' }).select('id').single()
     expect(error).toBeNull()
     expect(data?.id).toBeTruthy()
     professionalTransactionId = data!.id
+  })
+
+  it('prevents another user from reading or writing the Professional workspace', async () => {
+    const read = await pro.from('business_workspaces').select('id').eq('id', professionalWorkspaceId)
+    expect(read.error).toBeNull()
+    expect(read.data).toEqual([])
+    const write = await pro.from('business_customers').insert({ workspace_id: professionalWorkspaceId, name: 'Cross tenant' })
+    expect(write.error).not.toBeNull()
   })
 
   it.each([
@@ -298,7 +321,7 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
 
   it('stores exactly one appointment for concurrent retries with one idempotency key', async () => {
     const idempotencyKey = crypto.randomUUID()
-    const payload = { user_id: premiumUser.id, client_name: `idempotency-${crypto.randomUUID()}`, service: 'RLS', value: 1, date: '2099-01-01', time: '10:00', idempotency_key: idempotencyKey }
+    const payload = { user_id: premiumUser.id, workspace_id: professionalWorkspaceId, client_name: `idempotency-${crypto.randomUUID()}`, service: 'RLS', value: 1, date: '2099-01-01', time: '10:00', idempotency_key: idempotencyKey }
     const attempts = await Promise.all([premium.from('appointments').insert(payload), premium.from('appointments').insert(payload)])
     expect(attempts.filter(({ error }) => error === null)).toHaveLength(1)
     expect(attempts.filter(({ error }) => error?.code === '23505')).toHaveLength(1)

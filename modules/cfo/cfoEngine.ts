@@ -2,7 +2,7 @@ export interface BusinessMetrics {
   revenue: number;
   expenses: number;
   cashReserve: number;
-  taxRate: number;
+  taxRate: number | null;
   activeClients: number;
   totalHoursWorked: number;
 }
@@ -15,7 +15,8 @@ export const cfoEngine = {
   },
 
   // 2. Margem Líquida
-  calculateNetMargin: (revenue: number, expenses: number, taxRate: number): number => {
+  calculateNetMargin: (revenue: number, expenses: number, taxRate: number | null): number | null => {
+    if (taxRate === null) return null;
     if (revenue <= 0) return 0;
     const taxAmount = revenue * (taxRate / 100);
     const netProfit = revenue - expenses - taxAmount;
@@ -23,7 +24,8 @@ export const cfoEngine = {
   },
 
   // 3. Reserva Tributária
-  calculateTaxReserve: (revenue: number, taxRate: number): number => {
+  calculateTaxReserve: (revenue: number, taxRate: number | null): number | null => {
+    if (taxRate === null) return null;
     return revenue * (taxRate / 100);
   },
 
@@ -59,9 +61,9 @@ export const cfoEngine = {
     const runway = cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses);
 
     // Regra 1: Margem (Max 40)
-    if (netMargin >= 30) score += 40;
-    else if (netMargin >= 15) score += 25;
-    else if (netMargin > 0) score += 10;
+    if (netMargin !== null && netMargin >= 30) score += 40;
+    else if (netMargin !== null && netMargin >= 15) score += 25;
+    else if (netMargin !== null && netMargin > 0) score += 10;
 
     // Regra 2: Caixa (Max 40)
     if (runway !== null && runway >= 6) score += 40;

@@ -35,12 +35,8 @@ import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
 import TransactionDetailModal from '@/modules/personal/components/TransactionDetailModal'
 import { financeService } from '@/services/financeService'
 import type { CreditCard as CreditCardRecord } from '@/types_db'
-import type { User } from '@supabase/supabase-js'
 import { toast } from 'sonner'
-
-interface TransactionsViewProps {
-  user: User
-}
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 interface FilterOption<T extends string> {
   id: T
@@ -445,7 +441,7 @@ function NewTransactionModal({
   )
 }
 
-export default function TransactionsView({ user }: TransactionsViewProps) {
+export default function TransactionsView() {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -459,7 +455,7 @@ export default function TransactionsView({ user }: TransactionsViewProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
 
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
+  const { plan: userPlan } = useEntitlements()
   const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
   const currentMonthLabel = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
   const currentMonthStr = currentDate.toISOString().slice(0, 7)

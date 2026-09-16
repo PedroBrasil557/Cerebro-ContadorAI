@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getEntitlementsForPlan,
   PAID_SUBSCRIPTION_STATUSES,
+  resolveProductAccess,
 } from '../../lib/billing/plans'
 
 describe('billing plans', () => {
@@ -30,7 +31,30 @@ describe('billing plans', () => {
     expect(PAID_SUBSCRIPTION_STATUSES.has(status)).toBe(true)
   })
 
-  it.each(['past_due', 'canceled'] as const)('rejects %s as paid', (status) => {
+  it.each(['past_due', 'canceled', 'unpaid', 'incomplete'] as const)('rejects %s as paid', (status) => {
     expect(PAID_SUBSCRIPTION_STATUSES.has(status)).toBe(false)
+  })
+
+  it('separates common Personal and Professional subscribers', () => {
+    const personal = resolveProductAccess({ plan: 'pro', product: 'personal', status: 'active' })
+    const professional = resolveProductAccess({ plan: 'premium', product: 'professional', status: 'trialing' })
+    expect(personal.access).toMatchObject({ canAccessPersonal: true, canAccessProfessional: false, canSwitchProducts: false })
+    expect(professional.access).toMatchObject({ canAccessPersonal: false, canAccessProfessional: true, canSwitchProducts: false })
+  })
+
+  it.each(['admin', 'founder'] as const)('lets %s access and switch both products', (systemRole) => {
+    expect(resolveProductAccess({ status: 'canceled', systemRole }).access).toMatchObject({
+      canAccessPersonal: true,
+      canAccessProfessional: true,
+      canAccessAdmin: true,
+      canSwitchProducts: true,
+    })
+  })
+
+  it.each(['past_due', 'canceled', 'unpaid', 'incomplete'] as const)('falls back to Personal FREE for %s', (status) => {
+    expect(resolveProductAccess({ plan: 'premium', product: 'professional', status })).toMatchObject({
+      plan: 'free',
+      access: { product: 'personal', canAccessPersonal: true, canAccessProfessional: false },
+    })
   })
 })

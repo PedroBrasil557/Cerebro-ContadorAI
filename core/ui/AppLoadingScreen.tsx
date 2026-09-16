@@ -9,7 +9,7 @@ interface AppLoadingScreenProps {
 }
 
 const LOADING_MESSAGES = [
-  "Estabelecendo conexão segura neural...",
+  "Estabelecendo conexão segura...",
   "Sincronizando transações financeiras...",
   "Carregando módulos de inteligência artificial...",
   "Calculando projeções de patrimônio...",

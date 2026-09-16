@@ -7,7 +7,7 @@ import {
   ShieldCheck, AlertTriangle, Target, Calculator, Users, Loader2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import { businessFinanceService } from '@/services/businessFinanceService'
 
 import CostEngineeringPanel from './CostEngineeringPanel'
 import FinancialCrmPanel from './FinancialCrmPanel'
@@ -25,7 +25,6 @@ interface HealthData {
 }
 
 export default function FinancialCommandCenter() {
-  const supabase = createClient()
   const [activeSubTab, setActiveSubTab] = useState<'visao_geral' | 'custos' | 'crm' | 'decisao'>('visao_geral')
   
   // 🟢 ESTADOS REAIS DO SISTEMA
@@ -44,33 +43,14 @@ export default function FinancialCommandCenter() {
   useEffect(() => {
     const fetchRealData = async () => {
       setIsLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      // 1. Pegar o início do mês atual para filtrar transações
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-      // 2. Buscar Transações (Faturamento)
-      const { data: txs } = await supabase
-        .from('transactions')
-        .select('amount, type')
-        .eq('user_id', user.id)
-        .eq('scope', 'business')
-        .gte('date', startOfMonth)
-
-      // 3. Buscar Insumos (Custos)
-      const { data: materials } = await supabase
-        .from('nail_products')
-        .select('cost_per_application')
-        .eq('user_id', user.id)
+      const { transactions: txs, costs: materials } = await businessFinanceService.getDashboardData()
 
       // 🧮 MATEMÁTICA
       let grossRev = 0
       let totalAppointments = 0 // Simulação baseada em número de receitas
 
       if (txs) {
-        txs.forEach((tx: { amount: number; type: string }) => {
+        txs.forEach((tx) => {
           if (tx.type === 'receita') {
             grossRev += Number(tx.amount)
             totalAppointments += 1
@@ -79,18 +59,15 @@ export default function FinancialCommandCenter() {
       }
 
       // Custo dos materiais por cada atendimento feito
-      const materialCostPerApp = materials
-        ? materials.reduce(
-          (acc: number, curr: { cost_per_application: number | null }) =>
-            acc + Number(curr.cost_per_application || 0),
-          0
-        )
-        : 0
+      const materialCostPerApp = materials.reduce(
+        (acc, curr) => acc + Number(curr.cost_per_use || 0),
+        0,
+      )
       const totalMaterialCost = materialCostPerApp * totalAppointments
       
       const registeredExpenses = (txs ?? [])
-        .filter((tx: { type: string }) => tx.type === 'despesa_fixa' || tx.type === 'despesa_variavel')
-        .reduce((sum: number, tx: { amount: number }) => sum + Math.abs(Number(tx.amount)), 0)
+        .filter((tx) => tx.type === 'despesa_fixa' || tx.type === 'despesa_variavel')
+        .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
       const netProfit = grossRev - totalMaterialCost - registeredExpenses
       const margin = grossRev > 0 ? (netProfit / grossRev) * 100 : 0
       
@@ -107,9 +84,9 @@ export default function FinancialCommandCenter() {
 
       setHealth({
         gross_revenue: grossRev,
-        net_profit: netProfit > 0 ? netProfit : 0,
+        net_profit: netProfit,
         average_ticket: totalAppointments > 0 ? grossRev / totalAppointments : 0,
-        profit_margin_pct: margin > 0 ? margin : 0,
+        profit_margin_pct: margin,
         stability_index: stability,
         safe_pro_labore: safeProLabore,
         reinvestment_pool: reinvestment,
@@ -121,7 +98,7 @@ export default function FinancialCommandCenter() {
     if (activeSubTab === 'visao_geral') {
       fetchRealData()
     }
-  }, [activeSubTab, supabase])
+  }, [activeSubTab])
 
   // Lógica visual do Índice de Estabilidade
   const getIndexColor = (index: number) => {
@@ -144,19 +121,19 @@ export default function FinancialCommandCenter() {
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
             <Activity className="text-pink-500" />
-            Command Center
+            Visão do Negócio
           </h2>
           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
-            Gestão Financeira Estratégica
+            Indicadores baseados nos dados registrados
           </p>
         </div>
 
         <div className="flex items-center p-1 bg-[#050505] border border-white/5 rounded-xl shadow-inner overflow-x-auto scrollbar-none">
           {[
             { id: 'visao_geral', label: 'Visão Geral', icon: Activity },
-            { id: 'custos', label: 'Engenharia de Preços', icon: Calculator },
-            { id: 'crm', label: 'CRM Financeiro', icon: Users },
-            { id: 'decisao', label: 'Modo Decisão', icon: Target }
+            { id: 'custos', label: 'Custos e preços', icon: Calculator },
+            { id: 'crm', label: 'Clientes', icon: Users },
+            { id: 'decisao', label: 'Simulador', icon: Target }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -212,7 +189,7 @@ export default function FinancialCommandCenter() {
                     Margem: {health.profit_margin_pct.toFixed(1)}%
                   </span>
                 </div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Lucro Líquido Estimado</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Resultado estimado</p>
                 <h3 className="text-3xl font-black text-white mt-1 relative z-10">{formatCurrency(health.net_profit)}</h3>
               </div>
             </div>

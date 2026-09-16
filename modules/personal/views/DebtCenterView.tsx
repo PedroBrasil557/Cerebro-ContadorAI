@@ -190,7 +190,7 @@ export default function DebtManagerWarRoom() {
             if (!response.ok) throw new Error(data.error?.message ?? 'Falha ao gerar estratégia')
             setAiStrategyText(data.strategy)
             toast.success("Plano de Guerra Gerado!")
-        } catch { toast.error("Falha neural.") } finally { setAnalyzing(false) }
+        } catch { toast.error("Não foi possível gerar a análise.") } finally { setAnalyzing(false) }
     }
 
     if (loading) return <div className="flex justify-center items-center h-screen bg-[#050505]"><Loader2 className="animate-spin text-rose-500" size={40}/></div>
@@ -202,12 +202,12 @@ export default function DebtManagerWarRoom() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 relative z-10">
                 <div>
                     <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-4xl font-black text-white tracking-tight uppercase italic">Sala de Guerra</h1>
+                        <h1 className="text-4xl font-black text-white tracking-tight">Plano de quitação</h1>
                         <span className="text-[9px] bg-rose-500/10 text-rose-500 border border-rose-500/20 px-3 py-1 rounded-full font-black uppercase tracking-widest flex items-center gap-1.5">
                             <Swords size={12} /> Live
                         </span>
                     </div>
-                    <p className="text-gray-500 text-xs font-bold uppercase tracking-[0.2em] opacity-80">Otimização Neural de Amortização</p>
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-[0.2em] opacity-80">Organize prioridades e acompanhe pagamentos</p>
                 </div>
                 <button type="button" onClick={() => setIsModalOpen(true)} className="bg-white text-black px-6 py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 transition-all shadow-xl active:scale-95">
                     <Plus size={16} className="inline mr-2" /> Novo Passivo
@@ -295,7 +295,7 @@ export default function DebtManagerWarRoom() {
                   <div className="lg:col-span-5 bg-gradient-to-br from-indigo-900/20 to-[#09090b] border border-indigo-500/20 rounded-[3rem] p-8 relative overflow-hidden group shadow-2xl">
                       <div className="flex items-center gap-4 mb-6 pb-4 border-b border-white/5">
                           <div className="h-12 w-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20 text-indigo-400"><BrainCircuit size={24} /></div>
-                          <div><h3 className="text-lg font-black text-white uppercase italic tracking-tighter">Estrategista</h3><p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Protocolo Neural</p></div>
+                          <div><h3 className="text-lg font-black text-white tracking-tight">Análise assistida</h3><p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Recomendação educativa</p></div>
                       </div>
                       <div className="h-[120px] overflow-y-auto custom-scrollbar mb-6 text-xs text-gray-300 font-medium leading-relaxed bg-black/20 p-4 rounded-2xl border border-white/5 italic">
                         {aiStrategyText || "Aguardando comando para auditar faturas e sugerir amortização estratégica baseada no seu caixa livre."}

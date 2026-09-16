@@ -5,7 +5,7 @@ import { ValidationError } from '@/lib/api/errors'
 import { serverEnv } from '@/lib/env/server'
 import { getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { PlanCode, SubscriptionStatus } from '@/lib/billing/plans'
+import { productForPlan, type PlanCode, type SubscriptionStatus } from '@/lib/billing/plans'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     const userId = await resolveUserId(subscription, customerId)
     const plan = planFromPrice(item.price.id)
     const supabase = createAdminClient()
-    const { data, error } = await supabase.rpc('process_stripe_subscription_event', {
+    const { data, error } = await supabase.rpc('process_stripe_subscription_event_v2', {
       p_event_id: event.id,
       p_event_type: event.type,
       p_user_id: userId,
@@ -118,6 +118,7 @@ export async function POST(request: Request) {
       p_stripe_subscription_id: subscription.id,
       p_stripe_price_id: item.price.id,
       p_plan: plan,
+      p_product: productForPlan(plan),
       p_status: normalizeStatus(subscription.status),
       p_current_period_start: new Date(item.current_period_start * 1000).toISOString(),
       p_current_period_end: new Date(item.current_period_end * 1000).toISOString(),

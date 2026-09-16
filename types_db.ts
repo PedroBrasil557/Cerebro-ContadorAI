@@ -4,6 +4,7 @@
 
 export type SystemRole = 'user' | 'admin' | 'founder'
 export type AccountMode = 'personal' | 'professional'
+export type ProductCode = 'personal' | 'professional'
 export type PlanTier = 'free' | 'basic' | 'pro' | 'premium' | 'professional_full'
 export type TransactionType = 'receita' | 'despesa_fixa' | 'despesa_variavel' | 'transferencia'
 export type TransactionScope = 'personal' | 'business'
@@ -40,6 +41,7 @@ export interface Transaction {
   id: string
   user_id: string
   business_id?: string
+  workspace_id?: string | null
   description: string
   amount: number | string
   type: TransactionType
@@ -159,6 +161,7 @@ export interface ShoppingReceipt {
 export interface ClientAppointment {
   id: string
   user_id: string
+  workspace_id?: string | null
   client_name: string
   client_email?: string
   service: string
@@ -200,9 +203,10 @@ export interface NailAppointment extends ClientAppointment {
 
 export interface BusinessSettings {
   user_id: string
+  workspace_id?: string | null
   current_balance: number
   monthly_goal: number
-  tax_rate: number
+  tax_rate: number | null
   reserve_rate: number
   updated_at?: string
 }
@@ -210,7 +214,7 @@ export interface BusinessSettings {
 export interface CaixaData {
   currentBalance: number
   monthlyGoal: number
-  taxRate: number
+  taxRate: number | null
   reserveRate?: number
   entries: Transaction[]
 }
@@ -289,4 +293,96 @@ export interface BusinessHealthSnapshot {
   safe_pro_labore: number; // O que ela pode sacar sem quebrar a empresa
   stability_index: number; // 0-100 (A Jóia da Coroa)
   ai_diagnostic_summary: string;
+}
+
+export type BusinessCapability =
+  | 'finance'
+  | 'customers'
+  | 'catalog'
+  | 'pricing'
+  | 'decision_simulator'
+  | 'sales'
+  | 'quotes'
+  | 'receivables'
+  | 'payables'
+  | 'reports'
+  | 'appointments'
+  | 'projects'
+  | 'inventory'
+  | 'purchases'
+  | 'suppliers'
+
+export interface BusinessWorkspace {
+  id: string
+  owner_user_id: string
+  name: string
+  business_type: 'service' | 'commerce' | 'appointments' | 'projects' | 'products_and_services' | 'other'
+  document?: string | null
+  base_currency: string
+  timezone: string
+  tax_rate: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BusinessWorkspaceMember {
+  workspace_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'member'
+  created_at: string
+}
+
+export interface BusinessWorkspaceCapability {
+  workspace_id: string
+  capability: BusinessCapability
+  enabled: boolean
+  created_at: string
+}
+
+export interface BusinessCustomer {
+  id: string
+  workspace_id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  notes?: string | null
+  document?: string | null
+  customer_type: 'person' | 'company'
+  tags: string[]
+  total_spent: number
+  interaction_count: number
+  last_interaction_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BusinessCatalogItem {
+  id: string
+  workspace_id: string
+  name: string
+  kind: 'product' | 'service'
+  description?: string | null
+  sku?: string | null
+  unit?: string | null
+  sale_price?: number | null
+  cost_price?: number | null
+  active: boolean
+  track_stock: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface BusinessCostItem {
+  id: string
+  workspace_id: string
+  name: string
+  category: string
+  purchase_price: number
+  quantity?: number | null
+  estimated_yield?: number | null
+  cost_per_unit?: number | null
+  cost_per_use?: number | null
+  active: boolean
+  created_at: string
+  updated_at: string
 }

@@ -6,8 +6,6 @@ import {
   X, Send, Zap, BrainCircuit, Loader2, LayoutDashboard, Terminal
 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
-import { financeService } from '@/services/financeService'
-import type { Goal, Transaction } from '@/types_db'
 
 interface Message {
   id: string
@@ -17,50 +15,17 @@ interface Message {
 
 interface AIAssistantProps {
   user: User
-  realBalance: number
 }
 
-interface AssistantContext {
-  transactions: Transaction[]
-  goals: Goal[]
-  balance: {
-    currentBalance: number
-    monthlyGoal: number
-  }
-}
-
-export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
+export default function AIAssistant({ user }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'assistant', content: `Conexão estabelecida. 🧠\nOlá ${user?.user_metadata?.full_name || 'Comandante'}. O Cérebro.IA está online. Como posso ajudar hoje?` }
+    { id: '1', role: 'assistant', content: `Olá, ${user?.user_metadata?.full_name || 'tudo bem'}? Posso ajudar a entender e organizar suas finanças pessoais.` }
   ])
   const [isTyping, setIsTyping] = useState(false)
   
-  const [contextData, setContextData] = useState<AssistantContext>({
-      transactions: [],
-      goals: [],
-      balance: { currentBalance: realBalance, monthlyGoal: 0 }
-  })
-
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const loadContext = async () => {
-        try {
-            const [trans, goals] = await Promise.all([
-                financeService.getTransactions(),
-                financeService.getGoals()
-            ])
-            setContextData({
-              transactions: trans || [],
-              goals: goals || [],
-              balance: { currentBalance: realBalance, monthlyGoal: 0 },
-            })
-        } catch (error) { console.error("Erro Contexto IA:", error) }
-    }
-    if (isOpen) loadContext()
-  }, [isOpen, realBalance])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -81,20 +46,14 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
         const response = await fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                message: textToSend, 
-                context: {
-                    ...contextData,
-                    balance: { ...contextData.balance, currentBalance: realBalance },
-                } 
-            })
+            body: JSON.stringify({ message: textToSend })
         })
         
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Falha ao consultar a IA.')
         setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: data.response }])
     } catch {
-        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: '⚠️ Falha na sinapse neural. Tente novamente.' }])
+        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: 'Não consegui responder agora. Tente novamente em instantes.' }])
     } finally { setIsTyping(false) }
   }
 
@@ -205,7 +164,7 @@ export default function AIAssistant({ user, realBalance }: AIAssistantProps) {
                     <input 
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Comandar auditoria neural..."
+                        placeholder="Pergunte sobre suas finanças..."
                         className="flex-1 bg-transparent text-white placeholder:text-gray-600 outline-none text-sm h-12 font-medium"
                     />
                     <button 

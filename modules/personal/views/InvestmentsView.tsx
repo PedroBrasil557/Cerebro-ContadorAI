@@ -15,7 +15,7 @@ import { Goal, Investment, NewGoal, PatrimonyHistory } from '@/types_db'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
-import type { User } from '@supabase/supabase-js'
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 // Importação dos Componentes Modulares
 import MarketTicker from '@/modules/personal/components/investments/MarketTicker'
@@ -79,12 +79,11 @@ const SectionTitle = ({ icon: Icon, title, subtitle, onAiClick, aiText, isLocked
 
 // --- VIEW PRINCIPAL ---
 interface InvestmentsViewProps {
-  user: User
   goals: Goal[]
   onAddGoal: (goal: NewGoal) => void
 }
 
-export default function InvestmentsView({ user, goals, onAddGoal }: InvestmentsViewProps) {
+export default function InvestmentsView({ goals, onAddGoal }: InvestmentsViewProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [investments, setInvestments] = useState<Investment[]>([])
@@ -95,7 +94,7 @@ export default function InvestmentsView({ user, goals, onAddGoal }: InvestmentsV
   const supabase = useMemo(() => createClient(), [])
 
   // 🛡️ Lógica de Plano
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
+  const { plan: userPlan } = useEntitlements()
   const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
 
   const fetchData = useCallback(async () => {
@@ -211,7 +210,7 @@ export default function InvestmentsView({ user, goals, onAddGoal }: InvestmentsV
 
       {/* CALCULADORAS */}
       <section>
-          <SectionTitle icon={BrainCircuit} title="Cognição Financeira" subtitle="Simuladores de projeção de riqueza." isLocked={isFreePlan} onAiClick={() => triggerAiHelp("Selic vs Dívidas")} aiText="Decisão Estratégica" />
+          <SectionTitle icon={BrainCircuit} title="Simuladores" subtitle="Projeções educativas para seu planejamento." isLocked={isFreePlan} onAiClick={() => triggerAiHelp("Selic vs Dívidas")} aiText="Comparar cenários" />
           <FinancialCalculators />
       </section>
 

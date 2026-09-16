@@ -11,7 +11,7 @@ O schema em produção evolui por migrations SQL aditivas em `supabase/migration
 | Identidade | `profiles` | `id = auth.uid()` |
 | Financeiro | `transactions`, `credit_cards`, `debts`, `goals`, `investments` | `user_id` |
 | Compras | `monthly_shopping_sessions`, `shopping_items`, `shopping_receipts` | usuário da sessão |
-| Profissional | `businesses`, `appointments` e tabelas operacionais | `user_id`/empresa |
+| Profissional | `business_workspaces`, membros, capacidades, clientes, catálogo, custos, configurações e transações business | `workspace_id` + associação |
 | Billing | `subscriptions`, `stripe_events` | usuário; eventos só Service Role |
 | Consumo | `api_usage` | usuário; escrita só Service Role |
 
@@ -21,12 +21,13 @@ Transações usam `scope = personal | business`. Transferências permanecem regi
 
 Toda tabela exposta pela Data API deve ter RLS habilitada. Políticas de usuário usam `(select auth.uid())` e não confiam em IDs enviados pelo cliente. `profiles` permite ao usuário alterar somente campos de perfil; `plan`, `plan_tier` e `system_role` não fazem parte do grant de atualização. `subscriptions` e `api_usage` são gerenciadas pelo servidor e legíveis apenas pelo proprietário. `audit_logs` e `stripe_events` são internos e exclusivos da Service Role. Tabelas globais de regras, flags, moedas e inflação são referências read-only para usuários autenticados.
 
-`subscriptions` é a única fonte de autorização paga. FREE não acessa investimentos, dívidas ou recursos profissionais; PRO acessa investimentos e dívidas; PREMIUM também acessa o domínio profissional. Perfil e metadata do Auth não concedem entitlement.
+`subscriptions` é a única fonte de autorização paga. A coluna `product` separa Pessoal de Profissional. FREE e PRO são Pessoal; PREMIUM é Profissional durante a transição. Um cliente Profissional não herda módulos pessoais. Perfil e metadata do Auth não concedem entitlement.
 
 ## Funções
 
 - `consume_api_usage`: consumo atômico de cota;
-- `process_stripe_subscription_event`: idempotência do webhook e atualização da assinatura;
+- `process_stripe_subscription_event_v2`: idempotência do webhook e atualização atômica de plano + produto;
+- `bootstrap_business_workspace_v2`: cria workspace, proprietário e capacidades iniciais; somente Service Role;
 - `delete_account_data`: remoção transacional dos dados da conta, executável apenas pela Service Role.
 
 Funções privilegiadas devem definir `search_path` explicitamente, receber grants mínimos e permanecer inacessíveis a `anon` e `authenticated` quando forem internas.
@@ -40,6 +41,8 @@ Funções privilegiadas devem definir `search_path` explicitamente, receber gran
 5. executar advisors de segurança e performance;
 6. executar testes RLS com usuários dedicados FREE, PRO e PREMIUM;
 7. confirmar rollback lógico ou plano de recuperação.
+
+Para a fundação V2, aplique `20260916125508_separate_personal_professional_products.sql` antes de publicar o código que consulta `subscriptions.product`. A migration é aditiva, faz backfill de produto/workspace e mantém as tabelas legadas. Não execute manualmente contra produção sem backup, janela aprovada e validação prévia em banco local/staging.
 
 ## Reconstrução e validação
 

@@ -100,8 +100,8 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
             {/* Grid de Benefícios Premium */}
             <div className="w-full grid grid-cols-1 gap-4 mb-10 text-left">
               {[
-                { txt: 'Cérebro IA: Auditoria Cognitiva', icon: Sparkles },
-                { txt: 'Sala de Guerra: Plano de Quitação', icon: Swords },
+                { txt: 'Análises financeiras assistidas', icon: Sparkles },
+                { txt: 'Plano de quitação de dívidas', icon: Swords },
                 { txt: 'Patrimônio: Gestão de Ativos', icon: TrendingDown },
                 { txt: 'Cartões e Metas Ilimitados', icon: Layers },
               ].map((item, i) => (

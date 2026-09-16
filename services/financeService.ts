@@ -7,7 +7,6 @@ import {
   Transaction, 
   Goal, 
   UserProfile, 
-  CaixaData, 
   NewGoal, 
   NotificationItem, 
   CreditCard,
@@ -303,29 +302,4 @@ export const financeService = {
     if (error) throw error
     return data
   },
-
-  // ============================================================================
-  // FLUXO DE CAIXA / CAIXA EMPRESARIAL
-  // ============================================================================
-  getCaixaData: async (): Promise<CaixaData> => {
-        const user = await getAuthenticatedUser('business_cash')
-        const [{ data: settings, error: settingsError }, { data: entries, error: entriesError }] = await Promise.all([
-          supabase.from('business_settings').select('*').eq('user_id', user.id).maybeSingle(),
-          supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('scope', 'business'),
-        ])
-        if (settingsError) throw databaseError('business_settings', user.id, settingsError)
-        if (entriesError) throw databaseError('business_cash', user.id, entriesError)
-
-        return {
-          currentBalance: Number(settings?.current_balance) || 0,
-          monthlyGoal: Number(settings?.monthly_goal) || 0,
-          taxRate: Number(settings?.tax_rate) || 0,
-          reserveRate: Number(settings?.reserve_rate) || 0,
-          entries: (entries as Transaction[]) || []
-        }
-  }
 }

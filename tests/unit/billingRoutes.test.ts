@@ -61,9 +61,9 @@ describe('billing route security', () => {
   })
 
   it.each([
-    ['pro', 'price_pro_server'],
-    ['premium', 'price_premium_server'],
-  ] as const)('maps %s to the server-side Stripe price', async (plan, expectedPrice) => {
+    ['pro', 'price_pro_server', 'personal'],
+    ['premium', 'price_premium_server', 'professional'],
+  ] as const)('maps %s to the server-side Stripe price', async (plan, expectedPrice, product) => {
     const { POST } = await import('../../app/api/checkout/route')
     const response = await POST(new Request('https://preview.example.test/api/checkout', {
       method: 'POST',
@@ -75,10 +75,10 @@ describe('billing route security', () => {
       customer: 'cus_server',
       line_items: [{ price: expectedPrice, quantity: 1 }],
       mode: 'subscription',
-      success_url: 'https://preview.example.test/?success=true',
-      cancel_url: 'https://preview.example.test/?canceled=true',
-      metadata: { userId: 'user-1', plan },
-      subscription_data: { metadata: { userId: 'user-1', plan } },
+      success_url: 'https://preview.example.test/app?success=true',
+      cancel_url: 'https://preview.example.test/app?canceled=true',
+      metadata: { userId: 'user-1', plan, product },
+      subscription_data: { metadata: { userId: 'user-1', plan, product } },
     }), expect.objectContaining({ idempotencyKey: expect.stringContaining(`checkout:user-1:${plan}:`) }))
   })
 
@@ -123,10 +123,11 @@ describe('billing route security', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.constructEvent).toHaveBeenCalledWith('{"id":"evt_test"}', 'signature-test', 'whsec_placeholder')
-    expect(mocks.rpc).toHaveBeenCalledWith('process_stripe_subscription_event', expect.objectContaining({
+    expect(mocks.rpc).toHaveBeenCalledWith('process_stripe_subscription_event_v2', expect.objectContaining({
       p_event_id: 'evt_test',
       p_user_id: 'user-1',
       p_plan: 'pro',
+      p_product: 'personal',
       p_status: 'active',
       p_stripe_subscription_id: 'sub_test',
       p_stripe_price_id: 'price_pro_server',

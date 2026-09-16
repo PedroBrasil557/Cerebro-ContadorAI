@@ -39,6 +39,7 @@ describe('AI route security', () => {
     mocks.requireUser.mockResolvedValue({ id: 'user-1', email: 'user@example.test' })
     mocks.getUserEntitlements.mockResolvedValue({
       plan: 'free',
+      access: { canAccessPersonal: true },
       entitlements: { debtCenter: false },
     })
     mocks.checkUsageLimit.mockResolvedValue({

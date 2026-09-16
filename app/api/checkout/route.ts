@@ -6,6 +6,7 @@ import { publicEnv } from '@/lib/env/public'
 import { serverEnv } from '@/lib/env/server'
 import { getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { productForPlan } from '@/lib/billing/plans'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     if (!user.email) throw new ValidationError('Sua conta não possui um e-mail válido.')
 
     const { plan } = checkoutSchema.parse(await request.json())
+    const product = productForPlan(plan)
     const priceId = plan === 'pro'
       ? serverEnv.STRIPE_PRICE_PRO
       : serverEnv.STRIPE_PRICE_PREMIUM
@@ -55,11 +57,11 @@ export async function POST(request: Request) {
       customer,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/?success=true`,
-      cancel_url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/?canceled=true`,
-      metadata: { userId: user.id, plan },
+      success_url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/app?success=true`,
+      cancel_url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/app?canceled=true`,
+      metadata: { userId: user.id, plan, product },
       subscription_data: {
-        metadata: { userId: user.id, plan },
+        metadata: { userId: user.id, plan, product },
       },
       client_reference_id: user.id,
       allow_promotion_codes: true,

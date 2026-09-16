@@ -11,6 +11,7 @@ import NailClientManager from '../components/nail/NailClientManager'
 import NailServiceManager from '../components/nail/NailServiceManager'
 
 export default function NailDesignView() {
+  // LEGACY / DEPRECATED: mantido temporariamente para compatibilidade; não faz parte da navegação Profissional V2.
   const [activeTab, setActiveTab] = useState('geral')
 
   return (
