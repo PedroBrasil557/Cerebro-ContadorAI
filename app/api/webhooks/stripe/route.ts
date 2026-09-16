@@ -2,7 +2,7 @@ import Stripe from 'stripe'
 import { headers } from 'next/headers'
 import { errorResponse, successResponse } from '@/lib/api/response'
 import { ValidationError } from '@/lib/api/errors'
-import { serverEnv } from '@/lib/env/server'
+import { getStripePriceIds, serverEnv } from '@/lib/env/server'
 import { getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { productForPlan, type PlanCode, type SubscriptionStatus } from '@/lib/billing/plans'
@@ -37,8 +37,9 @@ function normalizeStatus(status: Stripe.Subscription.Status): SubscriptionStatus
 }
 
 function planFromPrice(priceId: string): PlanCode {
-  if (priceId === serverEnv.STRIPE_PRICE_PRO) return 'pro'
-  if (priceId === serverEnv.STRIPE_PRICE_PREMIUM) return 'premium'
+  const stripePrices = getStripePriceIds()
+  if (priceId === stripePrices.STRIPE_PRICE_PRO) return 'pro'
+  if (priceId === stripePrices.STRIPE_PRICE_PREMIUM) return 'premium'
   throw new ValidationError('O preço recebido do Stripe não corresponde a um plano conhecido.')
 }
 

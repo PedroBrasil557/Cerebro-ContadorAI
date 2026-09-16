@@ -3,7 +3,7 @@ import { errorResponse, successResponse } from '@/lib/api/response'
 import { ValidationError } from '@/lib/api/errors'
 import { requireUser } from '@/lib/auth/requireUser'
 import { publicEnv } from '@/lib/env/public'
-import { serverEnv } from '@/lib/env/server'
+import { getStripePriceIds } from '@/lib/env/server'
 import { getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { productForPlan } from '@/lib/billing/plans'
@@ -47,9 +47,10 @@ export async function POST(request: Request) {
 
     const { plan } = checkoutSchema.parse(await request.json())
     const product = productForPlan(plan)
+    const stripePrices = getStripePriceIds()
     const priceId = plan === 'pro'
-      ? serverEnv.STRIPE_PRICE_PRO
-      : serverEnv.STRIPE_PRICE_PREMIUM
+      ? stripePrices.STRIPE_PRICE_PRO
+      : stripePrices.STRIPE_PRICE_PREMIUM
     const customer = await getOrCreateCustomer(user.id, user.email)
 
     const checkoutWindow = Math.floor(Date.now() / 60_000)

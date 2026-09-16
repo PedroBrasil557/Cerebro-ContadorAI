@@ -27,6 +27,7 @@ vi.mock('@/lib/env/server', () => ({
     STRIPE_PRICE_PRO: 'price_pro_server',
     STRIPE_PRICE_PREMIUM: 'price_premium_server',
   },
+  getStripePriceIds: () => ({ STRIPE_PRICE_PRO: 'price_pro_server', STRIPE_PRICE_PREMIUM: 'price_premium_server' }),
 }))
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => ({
