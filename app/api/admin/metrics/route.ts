@@ -1,24 +1,13 @@
-import { ForbiddenError } from '@/lib/api/errors'
 import { errorResponse, successResponse } from '@/lib/api/response'
-import { requireUser } from '@/lib/auth/requireUser'
+import { requirePlatformAdmin } from '@/lib/auth/platform'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const user = await requireUser()
+    await requirePlatformAdmin()
     const admin = createAdminClient()
-    const { data: profile, error: profileError } = await admin
-      .from('profiles')
-      .select('system_role')
-      .eq('id', user.id)
-      .single()
-    if (profileError) throw profileError
-    if (profile.system_role !== 'founder' && profile.system_role !== 'admin') {
-      throw new ForbiddenError('Acesso administrativo necessário.')
-    }
-
     const now = Date.now()
     const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
     const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString()
