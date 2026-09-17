@@ -9,22 +9,36 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
   await login(page)
   await page.getByRole('button', { name: /Transações/ }).click()
   await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible()
+
   await page.getByRole('button', { name: 'Nova transação', exact: true }).first().click()
-  await page.getByRole('button', { name: 'Receita' }).click()
-  await page.locator('input[name="amount"]').fill('125.50')
-  await page.getByPlaceholder('Ex: Aluguel').fill(description)
-  await page.getByRole('button', { name: 'Processar Agora' }).click()
+  const createDialog = page.getByRole('dialog', { name: 'Nova transação' })
+  await expect(createDialog).toBeVisible()
+  await createDialog.getByRole('button', { name: 'Receita', exact: true }).click()
+  await createDialog.getByLabel('Valor').fill('125.50')
+  await createDialog.getByLabel('Descrição').fill(description)
+  await createDialog.getByRole('button', { name: 'Salvar transação', exact: true }).click()
 
   await expect(page.getByText(description, { exact: true })).toBeVisible()
   await page.getByText(description, { exact: true }).click()
-  await page.getByRole('button', { name: 'Editar' }).click()
-  await page.locator('input[name="description"]').fill(updatedDescription)
-  await page.getByPlaceholder('Ex: Digitei o valor errado...').fill('Correção validada pelo teste E2E')
-  await page.getByRole('button', { name: 'Salvar' }).click()
-  await expect(page.getByText(updatedDescription, { exact: true })).toBeVisible()
 
+  const detailDialog = page.getByRole('dialog', { name: 'Detalhes da transação' })
+  await expect(detailDialog).toBeVisible()
+  await detailDialog.getByRole('button', { name: 'Editar', exact: true }).click()
+
+  const editDialog = page.getByRole('dialog', { name: 'Editar transação' })
+  await editDialog.getByLabel('Descrição').fill(updatedDescription)
+  await editDialog.getByLabel(/Motivo da edição/).fill('Correção validada pelo teste E2E')
+  await editDialog.getByRole('button', { name: 'Salvar alterações', exact: true }).click()
+
+  await expect(page.getByText(updatedDescription, { exact: true })).toBeVisible()
   await page.getByText(updatedDescription, { exact: true }).click()
-  await page.getByRole('button', { name: 'Excluir' }).click()
-  await page.getByRole('button', { name: 'Sim, Excluir' }).click()
+
+  const updatedDetailDialog = page.getByRole('dialog', { name: 'Detalhes da transação' })
+  await updatedDetailDialog.getByRole('button', { name: 'Excluir', exact: true }).click()
+
+  const deleteDialog = page.getByRole('alertdialog', { name: 'Excluir transação?' })
+  await expect(deleteDialog).toBeVisible()
+  await deleteDialog.getByRole('button', { name: 'Excluir', exact: true }).click()
+
   await expect(page.getByText(updatedDescription, { exact: true })).toHaveCount(0)
 })
