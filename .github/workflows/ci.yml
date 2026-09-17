@@ -53,7 +53,7 @@ jobs:
         run: npm run build
 
   release-rls:
-    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening'
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening' || github.ref == 'refs/heads/foundation/product-separation-professional-v2' || github.head_ref == 'foundation/product-separation-professional-v2'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -80,7 +80,7 @@ jobs:
           npm run test:rls
 
   release-e2e:
-    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening'
+    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening' || github.ref == 'refs/heads/foundation/product-separation-professional-v2' || github.head_ref == 'foundation/product-separation-professional-v2'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
