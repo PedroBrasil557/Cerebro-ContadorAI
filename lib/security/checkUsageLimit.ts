@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getEntitlementsForPlan, type PlanCode } from '@/lib/billing/plans'
+import type { Entitlements } from '@/lib/billing/plans'
 
 export type UsageFeature = 'ai_chat' | 'ai_debt_strategy' | 'ai_cfo' | 'ocr'
 
@@ -26,10 +26,9 @@ function getPeriod(feature: UsageFeature, now: Date) {
 export async function checkUsageLimit(
   userId: string,
   feature: UsageFeature,
-  plan: PlanCode,
+  entitlements: Pick<Entitlements, 'aiMessagesPerDay' | 'ocrPerMonth'>,
   now = new Date()
 ) {
-  const entitlements = getEntitlementsForPlan(plan)
   const limit = feature === 'ocr'
     ? entitlements.ocrPerMonth
     : entitlements.aiMessagesPerDay

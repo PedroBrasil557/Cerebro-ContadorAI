@@ -3,11 +3,10 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Transaction, Goal, CaixaData, NewGoal, Investment, ActiveTab
+  Transaction, Goal, NewGoal, Investment, ActiveTab
 } from '@/types_db'
-import type { User } from '@supabase/supabase-js'
 import dynamic from 'next/dynamic'
-import { useEntitlements } from '@/core/hooks/useEntitlements'
+import type { ProductAccess } from '@/lib/billing/plans'
 
 // ==========================================
 // 📦 CAMADA 2: MÓDULOS PESSOAIS
@@ -25,14 +24,12 @@ const SmartShoppingView = dynamic(() => import('@/modules/personal/views/SmartSh
 // 💼 CAMADA 3: MÓDULOS PROFISSIONAIS (B2B)
 // ==========================================
 const CaixaView = dynamic(() => import('@/modules/professional/views/CaixaView'), { loading: moduleLoading })
-const NailDesignView = dynamic(() => import('@/modules/professional/views/NailDesignView'), { loading: moduleLoading })
 const FinancialCommandCenter = dynamic(() => import('@/modules/professional/components/FinancialCommandCenter'), { loading: moduleLoading })
 const FounderDashboard = dynamic(() => import('@/modules/admin/views/FounderDashboard'), { loading: moduleLoading })
 
 interface ViewContainerProps {
   activeTab: ActiveTab
   handleRedirect: (tab: ActiveTab) => void
-  user: User
   
   // Resumo Financeiro
   summary: {
@@ -45,9 +42,8 @@ interface ViewContainerProps {
   // Dados
   goals: Goal[]
   transactions: Transaction[]
-  caixaData: CaixaData
   investments: Investment[] 
-  systemRole?: 'user' | 'admin' | 'founder'
+  access: ProductAccess
   accountMode: 'personal' | 'professional'
 
   // Handlers
@@ -55,19 +51,9 @@ interface ViewContainerProps {
 }
 
 export default function ViewContainer({ 
-  activeTab, handleRedirect, user, summary, transactions = [], goals = [], caixaData,
-  onAddGoal, investments = [], systemRole = 'user', accountMode
+  activeTab, handleRedirect, summary, transactions = [], goals = [],
+  onAddGoal, investments = [], access, accountMode
 }: ViewContainerProps) {
-  const { plan } = useEntitlements()
-
-  const billingAwareUser = React.useMemo<User>(() => ({
-    ...user,
-    user_metadata: {
-      ...user.user_metadata,
-      plan_tier: plan,
-    },
-  }), [user, plan])
-
   // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
   
@@ -94,7 +80,7 @@ export default function ViewContainer({
         {/* ========================================== */}
         {/* 🟢 RENDERIZAÇÃO MODO PESSOAL (CPF)          */}
         {/* ========================================== */}
-        {accountMode === 'personal' && (
+        {accountMode === 'personal' && access.canAccessPersonal && (
           <>
             {currentTab === 'dashboard' && (
               <DashboardView 
@@ -111,19 +97,18 @@ export default function ViewContainer({
             )}
             
             {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
-              <TransactionsView user={billingAwareUser} /> 
+              <TransactionsView />
             )}
             
             {currentTab === 'investimentos' && (
               <InvestmentsView 
-                user={billingAwareUser}
                 goals={goals} 
                 onAddGoal={onAddGoal} 
               />
             )}
             
             {(currentTab === 'minha carteira' || currentTab === 'carteira') && (
-              <WalletView user={billingAwareUser} /> 
+              <WalletView />
             )}
             
             {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
@@ -135,21 +120,14 @@ export default function ViewContainer({
         {/* ========================================== */}
         {/* 🏢 RENDERIZAÇÃO MODO PROFISSIONAL (CNPJ)     */}
         {/* ========================================== */}
-        {accountMode === 'professional' && (
+        {accountMode === 'professional' && access.canAccessProfessional && (
           <>
-            {(currentTab === 'nail design' || currentTab === 'dashboard') && (
+            {(currentTab === 'visão do negócio' || currentTab === 'dashboard') && (
               <FinancialCommandCenter />
             )}
 
-            {(currentTab === 'agenda smart' || currentTab === 'agenda') && (
-              <NailDesignView />
-            )}
-
             {(currentTab === 'caixa empresarial' || currentTab === 'caixa') && (
-              <CaixaView 
-                data={caixaData} 
-                transactions={transactions} 
-              />
+              <CaixaView />
             )}
           </>
         )}
@@ -161,7 +139,7 @@ export default function ViewContainer({
           <ProfileView />
         )}
 
-        {currentTab === 'admin' && (systemRole === 'founder' || systemRole === 'admin') && (
+        {currentTab === 'admin' && access.canAccessAdmin && (
           <FounderDashboard />
         )}
 

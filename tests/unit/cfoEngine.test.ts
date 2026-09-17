@@ -24,4 +24,10 @@ describe('cfoEngine data sufficiency', () => {
   it('calculates runway from observed balance and expenses', () => {
     expect(cfoEngine.calculateRunway(12_000, 2_000)).toBe(6)
   })
+
+  it('does not invent tax calculations when the rate is not configured', () => {
+    expect(cfoEngine.calculateTaxReserve(10_000, null)).toBeNull()
+    expect(cfoEngine.calculateNetMargin(10_000, 2_000, null)).toBeNull()
+    expect(cfoRulesEngine.calculateSafeDraw(metrics({ taxRate: null }))).toBe(0)
+  })
 })

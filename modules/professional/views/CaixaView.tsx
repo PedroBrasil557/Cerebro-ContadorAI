@@ -1,509 +1,240 @@
 'use client'
 
-import React, { type ReactNode, useCallback, useState, useMemo, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  ShieldCheck, AlertTriangle, TrendingUp,
-  Settings2, AlertOctagon, PiggyBank, Activity,
-  Sparkles, Loader2, Briefcase, Calculator, Receipt,
-  Target, Wallet, Plus, Search, Filter, ArrowUpRight, ArrowDownRight, CheckCircle2, FileText, X
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
-import { CaixaData, Transaction } from '@/types_db' 
-import { formatCurrency } from '@/lib/utils'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Briefcase, Calculator, FileText, Loader2, Plus, Settings2, ShieldCheck, Sparkles, Target, Wallet, X } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
-
-// Importando a Camada de Domínio (O Cérebro do Negócio)
-import { cfoEngine, BusinessMetrics } from '@/modules/cfo/cfoEngine'
+import { businessFinanceService } from '@/services/businessFinanceService'
+import { summarizeBusinessFinance } from '@/lib/business/finance'
+import { formatCurrency } from '@/lib/utils'
+import { cfoEngine, type BusinessMetrics } from '@/modules/cfo/cfoEngine'
 import { cfoRulesEngine } from '@/modules/cfo/cfoRulesEngine'
 import { cfoSimulator } from '@/modules/cfo/cfoSimulator'
+import type { BusinessSettings, BusinessWorkspace, Transaction } from '@/types_db'
 
-// --- COMPONENTES VISUAIS AUXILIARES ---
-const GlassCard = ({ children, className = "", glow = false }: { children: ReactNode; className?: string; glow?: boolean }) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className={`relative bg-[#09090b]/60 backdrop-blur-xl border border-white/[0.06] rounded-3xl overflow-hidden shadow-2xl ${className}`}
-  >
-    <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] pointer-events-none" />
-    {glow && <div className="absolute -top-20 -right-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />}
-    <div className="relative z-10">{children}</div>
-  </motion.div>
+const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`rounded-3xl border border-white/[0.07] bg-[#09090b]/70 shadow-2xl backdrop-blur-xl ${className}`}>{children}</div>
 )
 
-const KPICard = ({ label, value, subtext, icon: Icon, colorClass = "text-emerald-400", bgClass = "bg-emerald-500/10" }: {
-  label: string
-  value: string
-  subtext?: string
-  icon: LucideIcon
-  colorClass?: string
-  bgClass?: string
-}) => (
-  <div className="min-w-[160px] md:min-w-0 p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all group flex flex-col justify-between h-36">
-    <div className="flex justify-between items-start mb-2">
-      <div className={`p-2 rounded-lg ${bgClass} ${colorClass} group-hover:scale-110 transition-transform`}>
-        <Icon size={18} />
-      </div>
-    </div>
-    <div>
-      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">{label}</p>
-      <h3 className="text-lg font-black text-white truncate">{value}</h3>
-      {subtext && <p className="text-[10px] text-gray-400 mt-1 truncate font-medium">{subtext}</p>}
-    </div>
-  </div>
-)
-
-// --- MÓDULO SIMULADOR FRONT-END ---
-const SimulatorWidget = ({ metrics }: { metrics: BusinessMetrics }) => {
-  const [extraContribution, setExtraContribution] = useState(0)
+function SimulatorWidget({ metrics }: { metrics: BusinessMetrics }) {
+  const [monthlyContribution, setMonthlyContribution] = useState(0)
   const [months, setMonths] = useState(6)
-  
-  const simResult = useMemo(() => {
-      return cfoSimulator.runSimulation(metrics, {
-          cashInjection: extraContribution * months
-      })
-  }, [metrics, extraContribution, months])
+  const simulation = useMemo(() => cfoSimulator.runSimulation(metrics, {
+    cashInjection: monthlyContribution * months,
+  }), [metrics, monthlyContribution, months])
 
   return (
-    <GlassCard className="p-6 md:p-8 h-full flex flex-col justify-between" glow>
+    <Card className="flex h-full flex-col justify-between p-6 md:p-8">
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Settings2 className="text-emerald-400 h-5 w-5" />
-          <h3 className="text-lg font-bold text-white">Simulador Estratégico</h3>
+        <div className="mb-4 flex items-center gap-2">
+          <Settings2 className="text-emerald-400" size={20} />
+          <h3 className="text-lg font-bold text-white">Simulador estratégico</h3>
         </div>
-        <p className="text-xs text-gray-400 mb-6 leading-relaxed">Projete o impacto de aportes extras no Score e Fôlego da sua empresa.</p>
-        
+        <p className="mb-6 text-xs leading-relaxed text-gray-400">
+          Hipótese educativa de aportes ao caixa. Não representa garantia de resultado.
+        </p>
         <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase">
-              <label>Aporte Mensal Extra</label>
-              <span className="text-emerald-400 font-mono">{formatCurrency(extraContribution)}</span>
-            </div>
-            <input type="range" min="0" max="5000" step="100" value={extraContribution} onChange={(e) => setExtraContribution(Number(e.target.value))} className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase">
-              <label>Tempo de Acúmulo</label>
-              <span className="text-white font-mono">{months} meses</span>
-            </div>
-            <input type="range" min="1" max="24" step="1" value={months} onChange={(e) => setMonths(Number(e.target.value))} className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
-          </div>
-        </div>
-      </div>
-      
-      <div className="mt-8 grid grid-cols-2 gap-4">
-        <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
-            <p className="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wide">Score Projetado</p>
-            <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-white">{simResult.projectedScore}</span>
-            <span className={`text-xs font-bold ${simResult.scoreImpact >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {simResult.scoreImpact >= 0 ? '+' : ''}{simResult.scoreImpact} pts
+          <label className="block space-y-3">
+            <span className="flex justify-between text-[10px] font-bold uppercase text-gray-500">
+              <span>Aporte mensal hipotético</span>
+              <span className="font-mono text-emerald-400">{formatCurrency(monthlyContribution)}</span>
             </span>
-            </div>
-        </div>
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-black border border-emerald-500/20">
-            <p className="text-[10px] text-emerald-200 font-bold mb-1 uppercase tracking-wide">Novo Runway</p>
-            <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-white">{simResult.projectedRunway === null ? 'Sem dados' : simResult.projectedRunway.toFixed(1)}</span>
-            {simResult.projectedRunway !== null && <span className="text-xs font-bold text-gray-500">meses</span>}
-            </div>
+            <input type="range" min="0" max="5000" step="100" value={monthlyContribution} onChange={(event) => setMonthlyContribution(Number(event.target.value))} className="w-full accent-emerald-500" />
+          </label>
+          <label className="block space-y-3">
+            <span className="flex justify-between text-[10px] font-bold uppercase text-gray-500">
+              <span>Período da hipótese</span>
+              <span className="font-mono text-white">{months} meses</span>
+            </span>
+            <input type="range" min="1" max="24" step="1" value={months} onChange={(event) => setMonths(Number(event.target.value))} className="w-full accent-blue-500" />
+          </label>
         </div>
       </div>
-    </GlassCard>
+      <div className="mt-8 grid grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-white/5 bg-black/40 p-4">
+          <p className="text-[10px] font-bold uppercase text-gray-400">Indicador financeiro projetado</p>
+          <p className="mt-1 text-2xl font-black text-white">{simulation.projectedScore}<span className="ml-1 text-xs text-gray-500">/100</span></p>
+          <p className="text-[10px] text-gray-500">Regra interna, variação {simulation.scoreImpact >= 0 ? '+' : ''}{simulation.scoreImpact}</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/30 p-4">
+          <p className="text-[10px] font-bold uppercase text-emerald-200">Fôlego de caixa projetado</p>
+          <p className="mt-1 text-2xl font-black text-white">{simulation.projectedRunway === null ? 'Dados insuficientes' : `${simulation.projectedRunway.toFixed(1)} meses`}</p>
+        </div>
+      </div>
+      <p className="mt-4 text-[10px] leading-relaxed text-gray-500">
+        Dados usados: receitas, despesas e saldo registrados. Limitações: não considera demanda futura nem eventos não cadastrados.
+      </p>
+    </Card>
   )
 }
 
-// --- COMPONENTE PRINCIPAL ---
-interface CaixaViewProps {
-  data: CaixaData
-  transactions?: Transaction[]
-}
-
-export default function CaixaView({ data, transactions: initialTransactions = [] }: CaixaViewProps) {
-  const supabase = useMemo(() => createClient(), [])
-  
-  // Estados do CFO Engine
+export default function CaixaView() {
+  const [workspace, setWorkspace] = useState<BusinessWorkspace | null>(null)
+  const [settings, setSettings] = useState<BusinessSettings | null>(null)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
-  const [cfoAnalysis, setCfoAnalysis] = useState<string | null>(null)
-  
-  // Estados Operacionais do Caixa
-  const [liveTransactions, setLiveTransactions] = useState<Transaction[]>(initialTransactions)
-  const [isTxLoading, setIsTxLoading] = useState(true)
-  
-  // Estados do Modal Rápido
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [txType, setTxType] = useState<'receita' | 'despesa_variavel'>('receita')
-  const [newTx, setNewTx] = useState({ description: '', amount: '', category: 'Serviço' })
+  const [analysis, setAnalysis] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [type, setType] = useState<'receita' | 'despesa_variavel'>('receita')
+  const [form, setForm] = useState({ description: '', amount: '', category: 'Geral' })
 
-  const safeData = useMemo(
-    () => data || { currentBalance: 0, monthlyGoal: 0, taxRate: 0, reserveRate: 0, entries: [] },
-    [data],
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await businessFinanceService.getDashboardData()
+      setWorkspace(data.workspace)
+      setSettings(data.settings)
+      setTransactions(data.transactions)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível carregar o financeiro.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const confirmedTaxRate = workspace?.tax_rate_confirmed_at
+    ? workspace.tax_rate
+    : settings?.tax_rate_confirmed_at
+      ? settings.tax_rate
+      : null
+  const summary = useMemo(() => summarizeBusinessFinance(transactions, {
+    taxRate: confirmedTaxRate,
+    monthlyGoal: settings?.monthly_goal ?? null,
+  }), [confirmedTaxRate, settings?.monthly_goal, transactions])
+  const openingBalance = Number.isFinite(Number(settings?.current_balance)) ? Number(settings?.current_balance) : 0
+  const currentBalance = openingBalance + summary.balance
+  const metrics = useMemo<BusinessMetrics>(() => ({
+    revenue: summary.revenue,
+    expenses: summary.expenses,
+    cashReserve: Math.max(currentBalance, 0),
+    taxRate: confirmedTaxRate,
+    activeClients: 0,
+    totalHoursWorked: 0,
+  }), [confirmedTaxRate, currentBalance, summary.expenses, summary.revenue])
+  const { score: financialIndicator, alerts } = useMemo(() => cfoRulesEngine.evaluateHealth(metrics), [metrics])
+  const runway = useMemo(() => cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses), [metrics])
+  const safeDraw = useMemo(
+    () => confirmedTaxRate === null ? null : cfoRulesEngine.calculateSafeDraw(metrics),
+    [confirmedTaxRate, metrics],
   )
 
-  // 0. BUSCA REAL-TIME DAS TRANSAÇÕES
-  const fetchTransactions = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-      const { data: fetchedTxs } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('scope', 'business')
-        .gte('date', startOfMonth)
-        .order('date', { ascending: false })
-      
-      if (fetchedTxs) {
-          // O TypeScript do Supabase pode retornar os dados de forma genérica.
-          // O cast as unknown as Transaction[] força a tipagem correta.
-          setLiveTransactions(fetchedTxs as unknown as Transaction[])
-      }
-    }
-    setIsTxLoading(false)
-  }, [supabase])
-
-  useEffect(() => {
-    void fetchTransactions()
-  }, [fetchTransactions])
-
-  // 1. CONSTRUÇÃO DO DOMÍNIO (Data Prep)
-  const metrics: BusinessMetrics = useMemo(() => {
-    // Calcula com base nas transações reais carregadas do Supabase
-    const revenue = liveTransactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + Number(t.amount), 0)
-    const expenses = liveTransactions
-      .filter(t => t.type === 'despesa_fixa' || t.type === 'despesa_variavel')
-      .reduce((acc, t) => acc + Math.abs(Number(t.amount)), 0)
-
-    // O Saldo real atualizado
-    const realBalance = (safeData.currentBalance || 0) + revenue - expenses
-
-    return {
-        revenue,
-        expenses,
-        cashReserve: realBalance > 0 ? realBalance : 0, // Garante que não fica negativo visualmente no CFO
-        taxRate: safeData.taxRate,
-        activeClients: 0,
-        totalHoursWorked: 0,
-    }
-  }, [liveTransactions, safeData])
-
-  // 2. AVALIAÇÃO PELO MOTOR DO CFO
-  const { score, alerts } = useMemo(() => cfoRulesEngine.evaluateHealth(metrics), [metrics])
-  const safeDraw = useMemo(() => cfoRulesEngine.calculateSafeDraw(metrics), [metrics])
-  const taxReserve = useMemo(() => cfoEngine.calculateTaxReserve(metrics.revenue, metrics.taxRate), [metrics])
-  const runway = useMemo(() => cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses), [metrics])
-
-  const criticalAlerts = alerts.filter(a => a.severity === 'critical').length
-  const status = criticalAlerts > 0 ? 'critical' : score < 50 ? 'warning' : 'healthy'
-
-  // 3. IA CONSULTING (Integração com o Interpreter)
-  const handleAnalyzeCash = async () => {
+  const analyze = async () => {
     setAnalyzing(true)
     try {
-      const response = await fetch('/api/cfo-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}'
-      })
-
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error?.message ?? 'Falha ao consultar o CFO Virtual.')
-      setCfoAnalysis(result.analysis)
-      toast.success("Análise estratégica concluída!")
-    } catch {
-      toast.error("Erro ao consultar o CFO Virtual.")
+      const response = await fetch('/api/cfo-analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const result = await response.json() as { analysis?: string; error?: { message?: string } }
+      if (!response.ok || !result.analysis) throw new Error(result.error?.message ?? 'Falha na análise.')
+      setAnalysis(result.analysis)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível gerar a análise.')
     } finally {
       setAnalyzing(false)
     }
   }
 
-  // 4. CADASTRO DE LANÇAMENTO
-  const handleAddTransaction = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { error } = await supabase.from('transactions').insert({
-      user_id: user.id,
-      description: newTx.description,
-      amount: parseFloat(newTx.amount),
-      type: txType,
-      scope: 'business',
-      category: newTx.category,
-      date: new Date().toISOString(),
-      status: 'concluido'
-    })
-
-    if (!error) {
-      setIsModalOpen(false)
-      setNewTx({ description: '', amount: '', category: 'Serviço' })
-      fetchTransactions() // Recarrega o painel e o CFO instantaneamente
-      toast.success("Lançamento salvo com sucesso!")
-    } else {
-      toast.error(`Erro ao salvar: ${error.message}`)
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
+    try {
+      await businessFinanceService.createTransaction({
+        description: form.description,
+        amount: Number(form.amount),
+        type,
+        category: form.category,
+      })
+      setModalOpen(false)
+      setForm({ description: '', amount: '', category: 'Geral' })
+      await load()
+      toast.success('Lançamento salvo.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível salvar.')
+    } finally {
+      setSubmitting(false)
     }
-    setIsSubmitting(false)
   }
 
   return (
-    <div className="p-4 md:p-10 space-y-8 max-w-[1600px] mx-auto pb-32 animate-in fade-in duration-700">
-      
-      {/* HEADER DINÂMICO */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-         <div>
-            <div className="flex items-center gap-3 mb-2">
-               <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Caixa Empresarial</h1>
-               <div className={`flex items-center gap-1 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : status === 'warning' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
-                  {status === 'healthy' ? <ShieldCheck size={12}/> : <AlertTriangle size={12}/>}
-                  {status === 'healthy' ? 'Saudável' : status === 'warning' ? 'Atenção' : 'Risco Crítico'}
-               </div>
-            </div>
-            <p className="text-sm text-gray-400 font-medium">Motor de Gestão e Tesouraria Multi-tenant.</p>
-         </div>
-         
-         <div className="flex gap-4 w-full md:w-auto">
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20"
-            >
-              <Plus size={16} /> Lançar Movimentação
-            </button>
-            <button 
-                onClick={handleAnalyzeCash}
-                disabled={analyzing}
-                className="group flex-1 md:flex-none flex items-center justify-center gap-2 bg-white text-black px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:bg-emerald-400 active:scale-95 disabled:opacity-50"
-            >
-                {analyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="group-hover:animate-pulse" />}
-                Consultar CFO
-            </button>
-         </div>
+    <div className="mx-auto max-w-[1600px] space-y-8 p-4 pb-32 md:p-10">
+      <header className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+        <div>
+          <h1 className="text-3xl font-black text-white md:text-4xl">Financeiro do negócio</h1>
+          <p className="mt-2 text-sm text-gray-400">Receitas, despesas e indicadores do ambiente {workspace?.name ?? 'profissional'}.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-xs font-bold text-white"><Plus size={16}/> Novo lançamento</button>
+          <button onClick={analyze} disabled={analyzing} className="flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-xs font-bold text-black disabled:opacity-50">{analyzing ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16}/>} Análise do negócio com IA</button>
+        </div>
       </header>
 
-      {/* ANÁLISE IA (Interpretador) */}
-      <AnimatePresence>
-        {cfoAnalysis && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-            <GlassCard className="p-6 border-indigo-500/30 bg-indigo-500/5" glow>
-              <div className="flex justify-between mb-4">
-                <div className="flex items-center gap-2 text-indigo-400 font-bold uppercase text-[10px] tracking-widest">
-                  <Briefcase size={14}/> Relatório do Conselho
-                </div>
-                <button onClick={() => setCfoAnalysis(null)} className="text-gray-500 hover:text-white"><Receipt size={16}/></button>
-              </div>
-              <div className="prose prose-invert prose-sm max-w-none">
-                <div className="whitespace-pre-wrap text-gray-300 leading-relaxed font-light">{cfoAnalysis}</div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {analysis && <Card className="p-6"><div className="mb-3 flex items-center justify-between text-sm font-bold text-indigo-300"><span className="flex items-center gap-2"><Briefcase size={16}/> Análise educativa</span><button onClick={() => setAnalysis(null)} aria-label="Fechar"><X size={16}/></button></div><p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300">{analysis}</p></Card>}
 
-      {/* MÉTRICAS SUPERIORES DO CFO */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-          <div className="lg:col-span-1 min-w-[160px] p-4 rounded-2xl bg-gradient-to-br from-[#09090b] to-[#111] border border-white/10 flex flex-col justify-between h-36 relative overflow-hidden">
-             <div className="absolute -right-4 -bottom-4 opacity-10"><Target size={80}/></div>
-             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Business Score</p>
-             <div>
-                <h3 className="text-4xl font-black text-white">{score}</h3>
-                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest mt-1">/ 100 pontos</p>
-             </div>
-          </div>
-          <KPICard label="Faturamento Real" value={formatCurrency(metrics.revenue)} subtext="No Mês Atual" icon={TrendingUp} />
-          <KPICard label="Pró-labore Seguro" value={formatCurrency(safeDraw)} subtext="Teto sugerido para saque" icon={PiggyBank} colorClass="text-purple-400" bgClass="bg-purple-500/10" />
-          <KPICard label="Runway Atual" value={runway === null ? 'Sem dados' : `${runway.toFixed(1)} Meses`} subtext={runway === null ? 'Registre despesas para calcular' : 'Cobertura pelas despesas observadas'} icon={Activity} colorClass={status === 'healthy' ? 'text-emerald-400' : 'text-rose-400'} bgClass={status === 'healthy' ? 'bg-emerald-500/10' : 'bg-rose-500/10'} />
-          <KPICard label="Reserva DAS/MEI" value={formatCurrency(taxReserve)} subtext={`Taxa: ${metrics.taxRate}%`} icon={Calculator} colorClass="text-blue-400" bgClass="bg-blue-500/10" />
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {[
+          { label: 'Receitas observadas', value: formatCurrency(summary.revenue), icon: ArrowUpRight },
+          { label: 'Despesas observadas', value: formatCurrency(summary.expenses), icon: ArrowDownRight },
+          { label: 'Retirada estimada', value: safeDraw === null ? 'Dados insuficientes' : formatCurrency(safeDraw), icon: Wallet },
+          { label: 'Fôlego de caixa', value: runway === null ? 'Dados insuficientes' : `${runway.toFixed(1)} meses`, icon: Activity },
+          { label: 'Reserva para impostos', value: summary.taxReserve === null ? 'Não configurada' : formatCurrency(summary.taxReserve), icon: Calculator },
+          { label: 'Indicador financeiro', value: `${financialIndicator}/100`, icon: ShieldCheck },
+        ].map(({ label, value, icon: Icon }) => <Card key={label} className="p-5"><Icon className="mb-5 text-indigo-400" size={20}/><p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</p><p className="mt-2 text-lg font-black text-white">{value}</p></Card>)}
       </section>
 
-      {/* NÚCLEO DO CAIXA: RESERVA + EXTRATO + SIMULADOR */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-          
-          {/* Coluna Esquerda: Saldo e Extrato Real */}
-          <div className="lg:col-span-2 space-y-6">
-              <GlassCard className="p-8 flex flex-col justify-between min-h-[350px]">
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-8">
-                      <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400 border border-emerald-500/20">
-                        <Wallet size={32} />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-bold text-white tracking-tight">Caixa de Segurança (Saldo Atual)</h2>
-                        <p className="text-xs text-emerald-200/50 font-bold uppercase tracking-widest">Capital Líquido da Empresa</p>
-                      </div>
-                    </div>
-                    <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter mb-10">
-                      {formatCurrency(metrics.cashReserve)}
-                    </h1>
-                  </div>
+      {confirmedTaxRate === null && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs leading-relaxed text-amber-100">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <p>A taxa de imposto ainda não foi confirmada. Valores legados foram preservados, mas não são usados silenciosamente como configuração tributária.</p>
+        </div>
+      )}
 
-                  <div className="relative z-10 space-y-4">
-                      <div className="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
-                        <span>Meta de Caixa: {formatCurrency(safeData.monthlyGoal)}</span>
-                        <span className="text-emerald-400">{((metrics.cashReserve / safeData.monthlyGoal) * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="h-4 w-full bg-white/5 rounded-full overflow-hidden p-1 border border-white/5">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min((metrics.cashReserve / safeData.monthlyGoal) * 100, 100)}%` }} className="h-full bg-emerald-500 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-                      </div>
-                  </div>
-              </GlassCard>
-
-              {/* Tabela de Extrato Inteligente */}
-              <div className="bg-[#050505] border border-white/5 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-                <div className="p-5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                    <h3 className="text-sm font-black text-white uppercase tracking-widest">Extrato Recente</h3>
-                    <div className="flex gap-2">
-                        <button className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 transition-colors"><Search size={16} /></button>
-                        <button className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 transition-colors"><Filter size={16} /></button>
-                    </div>
-                </div>
-
-                <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-2">
-                    {isTxLoading ? (
-                        <div className="h-32 flex items-center justify-center text-indigo-400"><Loader2 className="animate-spin h-8 w-8" /></div>
-                    ) : liveTransactions.length === 0 ? (
-                        <div className="h-48 flex flex-col items-center justify-center text-center p-10">
-                            <FileText size={32} className="text-gray-600 mb-3" />
-                            <p className="text-sm font-bold text-gray-400">Nenhum lançamento no mês</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-1">
-                            {liveTransactions.map((tx) => (
-                            <div key={tx.id} className="flex items-center justify-between p-4 rounded-2xl hover:bg-white/[0.02] transition-colors group">
-                                <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-xl ${tx.type === 'receita' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                                    {tx.type === 'receita' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-white">{tx.description}</p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded-md">
-                                            {tx.category}
-                                        </span>
-                                        <span className="text-[10px] text-gray-600 font-medium">
-                                            {new Date(tx.date).toLocaleDateString('pt-BR')}
-                                        </span>
-                                    </div>
-                                </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className={`text-base font-black ${tx.type === 'receita' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {tx.type === 'receita' ? '+' : '-'}{formatCurrency(tx.amount)}
-                                    </p>
-                                    <p className="text-[10px] text-gray-500 font-medium uppercase mt-0.5 flex items-center justify-end gap-1">
-                                        <CheckCircle2 size={10} className="text-emerald-500" /> Liquidado
-                                    </p>
-                                </div>
-                            </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-              </div>
+      <section className="grid gap-6 lg:grid-cols-[1.2fr_2fr]">
+        <Card className="p-8">
+          <Target className="text-emerald-400"/>
+          <p className="mt-8 text-xs font-bold uppercase tracking-widest text-gray-500">Saldo observado</p>
+          <p className="mt-2 text-4xl font-black text-white">{formatCurrency(currentBalance)}</p>
+          <p className="mt-6 text-sm text-gray-400">Meta mensal: {summary.monthlyGoal && summary.monthlyGoal > 0 ? formatCurrency(summary.monthlyGoal) : 'não configurada'}</p>
+          <p className="mt-1 text-sm text-gray-400">Progresso: {summary.goalProgress === null ? 'dados insuficientes' : `${summary.goalProgress.toFixed(1)}%`}</p>
+        </Card>
+        <Card className="overflow-hidden">
+          <div className="border-b border-white/5 p-5"><h2 className="font-bold text-white">Movimentações do negócio</h2></div>
+          <div className="max-h-[440px] overflow-y-auto p-3">
+            {loading ? <div className="flex h-44 items-center justify-center"><Loader2 className="animate-spin text-indigo-400"/></div> : transactions.length === 0 ? <div className="flex h-44 flex-col items-center justify-center text-gray-500"><FileText/><p className="mt-3 text-sm">Nenhum lançamento registrado.</p></div> : transactions.map((transaction) => <div key={transaction.id} className="flex items-center justify-between rounded-2xl p-4 hover:bg-white/[0.03]"><div><p className="font-medium text-white">{transaction.description}</p><p className="text-xs text-gray-500">{transaction.category} · {new Date(transaction.date).toLocaleDateString('pt-BR')}</p></div><p className={transaction.type === 'receita' ? 'font-bold text-emerald-400' : 'font-bold text-rose-400'}>{transaction.type === 'receita' ? '+' : '-'}{formatCurrency(transaction.amount)}</p></div>)}
           </div>
-
-          {/* Coluna Direita: Simulador Estratégico e Alertas */}
-          <div className="space-y-6">
-            <SimulatorWidget metrics={metrics} />
-            
-            {alerts.length > 0 && (
-                <div className="p-5 rounded-3xl border border-white/5 bg-[#0a0a0c] space-y-4">
-                    <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                        <AlertTriangle size={16} className="text-amber-500" /> Diagnóstico Operacional
-                    </h2>
-                    <div className="flex flex-col gap-3">
-                        {alerts.map((alert, idx) => (
-                            <div key={idx} className={`p-3 rounded-2xl border flex gap-3 ${alert.severity === 'critical' ? 'bg-rose-500/10 border-rose-500/20' : alert.severity === 'medium' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
-                                <div className={`mt-0.5 ${alert.severity === 'critical' ? 'text-rose-400' : alert.severity === 'medium' ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                    {alert.severity === 'critical' ? <AlertOctagon size={16}/> : alert.severity === 'medium' ? <AlertTriangle size={16}/> : <ShieldCheck size={16}/>}
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{alert.metric}</p>
-                                    <p className={`text-xs font-medium mt-0.5 ${alert.severity === 'critical' ? 'text-rose-200' : alert.severity === 'medium' ? 'text-amber-200' : 'text-emerald-200'}`}>{alert.message}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-          </div>
+        </Card>
       </section>
 
-      {/* 🟢 MODAL DE LANÇAMENTO (ALTA VELOCIDADE) */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-            
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-[#0a0a0c] border border-white/10 rounded-3xl p-6 shadow-2xl w-full max-w-md relative z-10">
-              <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-lg font-black text-white">Novo Lançamento</h3>
-                 <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X size={20} /></button>
-              </div>
-
-              {/* Tabs Entrada/Saída */}
-              <div className="flex p-1 bg-[#050505] rounded-xl mb-6">
-                 <button 
-                   type="button" onClick={() => setTxType('receita')}
-                   className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${txType === 'receita' ? 'bg-emerald-500/20 text-emerald-400' : 'text-gray-500'}`}
-                 >
-                   + Receita
-                 </button>
-                 <button 
-                   type="button" onClick={() => setTxType('despesa_variavel')}
-                   className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${txType === 'despesa_variavel' ? 'bg-rose-500/20 text-rose-400' : 'text-gray-500'}`}
-                 >
-                   - Despesa
-                 </button>
-              </div>
-
-              <form onSubmit={handleAddTransaction} className="space-y-4">
-                <div>
-                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Descrição</label>
-                  <input required type="text" value={newTx.description} onChange={e => setNewTx({...newTx, description: e.target.value})} placeholder={txType === 'receita' ? "Ex: Alongamento Carol" : "Ex: Compra de Material"} className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500" />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Valor (R$)</label>
-                    <input required type="number" step="0.01" value={newTx.amount} onChange={e => setNewTx({...newTx, amount: e.target.value})} placeholder="0.00" className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Categoria</label>
-                    <select value={newTx.category} onChange={e => setNewTx({...newTx, category: e.target.value})} className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500 appearance-none">
-                      {txType === 'receita' ? (
-                        <>
-                          <option value="Serviço">Serviço/Atendimento</option>
-                          <option value="Produto">Venda de Produto</option>
-                          <option value="Outros">Outros</option>
-                        </>
-                      ) : (
-                        <>
-                          <option value="Insumos">Materiais/Insumos</option>
-                          <option value="Operacional">Custos Fixos/Aluguel</option>
-                          <option value="Marketing">Marketing/Anúncios</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                   <button disabled={isSubmitting} type="submit" className={`w-full font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${txType === 'receita' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white'}`}>
-                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : (txType === 'receita' ? 'Confirmar Receita' : 'Registrar Despesa')}
-                   </button>
-                </div>
-              </form>
-            </motion.div>
+      <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <SimulatorWidget metrics={metrics} />
+        <Card className="p-6">
+          <div className="mb-5 flex items-center gap-2">
+            <AlertTriangle className="text-amber-400" size={18} />
+            <div>
+              <h2 className="font-bold text-white">Alertas determinísticos</h2>
+              <p className="text-xs text-gray-500">Regras locais calculadas somente com dados do workspace.</p>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+          {alerts.length === 0 ? (
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 text-sm text-gray-400">
+              Não há alertas calculáveis com os dados atuais. Isso não representa garantia de saúde financeira.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {alerts.map((alert) => (
+                <div key={alert.id} className={`rounded-2xl border p-4 ${alert.severity === 'critical' ? 'border-rose-500/20 bg-rose-500/10 text-rose-100' : alert.severity === 'medium' ? 'border-amber-500/20 bg-amber-500/10 text-amber-100' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">{alert.metric === 'Runway' ? 'Fôlego de caixa' : alert.metric}</p>
+                  <p className="mt-1 text-sm font-medium">{alert.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-5 text-[10px] leading-relaxed text-gray-500">O indicador financeiro e os alertas são regras internas de apoio à organização; não constituem diagnóstico, garantia ou aconselhamento tributário.</p>
+        </Card>
+      </section>
 
+      <AnimatePresence>{modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="absolute inset-0 bg-black/70" onClick={() => setModalOpen(false)}/><motion.form onSubmit={submit} initial={{opacity:0,scale:.96}} animate={{opacity:1,scale:1}} className="relative z-10 w-full max-w-md space-y-4 rounded-3xl border border-white/10 bg-[#0a0a0c] p-6"><div className="flex justify-between"><h2 className="font-bold text-white">Novo lançamento</h2><button type="button" onClick={() => setModalOpen(false)}><X/></button></div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setType('receita')} className={`rounded-xl p-3 text-sm ${type === 'receita' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-gray-400'}`}>Receita</button><button type="button" onClick={() => setType('despesa_variavel')} className={`rounded-xl p-3 text-sm ${type !== 'receita' ? 'bg-rose-500/20 text-rose-300' : 'bg-white/5 text-gray-400'}`}>Despesa</button></div><input required value={form.description} onChange={(e) => setForm({...form,description:e.target.value})} placeholder="Descrição" className="w-full rounded-xl border border-white/10 bg-black p-3 text-white"/><input required min="0.01" step="0.01" type="number" value={form.amount} onChange={(e) => setForm({...form,amount:e.target.value})} placeholder="Valor" className="w-full rounded-xl border border-white/10 bg-black p-3 text-white"/><input value={form.category} onChange={(e) => setForm({...form,category:e.target.value})} placeholder="Categoria" className="w-full rounded-xl border border-white/10 bg-black p-3 text-white"/><button disabled={submitting} className="w-full rounded-xl bg-indigo-600 p-3 font-bold text-white disabled:opacity-50">{submitting ? 'Salvando…' : 'Salvar lançamento'}</button></motion.form></div>}</AnimatePresence>
     </div>
   )
 }

@@ -26,7 +26,7 @@ export async function GET() {
       admin.from('profiles').select('id', { count: 'exact', head: true }),
       admin.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo),
       admin.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgo),
-      admin.from('subscriptions').select('user_id,plan,status'),
+      admin.from('subscriptions').select('user_id,plan,product,status'),
       admin.from('api_usage').select('feature,usage_count'),
     ])
     const firstError = [profilesCount, newUsers7d, newUsers30d, subscriptionsResult, usageResult].find((result) => result.error)?.error
@@ -53,6 +53,8 @@ export async function GET() {
         freeUsers: Math.max(totalUsers - paidUsers.size, 0),
         proUsers: new Set(subscriptions.filter((item) => item.plan === 'pro' && paidStatuses.has(item.status)).map((item) => item.user_id)).size,
         premiumUsers: new Set(subscriptions.filter((item) => item.plan === 'premium' && paidStatuses.has(item.status)).map((item) => item.user_id)).size,
+        personalSubscribers: new Set(subscriptions.filter((item) => item.product === 'personal' && paidStatuses.has(item.status)).map((item) => item.user_id)).size,
+        professionalSubscribers: new Set(subscriptions.filter((item) => item.product === 'professional' && paidStatuses.has(item.status)).map((item) => item.user_id)).size,
         activeSubscriptions: subscriptions.filter((item) => paidStatuses.has(item.status)).length,
         pastDueSubscriptions: subscriptions.filter((item) => item.status === 'past_due').length,
         canceledSubscriptions: subscriptions.filter((item) => item.status === 'canceled').length,

@@ -6,54 +6,50 @@ import {
   Loader2, Calculator, TrendingUp
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import { businessFinanceService } from '@/services/businessFinanceService'
 import { toast } from 'sonner'
 
 interface NailMaterial {
-  cost_per_application: number | string
+  cost_per_application: number | string | null
   name: string
 }
 
 export default function NailCalendar() {
-  const supabase = createClient()
   const [inputValue, setInputValue] = useState('')
   const [materials, setMaterials] = useState<NailMaterial[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [taxRate, setTaxRate] = useState<number | null>(null)
 
   // Busca de insumos para precisão
   useEffect(() => {
     const fetchMaterials = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase
-          .from('nail_products')
-          .select('cost_per_application, name')
-          .eq('user_id', user.id)
-        if (data) setMaterials(data)
-      }
+      const data = await businessFinanceService.getDashboardData()
+      setMaterials(data.costs.map((item) => ({ name: item.name, cost_per_application: item.cost_per_use ?? null })))
+      setTaxRate(data.workspace.tax_rate_confirmed_at
+        ? data.workspace.tax_rate
+        : data.settings?.tax_rate_confirmed_at
+          ? data.settings.tax_rate
+          : null)
     }
     fetchMaterials()
-  }, [supabase])
+  }, [])
 
   const metrics = useMemo(() => {
     const revenue = parseFloat(inputValue) || 0
     const realMaterialCost = materials.reduce((acc, curr) => acc + Number(curr.cost_per_application), 0)
-    const materialCost = realMaterialCost > 0 ? realMaterialCost : (revenue * 0.12)
-    const tax = revenue * 0.06 
-    const netProfit = revenue - materialCost - tax
-    const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0
+    const materialCost = realMaterialCost > 0 ? realMaterialCost : null
+    const tax = taxRate === null ? null : revenue * (taxRate / 100)
+    const netProfit = tax === null || materialCost === null ? null : revenue - materialCost - tax
+    const margin = revenue > 0 && netProfit !== null ? (netProfit / revenue) * 100 : null
 
     return { materialCost, tax, netProfit, margin, isRealData: realMaterialCost > 0 }
-  }, [inputValue, materials])
+  }, [inputValue, materials, taxRate])
 
   const handleQuickLaunch = async () => {
     if (!inputValue || isProcessing) return
     setIsProcessing(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { error } = await supabase.from('transactions').insert({
-        user_id: user.id,
+      await businessFinanceService.createTransaction({
         description: 'Checkout Profissional',
         amount: parseFloat(inputValue),
         type: 'receita',
@@ -62,7 +58,6 @@ export default function NailCalendar() {
         date: new Date().toISOString(),
         status: 'concluido'
       })
-      if (error) throw error
       setInputValue('')
       toast.success("Venda consolidada.")
     } catch {
@@ -122,15 +117,15 @@ export default function NailCalendar() {
         <div className="space-y-3 mt-4">
           <div className="flex justify-between text-xs">
             <span className="text-gray-500">Materiais</span>
-            <span className="text-rose-500 font-bold">-{formatCurrency(metrics.materialCost)}</span>
+            <span className="text-rose-500 font-bold">{metrics.materialCost === null ? 'Não configurados' : `-${formatCurrency(metrics.materialCost)}`}</span>
           </div>
           <div className="flex justify-between text-xs border-b border-white/5 pb-3">
             <span className="text-gray-500">Impostos</span>
-            <span className="text-rose-500 font-bold">-{formatCurrency(metrics.tax)}</span>
+            <span className="text-rose-500 font-bold">{metrics.tax === null ? 'Não configurados' : `-${formatCurrency(metrics.tax)}`}</span>
           </div>
           <div className="pt-1 flex justify-between items-center">
             <span className="text-[10px] font-black text-white uppercase">Lucro Líquido</span>
-            <span className="text-2xl font-black text-emerald-400">{formatCurrency(metrics.netProfit)}</span>
+            <span className="text-2xl font-black text-emerald-400">{metrics.netProfit === null ? 'Dados insuficientes' : formatCurrency(metrics.netProfit)}</span>
           </div>
         </div>
       </div>
@@ -143,15 +138,15 @@ export default function NailCalendar() {
         </div>
         
         <p className="text-xs text-gray-400 leading-relaxed py-4">
-          {metrics.margin > 70 
-            ? "Margem excelente para o padrão do estúdio." 
-            : "Margem estável dentro do previsto."}
+          {metrics.margin === null ? 'Configure a taxa de impostos para completar esta estimativa.' : metrics.margin > 70
+            ? "A margem estimada está acima de 70%."
+            : "Revise os custos antes de tomar uma decisão."}
         </p>
 
         <div className="flex items-center justify-between border-t border-white/5 pt-4">
           <span className="text-[10px] font-bold text-gray-600 uppercase">Saúde</span>
           <div className="flex items-center gap-1 text-emerald-400 font-black text-xs">
-            <TrendingUp size={12} /> {metrics.margin.toFixed(0)}%
+            <TrendingUp size={12} /> {metrics.margin === null ? '—' : `${metrics.margin.toFixed(0)}%`}
           </div>
         </div>
       </div>

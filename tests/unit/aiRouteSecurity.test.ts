@@ -39,7 +39,8 @@ describe('AI route security', () => {
     mocks.requireUser.mockResolvedValue({ id: 'user-1', email: 'user@example.test' })
     mocks.getUserEntitlements.mockResolvedValue({
       plan: 'free',
-      entitlements: { debtCenter: false },
+      access: { canAccessPersonal: true },
+      entitlements: { debtCenter: false, aiMessagesPerDay: 5, ocrPerMonth: 3 },
     })
     mocks.checkUsageLimit.mockResolvedValue({
       allowed: true,
@@ -102,7 +103,11 @@ describe('AI route security', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.getUserEntitlements).toHaveBeenCalledWith('user-1')
-    expect(mocks.checkUsageLimit).toHaveBeenCalledWith('user-1', 'ai_chat', 'free')
+    expect(mocks.checkUsageLimit).toHaveBeenCalledWith('user-1', 'ai_chat', {
+      debtCenter: false,
+      aiMessagesPerDay: 5,
+      ocrPerMonth: 3,
+    })
     expect(mocks.from).toHaveBeenCalledWith('transactions')
     expect(mocks.from).toHaveBeenCalledWith('goals')
     const request = mocks.groqCreate.mock.calls[0][0]

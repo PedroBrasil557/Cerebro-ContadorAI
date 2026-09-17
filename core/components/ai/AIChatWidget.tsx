@@ -9,7 +9,7 @@ import {
 import { financeService } from '@/services/financeService'
 import { formatCurrency } from '@/lib/utils'
 import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
-import type { CaixaData, Debt, Goal, Transaction } from '@/types_db'
+import type { Debt, Goal, Transaction } from '@/types_db'
 
 interface Message {
   id: string
@@ -21,7 +21,6 @@ interface FinancialContext {
   transactions: Transaction[]
   debts: Debt[]
   goals: Goal[]
-  balance: CaixaData | null
 }
 
 export default function AIChatWidget() {
@@ -37,7 +36,6 @@ export default function AIChatWidget() {
       transactions: [],
       debts: [],
       goals: [],
-      balance: null
   })
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -46,18 +44,16 @@ export default function AIChatWidget() {
   useEffect(() => {
     const loadContext = async () => {
         try {
-            const [trans, debts, goals, caixa] = await Promise.all([
+            const [trans, debts, goals] = await Promise.all([
                 financeService.getTransactions(),
                 financeService.getDebts(),
                 financeService.getGoals(),
-                financeService.getCaixaData()
             ])
             
             setContextData({
                 transactions: trans || [],
                 debts: debts || [],
                 goals: goals || [],
-                balance: caixa
             })
         } catch (error) {
             console.error("Erro ao carregar contexto para IA:", error)
@@ -126,7 +122,7 @@ export default function AIChatWidget() {
     return acc
   }, { income: 0, expense: 0 })
 
-  const currentBalance = contextData.balance?.currentBalance || (totals.income - totals.expense)
+  const currentBalance = totals.income - totals.expense
 
   return (
     <>

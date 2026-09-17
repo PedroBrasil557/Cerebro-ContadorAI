@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import type { Session, User } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
 import { CalendarClock, Bell, Menu, LogOut, ChevronDown, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
@@ -18,7 +18,8 @@ import AIAssistant from '@/core/components/ai/AIAssistant'
 import { checkAndTriggerSystemNotifications } from '@/core/action/notifications'
 import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 import { ActiveTab } from '@/types'
-import { Goal, Transaction, CaixaData, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
+import { Goal, Transaction, UserProfile, NotificationItem, Investment, AccountMode } from '@/types_db'
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 // ============================================================================
 // COMPONENTE: TOPBAR (CÉREBRO.OS GLOBAL HEADER)
@@ -156,9 +157,10 @@ const TopBar = ({ user, profile, notifications, onMarkAsRead, onToggleMenu, onNa
 // ============================================================================
 // MAIN LAYOUT ESTRUTURAL
 // ============================================================================
-export default function MainAppLayout({ session }: { session: Session }) {
+export default function MainAppLayout({ user }: { user: User }) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const billing = useEntitlements()
   
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const [accountMode, setAccountMode] = useState<AccountMode>('personal')
@@ -170,33 +172,38 @@ export default function MainAppLayout({ session }: { session: Session }) {
   const [goals, setGoals] = useState<Goal[]>([])
   const [investments, setInvestments] = useState<Investment[]>([]) 
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [caixa, setCaixa] = useState<CaixaData>({ currentBalance: 0, monthlyGoal: 0, taxRate: 0, reserveRate: 0, entries: [] })
 
   useEffect(() => {
     async function loadData() {
-        if (!session?.user) return
+        if (billing.loading) return
         try {
             await checkAndTriggerSystemNotifications()
 
-            const [dbProfile, dbTrans, dbGoals, dbCaixaData, dbNotifs, dbInvests] = await Promise.all([
-                financeService.getProfile(),
-                financeService.getTransactions(),
-                financeService.getGoals(),
-                financeService.getCaixaData(),
-                financeService.getNotifications(),
-                financeService.getInvestments()
+            const [dbProfile, dbNotifs] = await Promise.all([
+              financeService.getProfile(),
+              financeService.getNotifications(),
             ])
+            const [dbTrans, dbGoals, dbInvests] = billing.access.canAccessPersonal
+              ? await Promise.all([
+                  financeService.getTransactions(),
+                  financeService.getGoals(),
+                  financeService.getInvestments(),
+                ])
+              : [[], [], []]
             
             if (dbProfile) {
                 setUserProfile(dbProfile)
-                if (dbProfile.account_mode) setAccountMode(dbProfile.account_mode)
+                const preferred = dbProfile.account_mode
+                setAccountMode(
+                  billing.access.canSwitchProducts && preferred === 'professional'
+                    ? 'professional'
+                    : billing.product,
+                )
             }
             if (dbTrans) setTransactions(dbTrans)
             if (dbGoals) setGoals(dbGoals)
             if (dbNotifs) setNotifications(dbNotifs)
             if (dbInvests) setInvestments(dbInvests)
-            if (dbCaixaData) setCaixa(dbCaixaData)
-
         } catch (error) {
             if (error instanceof Error && error.name === 'AbortError') return
             console.error("Erro crítico de sincronização:", error)
@@ -206,7 +213,7 @@ export default function MainAppLayout({ session }: { session: Session }) {
         }
     }
     loadData()
-  }, [session?.user])
+  }, [billing.access.canAccessPersonal, billing.access.canSwitchProducts, billing.loading, billing.product, user.id])
 
   const handleLogout = async () => {
       await supabase.auth.signOut()
@@ -217,12 +224,12 @@ export default function MainAppLayout({ session }: { session: Session }) {
   const financialSummary = useMemo(() => {
     const income = calculateIncome(transactions)
     const expense = calculateExpenses(transactions)
-    return { balance: calculateBalance(transactions), income, expense, emergencyTotal: caixa.currentBalance }
-  }, [transactions, caixa])
+    return { balance: calculateBalance(transactions), income, expense, emergencyTotal: 0 }
+  }, [transactions])
 
   return (
     <div className="flex h-screen bg-[#050505] text-white overflow-hidden relative font-sans">
-      <AppLoadingScreen isLoading={isLoading} />
+      <AppLoadingScreen isLoading={isLoading || billing.loading} />
       <Toaster position="top-right" theme="dark" richColors closeButton />
       
       <Navigation 
@@ -231,14 +238,17 @@ export default function MainAppLayout({ session }: { session: Session }) {
         onLogout={handleLogout} 
         isOpen={isMenuOpen} 
         onClose={() => setIsMenuOpen(false)} 
-        user={session.user} 
-        systemRole={userProfile?.system_role}
+        accountMode={accountMode}
+        plan={billing.plan}
+        access={billing.access}
+        entitlements={billing.entitlements}
+        refreshEntitlements={billing.refresh}
         onAccountModeChange={setAccountMode}
       />
       
       <main className="flex-1 flex flex-col relative h-full">
         <TopBar 
-          user={session?.user} 
+          user={user}
           profile={userProfile} 
           notifications={notifications} 
           onMarkAsRead={(id: string) => financeService.markNotificationAsRead(id).then(() => setNotifications(prev => prev.map(n => n.id === id ? {...n, read: true} : n)))} 
@@ -251,24 +261,20 @@ export default function MainAppLayout({ session }: { session: Session }) {
            <ViewContainer
               activeTab={activeTab}
               handleRedirect={setActiveTab}
-              user={session?.user} 
               summary={financialSummary}
               goals={goals}
               transactions={transactions} 
-              caixaData={caixa}
               investments={investments} 
-              systemRole={userProfile?.system_role}
+              access={billing.access}
               accountMode={accountMode}
               onAddGoal={(g) => financeService.createGoal(g).then(res => setGoals(prev => [...prev, res]))}
            />
            <div className="h-24" /> 
         </div>
 
-        {/* ✅ RESOLUÇÃO DO ERRO DE BUILD: Passando realBalance e user */}
-        <AIAssistant 
-          user={session?.user} 
-          realBalance={financialSummary.balance} 
-        />
+        {accountMode === 'personal' && billing.access.canAccessPersonal && (
+          <AIAssistant user={user} />
+        )}
       </main>
     </div>
   )

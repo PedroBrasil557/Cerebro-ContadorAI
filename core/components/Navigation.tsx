@@ -2,21 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   ArrowLeftRight,
   PieChart,
   Wallet,
-  Calendar,
   Briefcase,
   User,
   LogOut,
   Sparkles,
   RefreshCw,
-  Scissors,
   ShoppingCart,
   Lock,
   ShieldAlert,
@@ -25,7 +21,7 @@ import { ActiveTab } from "@/types";
 import { toast } from "sonner";
 import UpgradeModal from "@/core/components/UpgradeModal";
 import { useRouter } from "next/navigation";
-import { useEntitlements } from "@/core/hooks/useEntitlements";
+import type { Entitlements, PlanCode, ProductAccess } from "@/lib/billing/plans";
 
 interface NavigationProps {
   activeTab: ActiveTab;
@@ -33,8 +29,11 @@ interface NavigationProps {
   onLogout: () => void;
   isOpen: boolean;
   onClose: () => void;
-  user: SupabaseUser;
-  systemRole?: "user" | "admin" | "founder";
+  accountMode: "personal" | "professional";
+  plan: PlanCode;
+  access: ProductAccess;
+  entitlements: Entitlements;
+  refreshEntitlements: () => Promise<void>;
   onAccountModeChange?: (mode: "personal" | "professional") => void;
 }
 
@@ -66,26 +65,21 @@ export default function Navigation({
   onLogout,
   isOpen,
   onClose,
-  user,
-  systemRole = "user",
+  accountMode,
+  plan,
+  access,
+  entitlements,
+  refreshEntitlements,
   onAccountModeChange,
 }: NavigationProps) {
-  const supabase = createClient();
   const router = useRouter();
   const [isSwitching, setIsSwitching] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { plan, entitlements, refresh } = useEntitlements();
-
-  const [accountMode, setAccountMode] = useState<"personal" | "professional">(
-    user.user_metadata?.account_mode === "professional"
-      ? "professional"
-      : "personal",
-  );
   const isFreePlan = plan === "free";
 
   // ✅ AJUSTE: O modo profissional só aparece para parceiros "premium"
-  const hasProfessionalAddon = entitlements.professional;
+  const canSwitchProducts = access.canSwitchProducts;
 
   const theme =
     accountMode === "personal" ? THEMES.personal : THEMES.professional;
@@ -94,15 +88,15 @@ export default function Navigation({
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("success") === "true") {
-      router.replace("/");
-      void refresh();
+      router.replace("/app");
+      void refreshEntitlements();
     }
-  }, [refresh, router]);
+  }, [refreshEntitlements, router]);
 
   const handleRefreshSession = async (isAutomatic = false) => {
     setIsRefreshing(true);
     try {
-      await refresh();
+      await refreshEntitlements();
       if (!isAutomatic) toast.success("Dados sincronizados com sucesso!");
       router.refresh();
     } catch {
@@ -144,7 +138,7 @@ export default function Navigation({
       icon: ShieldAlert,
       isPro: true,
     },
-    ...(systemRole === "founder" || systemRole === "admin"
+    ...(access.canAccessAdmin
       ? [
           {
             id: "admin" as const,
@@ -158,25 +152,29 @@ export default function Navigation({
 
   const professionalMenuItems: MenuItem[] = [
     {
-      id: "nail design",
-      label: "Gestão de Serviços",
-      icon: Scissors,
+      id: "visão do negócio",
+      label: "Visão do Negócio",
+      icon: LayoutDashboard,
       isPro: false,
     },
     {
       id: "caixa empresarial",
-      label: "Caixa Empresarial",
+      label: "Financeiro",
       icon: Briefcase,
       isPro: false,
     },
-    { id: "agenda smart", label: "Agenda Smart", icon: Calendar, isPro: false },
+    ...(access.canAccessAdmin ? [{ id: "admin" as const, label: "Administração", icon: ShieldAlert, isPro: false }] : []),
   ];
 
   const activeMenu =
     accountMode === "personal" ? personalMenuItems : professionalMenuItems;
 
+  const isItemLocked = (item: MenuItem) =>
+    (item.id === 'investimentos' && !entitlements.investments) ||
+    (item.id === 'central de dividas' && !entitlements.debtCenter);
+
   const handleTabClick = (item: MenuItem) => {
-    if (item.isPro && isFreePlan) {
+    if (isItemLocked(item)) {
       setShowUpgradeModal(true);
       onClose();
       return;
@@ -189,17 +187,17 @@ export default function Navigation({
     setIsSwitching(true);
     const newMode = accountMode === "personal" ? "professional" : "personal";
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ account_mode: newMode })
-        .eq("id", user.id);
-      if (error) throw error;
-      setAccountMode(newMode);
+      const response = await fetch('/api/account/mode', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: newMode }),
+      });
+      if (!response.ok) throw new Error('Mode switch rejected');
       onAccountModeChange?.(newMode);
       toast.success(
-        `Modo ${newMode === "personal" ? "Pessoal" : "Empresarial"} ativado!`,
+        `Cérebro.IA ${newMode === "personal" ? "Pessoal" : "Profissional"} ativado.`,
       );
-      onSelectTab(newMode === "personal" ? "dashboard" : "nail design");
+      onSelectTab(newMode === "personal" ? "dashboard" : "visão do negócio");
       router.refresh();
     } catch {
       toast.error("Erro ao alternar modo.");
@@ -245,7 +243,7 @@ export default function Navigation({
           </div>
         </div>
 
-        {hasProfessionalAddon && (
+        {canSwitchProducts && (
           <div className="mb-6 border-y border-white/[0.065] py-3">
             <button
               onClick={toggleAccountMode}
@@ -265,7 +263,7 @@ export default function Navigation({
                 <div className="text-left">
                   <p className="text-[11px] text-[#A0A8B5]">Área atual</p>
                   <p className="mt-0.5 text-sm font-medium text-white">
-                    {accountMode === "personal" ? "Pessoal" : "Empresarial"}
+                    {accountMode === "personal" ? "Cérebro.IA Pessoal" : "Cérebro.IA Profissional"}
                   </p>
                 </div>
               </div>
@@ -292,7 +290,7 @@ export default function Navigation({
           {activeMenu.map((item) => {
             const isActive = activeTab === item.id;
             const Icon = item.icon;
-            const locked = item.isPro && isFreePlan;
+            const locked = isItemLocked(item);
             return (
               <button
                 key={item.id}

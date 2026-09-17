@@ -15,6 +15,8 @@ Supabase Postgres/Auth/Storage · Stripe · Groq · SMTP
 
 O browser nunca recebe chaves privadas. A chave pública do Supabase identifica o projeto, enquanto a sessão do usuário e as políticas RLS determinam quais linhas podem ser acessadas.
 
+`/app` é a rota autenticada canônica. A aplicação resolve produto e permissões no servidor a partir de `subscriptions` e `profiles.system_role`; veja `PRODUCT_ARCHITECTURE.md`.
+
 ## Limites de confiança
 
 Operações diretas ao Supabase são aceitáveis para CRUD de dados pertencentes ao usuário quando a tabela tem RLS habilitada, políticas por `auth.uid()` e privilégios mínimos. O cliente ainda inclui filtros por `user_id` por clareza e eficiência, mas o filtro não substitui RLS.
@@ -41,4 +43,4 @@ Devem passar pelo backend:
 
 ## Fluxos críticos
 
-No billing, o cliente envia apenas o código de plano; o servidor escolhe o Price ID. O webhook valida a assinatura e uma função transacional registra o Event ID antes de atualizar a assinatura. Em IA/OCR, o backend autentica, valida o payload, consulta o entitlement e consome a cota antes de chamar o provedor. No Storage, recibos são privados e entregues por URL assinada temporária.
+No billing, o cliente envia apenas o código de plano; o servidor escolhe Price ID e produto. O webhook valida a assinatura e uma função transacional registra o Event ID antes de atualizar plano + produto. Em IA/OCR, o backend autentica, valida o payload, consulta o entitlement e consome a cota antes de chamar o provedor. O assistente Pessoal e a análise Profissional têm contextos e consultas separados. No Storage, recibos são privados e entregues por URL assinada temporária.

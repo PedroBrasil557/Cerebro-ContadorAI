@@ -12,8 +12,8 @@ const serverEnvSchema = z.object({
   GROQ_API_KEY: z.string().min(1),
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
-  STRIPE_PRICE_PRO: z.string().min(1),
-  STRIPE_PRICE_PREMIUM: z.string().min(1),
+  STRIPE_PRICE_PRO: optionalSecret,
+  STRIPE_PRICE_PREMIUM: optionalSecret,
   SMTP_USER: optionalSecret,
   SMTP_PASS: optionalSecret,
   FOUNDER_USER_ID: optionalSecret,
@@ -30,3 +30,16 @@ export const serverEnv = serverEnvSchema.parse({
   SMTP_PASS: process.env.SMTP_PASS,
   FOUNDER_USER_ID: process.env.FOUNDER_USER_ID,
 })
+
+const stripePriceSchema = z.object({
+  STRIPE_PRICE_PRO: z.string().min(1),
+  STRIPE_PRICE_PREMIUM: z.string().min(1),
+})
+
+/** Validate Stripe prices only inside Stripe request paths, not while unrelated routes are built. */
+export function getStripePriceIds() {
+  return stripePriceSchema.parse({
+    STRIPE_PRICE_PRO: serverEnv.STRIPE_PRICE_PRO,
+    STRIPE_PRICE_PREMIUM: serverEnv.STRIPE_PRICE_PREMIUM,
+  })
+}

@@ -237,7 +237,7 @@ export default function ProfileView() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
             <h1 className="text-4xl font-black tracking-tight mb-2 uppercase italic">Configurações</h1>
-            <p className="text-gray-500 font-medium uppercase tracking-widest text-xs">Identidade Digital e Parâmetros do Cérebro.IA</p>
+            <p className="text-gray-500 font-medium uppercase tracking-widest text-xs">Dados pessoais e preferências da conta</p>
         </div>
         <div className="flex items-center gap-3 bg-emerald-500/10 px-6 py-3 rounded-2xl border border-emerald-500/20">
             <ShieldCheck size={18} className="text-emerald-400" />
@@ -281,8 +281,8 @@ export default function ProfileView() {
                 <h3 className="text-lg font-black text-white uppercase tracking-tight mb-3">Nível de Processamento</h3>
                 <p className="text-xs text-gray-500 mb-8 leading-relaxed font-medium uppercase">
                     {isPro 
-                        ? "Potencial cognitivo máximo ativado. IA operando em 100% da capacidade."
-                        : "Capacidade limitada. Sincronize com o plano PRO para auditoria fiscal e IA estratégica."}
+                        ? "Recursos do plano PRO ativados."
+                        : "Recursos essenciais ativos. Faça upgrade para ampliar análises e limites."}
                 </p>
                 <button type="button" disabled={portalLoading} onClick={handlePlanAction} className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl disabled:opacity-60 ${isPro ? 'bg-white/5 text-gray-400 hover:text-white border border-white/5' : 'bg-white text-black hover:bg-gray-200'}`}>
                     {portalLoading ? 'Abrindo Stripe…' : isPro ? 'Configurar Plano' : 'Ativar Versão PRO'}
@@ -324,11 +324,11 @@ export default function ProfileView() {
 
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2"><Target size={12} className="text-indigo-500"/> Diretriz Financeira Principal</label>
-                        <textarea name="bio" value={profile.bio || ''} onChange={handleChange} disabled={!isEditing} rows={3} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-white text-sm font-medium focus:border-indigo-500/50 outline-none transition-all resize-none disabled:opacity-30" placeholder="Defina seu objetivo para a IA analisar..." />
+                        <textarea name="bio" value={profile.bio || ''} onChange={handleChange} disabled={!isEditing} rows={3} className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-white text-sm font-medium focus:border-indigo-500/50 outline-none transition-all resize-none disabled:opacity-30" placeholder="Conte um pouco sobre seus objetivos financeiros..." />
                     </div>
 
                     <div className="pt-8 border-t border-white/5">
-                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6 italic">Arquitetura Cognitiva</h3>
+                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6">Preferências financeiras</h3>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                              <div 
                                 onClick={() => setIaEnabled(!iaEnabled)}

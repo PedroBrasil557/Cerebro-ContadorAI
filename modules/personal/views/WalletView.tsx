@@ -14,7 +14,7 @@ import { createTransaction } from '@/core/action/transactions' // 🔥 Importado
 import { CreditCard as CreditCardType, Transaction } from '@/types_db'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
-import type { User } from '@supabase/supabase-js'
+import { useEntitlements } from '@/core/hooks/useEntitlements'
 
 // --- TIPAGENS ---
 interface CardUI extends CreditCardType {
@@ -28,10 +28,6 @@ interface BankAccount {
   name: string
   balance: number
   color: string
-}
-
-interface WalletViewProps {
-  user: User
 }
 
 const CARD_GRADIENTS = [
@@ -97,7 +93,7 @@ const CreditCardComponent = ({ card, onDelete }: { card: CardUI, onDelete: (id: 
   )
 }
 
-export default function WalletView({ user }: WalletViewProps) {
+export default function WalletView() {
   const [loading, setLoading] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [cards, setCards] = useState<CardUI[]>([])
@@ -109,7 +105,7 @@ export default function WalletView({ user }: WalletViewProps) {
   const [generatingStrategy, setGeneratingStrategy] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
 
-  const userPlan = user?.user_metadata?.plan_tier || 'free'
+  const { plan: userPlan } = useEntitlements()
   const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
 
   const loadData = async () => {
@@ -192,8 +188,7 @@ export default function WalletView({ user }: WalletViewProps) {
     if (cards.length === 0) return toast.error("Adicione um cartão primeiro.")
     setGeneratingStrategy(true)
     try {
-        const cardData = `Cartão: ${cards[0].name} (Limite: R$ ${cards[0].limit_amount}, Uso: R$ ${cards[0].current_invoice})`
-        const response = await fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: "Estratégia para aumento de limite.", context: { context: cardData } }) })
+        const response = await fetch('/api/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: "Como posso planejar um pedido de aumento de limite com responsabilidade?" }) })
         const data = await response.json()
         if (!response.ok) throw new Error(data.error || 'Falha ao consultar a IA.')
         setAiLimitStrategy(data.response)

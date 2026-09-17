@@ -9,6 +9,8 @@ interface Metrics {
   freeUsers: number
   proUsers: number
   premiumUsers: number
+  personalSubscribers: number
+  professionalSubscribers: number
   activeSubscriptions: number
   pastDueSubscriptions: number
   canceledSubscriptions: number
@@ -37,7 +39,7 @@ export default function FounderDashboard() {
 
   const cards = [
     ['Usuários totais', metrics.totalUsers, Users], ['Ativos em 30d', metrics.activeUsers, Activity],
-    ['FREE', metrics.freeUsers, Users], ['PRO', metrics.proUsers, Crown], ['PREMIUM', metrics.premiumUsers, Crown],
+    ['Sem assinatura', metrics.freeUsers, Users], ['Cérebro.IA Pessoal', metrics.personalSubscribers, Crown], ['Cérebro.IA Profissional', metrics.professionalSubscribers, Crown],
     ['Assinaturas ativas', metrics.activeSubscriptions, Activity], ['Past due', metrics.pastDueSubscriptions, AlertTriangle],
     ['Cancelamentos', metrics.canceledSubscriptions, AlertTriangle], ['Uso de IA', metrics.aiUsage, Bot],
     ['Uso de OCR', metrics.ocrUsage, ScanLine], ['Novos em 7d', metrics.newUsers7d, UserPlus], ['Novos em 30d', metrics.newUsers30d, UserPlus],

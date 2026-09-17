@@ -1,4 +1,4 @@
-import { RateLimitError, ValidationError } from '@/lib/api/errors'
+import { ForbiddenError, RateLimitError, ValidationError } from '@/lib/api/errors'
 import { errorResponse, successResponse } from '@/lib/api/response'
 import { requireUser } from '@/lib/auth/requireUser'
 import { getUserEntitlements } from '@/lib/billing/getEntitlements'
@@ -24,7 +24,10 @@ export async function POST(request: Request) {
     }
 
     const billing = await getUserEntitlements(user.id)
-    const usage = await checkUsageLimit(user.id, 'ocr', billing.plan)
+    if (!billing.access.canAccessPersonal) {
+      throw new ForbiddenError('O reconhecimento de cupons pertence ao produto Pessoal.')
+    }
+    const usage = await checkUsageLimit(user.id, 'ocr', billing.entitlements)
     if (!usage.allowed) throw new RateLimitError('Limite mensal de OCR atingido.')
 
     const { default: Tesseract } = await import('tesseract.js')

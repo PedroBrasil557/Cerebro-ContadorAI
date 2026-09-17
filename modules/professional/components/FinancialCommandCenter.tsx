@@ -7,7 +7,9 @@ import {
   ShieldCheck, AlertTriangle, Target, Calculator, Users, Loader2
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import { businessFinanceService } from '@/services/businessFinanceService'
+import { finiteNumber, summarizeBusinessFinance } from '@/lib/business/finance'
+import { cfoRulesEngine } from '@/modules/cfo/cfoRulesEngine'
 
 import CostEngineeringPanel from './CostEngineeringPanel'
 import FinancialCrmPanel from './FinancialCrmPanel'
@@ -21,11 +23,10 @@ interface HealthData {
   profit_margin_pct: number
   stability_index: number
   safe_pro_labore: number
-  reinvestment_pool: number
+  tax_reserve: number | null
 }
 
 export default function FinancialCommandCenter() {
-  const supabase = createClient()
   const [activeSubTab, setActiveSubTab] = useState<'visao_geral' | 'custos' | 'crm' | 'decisao'>('visao_geral')
   
   // 🟢 ESTADOS REAIS DO SISTEMA
@@ -37,65 +38,46 @@ export default function FinancialCommandCenter() {
     profit_margin_pct: 0,
     stability_index: 0,
     safe_pro_labore: 0,
-    reinvestment_pool: 0,
+    tax_reserve: null,
   })
 
   // 🧠 MOTOR DE CÁLCULO FINANCEIRO (BUSCA NO BANCO)
   useEffect(() => {
     const fetchRealData = async () => {
       setIsLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      // 1. Pegar o início do mês atual para filtrar transações
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-      // 2. Buscar Transações (Faturamento)
-      const { data: txs } = await supabase
-        .from('transactions')
-        .select('amount, type')
-        .eq('user_id', user.id)
-        .eq('scope', 'business')
-        .gte('date', startOfMonth)
-
-      // 3. Buscar Insumos (Custos)
-      const { data: materials } = await supabase
-        .from('nail_products')
-        .select('cost_per_application')
-        .eq('user_id', user.id)
+      const { transactions: txs, workspace, settings } = await businessFinanceService.getDashboardData()
 
       // 🧮 MATEMÁTICA
       let grossRev = 0
       let totalAppointments = 0 // Simulação baseada em número de receitas
 
       if (txs) {
-        txs.forEach((tx: { amount: number; type: string }) => {
+        txs.forEach((tx) => {
           if (tx.type === 'receita') {
-            grossRev += Number(tx.amount)
+            grossRev += finiteNumber(tx.amount)
             totalAppointments += 1
           }
         })
       }
 
-      // Custo dos materiais por cada atendimento feito
-      const materialCostPerApp = materials
-        ? materials.reduce(
-          (acc: number, curr: { cost_per_application: number | null }) =>
-            acc + Number(curr.cost_per_application || 0),
-          0
-        )
-        : 0
-      const totalMaterialCost = materialCostPerApp * totalAppointments
-      
-      const registeredExpenses = (txs ?? [])
-        .filter((tx: { type: string }) => tx.type === 'despesa_fixa' || tx.type === 'despesa_variavel')
-        .reduce((sum: number, tx: { amount: number }) => sum + Math.abs(Number(tx.amount)), 0)
-      const netProfit = grossRev - totalMaterialCost - registeredExpenses
+      const confirmedTaxRate = workspace.tax_rate_confirmed_at
+        ? workspace.tax_rate
+        : settings?.tax_rate_confirmed_at
+          ? settings.tax_rate
+          : null
+      const summary = summarizeBusinessFinance(txs, { taxRate: confirmedTaxRate, monthlyGoal: settings?.monthly_goal ?? null })
+      const netProfit = summary.balance - (summary.taxReserve ?? 0)
       const margin = grossRev > 0 ? (netProfit / grossRev) * 100 : 0
-      
-      const safeProLabore = 0
-      const reinvestment = 0
+      const currentBalance = (Number.isFinite(Number(settings?.current_balance)) ? Number(settings?.current_balance) : 0) + summary.balance
+      const metrics = {
+        revenue: summary.revenue,
+        expenses: summary.expenses,
+        cashReserve: Math.max(currentBalance, 0),
+        taxRate: confirmedTaxRate,
+        activeClients: 0,
+        totalHoursWorked: 0,
+      }
+      const safeProLabore = confirmedTaxRate === null ? 0 : cfoRulesEngine.calculateSafeDraw(metrics)
 
       // Algoritmo do Índice de Estabilidade (0 a 100)
       let stability = 0
@@ -107,12 +89,12 @@ export default function FinancialCommandCenter() {
 
       setHealth({
         gross_revenue: grossRev,
-        net_profit: netProfit > 0 ? netProfit : 0,
+        net_profit: netProfit,
         average_ticket: totalAppointments > 0 ? grossRev / totalAppointments : 0,
-        profit_margin_pct: margin > 0 ? margin : 0,
+        profit_margin_pct: margin,
         stability_index: stability,
         safe_pro_labore: safeProLabore,
-        reinvestment_pool: reinvestment,
+        tax_reserve: summary.taxReserve,
       })
 
       setIsLoading(false)
@@ -121,7 +103,7 @@ export default function FinancialCommandCenter() {
     if (activeSubTab === 'visao_geral') {
       fetchRealData()
     }
-  }, [activeSubTab, supabase])
+  }, [activeSubTab])
 
   // Lógica visual do Índice de Estabilidade
   const getIndexColor = (index: number) => {
@@ -144,19 +126,19 @@ export default function FinancialCommandCenter() {
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
             <Activity className="text-pink-500" />
-            Command Center
+            Visão do Negócio
           </h2>
           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
-            Gestão Financeira Estratégica
+            Indicadores baseados nos dados registrados
           </p>
         </div>
 
         <div className="flex items-center p-1 bg-[#050505] border border-white/5 rounded-xl shadow-inner overflow-x-auto scrollbar-none">
           {[
             { id: 'visao_geral', label: 'Visão Geral', icon: Activity },
-            { id: 'custos', label: 'Engenharia de Preços', icon: Calculator },
-            { id: 'crm', label: 'CRM Financeiro', icon: Users },
-            { id: 'decisao', label: 'Modo Decisão', icon: Target }
+            { id: 'custos', label: 'Custos e preços', icon: Calculator },
+            { id: 'crm', label: 'Clientes', icon: Users },
+            { id: 'decisao', label: 'Simulador', icon: Target }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -212,7 +194,7 @@ export default function FinancialCommandCenter() {
                     Margem: {health.profit_margin_pct.toFixed(1)}%
                   </span>
                 </div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Lucro Líquido Estimado</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest relative z-10">Resultado estimado</p>
                 <h3 className="text-3xl font-black text-white mt-1 relative z-10">{formatCurrency(health.net_profit)}</h3>
               </div>
             </div>
@@ -221,12 +203,12 @@ export default function FinancialCommandCenter() {
                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Distribuição pendente de configuração <span className="ml-2 text-amber-400">ESTIMATIVA</span></h4>
                <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Pró-Labore não configurado</p>
-                     <p className="text-xl font-black text-emerald-400">{formatCurrency(health.safe_pro_labore)}</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Retirada estimada</p>
+                     <p className="text-xl font-black text-emerald-400">{health.tax_reserve === null ? 'Dados insuficientes' : formatCurrency(health.safe_pro_labore)}</p>
                   </div>
                   <div className="flex-1 bg-[#0a0a0c] border border-white/5 rounded-2xl p-4">
-                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Reinvestimento não configurado</p>
-                     <p className="text-xl font-black text-white">{formatCurrency(health.reinvestment_pool)}</p>
+                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Reserva para impostos</p>
+                     <p className="text-xl font-black text-white">{health.tax_reserve === null ? 'Não configurada' : formatCurrency(health.tax_reserve)}</p>
                   </div>
                </div>
             </div>
@@ -274,7 +256,7 @@ export default function FinancialCommandCenter() {
                     <div className="bg-rose-500/10 p-4 rounded-2xl border border-rose-500/20 backdrop-blur-sm flex gap-3 items-start">
                        <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />
                        <p className="text-xs text-rose-200 leading-relaxed">
-                         Alerta: Sua margem está abaixo de 40%. Vá até a aba &quot;Engenharia de Preços&quot; para recalcular seus custos urgentemente.
+                         Sua margem está abaixo de 40%. Revise seus custos e preços para entender onde ela pode ser melhorada.
                        </p>
                     </div>
                   )}

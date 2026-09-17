@@ -8,18 +8,18 @@
 | OCR por mês | 3 | 50 | 100 |
 | Cartões | 3 | ilimitado | ilimitado |
 | Metas | 3 | ilimitado | ilimitado |
-| Investimentos e dívidas | bloqueado | liberado | liberado |
-| Modo profissional | bloqueado | bloqueado | liberado |
+| Investimentos e dívidas | bloqueado | liberado | não pertence ao produto |
+| Produto profissional | bloqueado | bloqueado | liberado |
 
-Somente `active` e `trialing` concedem acesso pago. `past_due`, `canceled`, `incomplete` e `unpaid` retornam os entitlements FREE.
+Somente `active` e `trialing` concedem acesso pago. `past_due`, `canceled`, `incomplete` e `unpaid` retornam o usuário comum ao produto Pessoal FREE. `subscriptions.product` é a fonte do produto e metadata não autoriza acesso.
 
 ## Checkout
 
-`POST /api/checkout` aceita apenas `{ "plan": "pro" | "premium" }`. O servidor resolve o Price ID pelas variáveis privadas e vincula a sessão ao usuário autenticado. O cliente nunca decide o Price ID nem o plano final persistido.
+`POST /api/checkout` aceita apenas `{ "plan": "pro" | "premium" }`. O servidor resolve Price ID e produto pelas variáveis privadas e pelo mapeamento interno. O cliente nunca decide Price ID, plano ou produto persistido.
 
 ## Webhook
 
-`POST /api/webhooks/stripe` valida o corpo bruto com `STRIPE_WEBHOOK_SECRET`. Eventos relevantes são normalizados e enviados à função `process_stripe_subscription_event`. `stripe_events.event_id` impede reprocessamento do mesmo evento.
+`POST /api/webhooks/stripe` valida o corpo bruto com `STRIPE_WEBHOOK_SECRET`. Eventos relevantes são normalizados e enviados à função `process_stripe_subscription_event_v2`. `stripe_events.event_id` impede reprocessamento do mesmo evento.
 
 Eventos cobertos incluem criação, atualização e exclusão de assinatura, checkout concluído, pagamento de fatura e falha de pagamento. Eventos desconhecidos retornam sucesso sem mutação para evitar retries desnecessários.
 

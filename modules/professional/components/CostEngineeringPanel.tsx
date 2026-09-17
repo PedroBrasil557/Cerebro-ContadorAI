@@ -1,312 +1,270 @@
 'use client'
 
-import React, { useCallback, useMemo, useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Package, Sliders, TrendingUp, AlertTriangle, CheckCircle2, Plus, X, Loader2, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Package,
+  Plus,
+  Sliders,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { toast } from 'sonner'
+import { businessFinanceService } from '@/services/businessFinanceService'
 import { formatCurrency } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
+import type { BusinessCostItem, Transaction } from '@/types_db'
 
-interface NailProduct {
-  id: string
-  name: string
-  category: string
-  purchase_price: number
-  quantity: number
-  estimated_yield: number
-  cost_per_application: number
-  status: string
+const initialForm = {
+  name: '',
+  category: 'Matéria-prima',
+  purchase_price: '',
+  quantity: '',
+  estimated_yield: '',
 }
-
 export default function CostEngineeringPanel() {
-  const supabase = useMemo(() => createClient(), [])
-  
-  const [materials, setMaterials] = useState<NailProduct[]>([])
-  const [fixedCostPerService, setFixedCostPerService] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [currentPrice, setCurrentPrice] = useState<number>(120)
-  
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [newMat, setNewMat] = useState({ name: '', category: 'gel', purchase_price: '', quantity: '', estimated_yield: '' })
+  const [items, setItems] = useState<BusinessCostItem[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [salePrice, setSalePrice] = useState(120)
+  const [form, setForm] = useState(initialForm)
 
-  const fetchMaterials = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-      const [{ data, error }, { data: transactions, error: transactionError }] = await Promise.all([
-        supabase.from('nail_products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('transactions').select('amount, type').eq('user_id', user.id).eq('scope', 'business').gte('date', monthStart),
-      ])
-      
-      if (error) {
-         console.error("Erro ao buscar insumos:", error)
-      } else if (data) {
-         setMaterials(data)
-      }
-      if (transactionError) {
-        console.error("Erro ao buscar custos fixos:", transactionError)
-      } else {
-        const serviceCount = (transactions ?? []).filter(tx => tx.type === 'receita').length
-        const fixedCosts = (transactions ?? [])
-          .filter(tx => tx.type === 'despesa_fixa')
-          .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
-        setFixedCostPerService(serviceCount > 0 && fixedCosts > 0 ? fixedCosts / serviceCount : null)
-      }
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await businessFinanceService.getDashboardData()
+      setItems(data.costs)
+      setTransactions(data.transactions)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível carregar os custos.')
+    } finally {
+      setLoading(false)
     }
-    setIsLoading(false)
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
-    void fetchMaterials()
-  }, [fetchMaterials])
+    void load()
+  }, [load])
 
-  // 💾 NOVA FUNÇÃO BLINDADA (COM AVISO DE ERROS)
-  const handleAddMaterial = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    
+  const pricing = useMemo(() => {
+    const revenueEntries = transactions.filter((item) => item.type === 'receita')
+    const fixedCosts = transactions
+      .filter((item) => item.type === 'despesa_fixa')
+      .reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
+    const itemsWithoutYield = items.filter((item) => item.cost_per_use === null || item.cost_per_use === undefined)
+    const costPerUse = items.reduce((sum, item) => sum + Math.max(Number(item.cost_per_use) || 0, 0), 0)
+    const fixedAllocation = revenueEntries.length > 0 ? fixedCosts / revenueEntries.length : null
+    const hasReliableBase = items.length > 0 && itemsWithoutYield.length === 0 && fixedAllocation !== null
+    const estimatedCost = hasReliableBase ? costPerUse + fixedAllocation : null
+    const estimatedResult = estimatedCost === null ? null : salePrice - estimatedCost
+    const estimatedMargin = salePrice > 0 && estimatedResult !== null
+      ? (estimatedResult / salePrice) * 100
+      : null
+
+    return {
+      revenueEntryCount: revenueEntries.length,
+      fixedCosts,
+      fixedAllocation,
+      costPerUse,
+      itemsWithoutYield: itemsWithoutYield.length,
+      estimatedCost,
+      estimatedResult,
+      estimatedMargin,
+    }
+  }, [items, salePrice, transactions])
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError || !user) {
-        alert("Erro de Autenticação: Sua sessão pode ter expirado. Recarregue a página.")
-        setIsSubmitting(false)
-        return
-      }
-
-      const insertPayload = {
-        user_id: user.id,
-        name: newMat.name,
-        category: newMat.category,
-        purchase_price: parseFloat(newMat.purchase_price),
-        quantity: parseFloat(newMat.quantity),
-        estimated_yield: parseInt(newMat.estimated_yield, 10),
-        status: 'ok'
-      }
-
-      console.log("Enviando para o Supabase:", insertPayload)
-
-      const { error } = await supabase.from('nail_products').insert(insertPayload)
-
-      if (error) {
-        console.error("Erro do Supabase:", error)
-        alert(`O banco de dados bloqueou o salvamento: ${error.message}`)
-      } else {
-        setIsModalOpen(false)
-        setNewMat({ name: '', category: 'gel', purchase_price: '', quantity: '', estimated_yield: '' })
-        fetchMaterials() // Recarrega a lista instantaneamente
-      }
-    } catch (err) {
-      console.error("Erro fatal inesperado:", err)
-      alert("Ocorreu um erro no sistema ao tentar salvar.")
+      await businessFinanceService.createCostItem({
+        name: form.name,
+        category: form.category,
+        purchase_price: Number(form.purchase_price),
+        quantity: form.quantity ? Number(form.quantity) : null,
+        estimated_yield: form.estimated_yield ? Number(form.estimated_yield) : null,
+      })
+      setModalOpen(false)
+      setForm(initialForm)
+      await load()
+      toast.success('Item de custo salvo.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível salvar o item.')
     } finally {
-      setIsSubmitting(false)
+      setSubmitting(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { error } = await supabase.from('nail_products').delete().eq('id', id).eq('user_id', user.id)
-    if (error) {
-       alert(`Erro ao deletar: ${error.message}`)
-    } else {
-       fetchMaterials()
+  const remove = async (id: string) => {
+    try {
+      await businessFinanceService.deleteCostItem(id)
+      await load()
+    } catch {
+      toast.error('Não foi possível remover o item.')
     }
   }
 
-  const totalMaterialCost = materials.reduce((acc, curr) => acc + Number(curr.cost_per_application || 0), 0)
-  const dataState = materials.length === 0
-    ? 'missing_data'
-    : fixedCostPerService === null ? 'estimated' : 'real'
-  const totalRealCost = totalMaterialCost + (fixedCostPerService ?? 0)
-  
-  const netProfit = currentPrice - totalRealCost
-  const profitMarginPct = currentPrice > 0 ? ((netProfit / currentPrice) * 100) : 0
-
-  const getMarginColor = (margin: number) => {
-    if (margin >= 60) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-    if (margin >= 40) return 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-    return 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-  }
+  const marginTone = pricing.estimatedMargin === null
+    ? 'border-gray-500/20 bg-gray-500/10 text-gray-300'
+    : pricing.estimatedMargin >= 40
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+      : pricing.estimatedMargin >= 20
+        ? 'border-amber-500/20 bg-amber-500/10 text-amber-200'
+        : 'border-rose-500/20 bg-rose-500/10 text-rose-200'
 
   return (
     <div className="relative h-full">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        
-        {/* PAINEL ESQUERDO: A Estrutura de Custos */}
-        <div className="bg-[#0a0a0c] border border-white/5 rounded-3xl p-6 shadow-2xl relative overflow-hidden flex flex-col h-[600px]">
-          <div className="flex items-center justify-between mb-6 relative z-10">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid gap-6 xl:grid-cols-2">
+        <section className="flex min-h-[600px] flex-col overflow-hidden rounded-3xl border border-white/5 bg-[#0a0a0c] p-6 shadow-2xl">
+          <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                <Package size={20} strokeWidth={2.5} />
-              </div>
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-2.5 text-indigo-400"><Package size={20} /></div>
               <div>
-                <h3 className="text-lg font-black text-white tracking-tight">Custo por Serviço</h3>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Seus Insumos Reais</p>
+                <h3 className="text-lg font-black text-white">Estrutura de custos</h3>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Custos por uso e custos fixos registrados</p>
               </div>
             </div>
-            
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors"
-            >
-              <Plus size={14} /> Novo Insumo
+            <button type="button" onClick={() => setModalOpen(true)} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700">
+              <Plus size={14} /> Novo item
             </button>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 relative z-10 mb-6">
-            {isLoading ? (
-               <div className="h-full flex items-center justify-center text-indigo-400">
-                  <Loader2 className="animate-spin h-8 w-8" />
-               </div>
-            ) : materials.length === 0 ? (
-               <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-white/5 rounded-2xl">
-                  <Package size={32} className="text-gray-600 mb-3" />
-                  <p className="text-sm font-bold text-gray-400">Nenhum insumo cadastrado</p>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Adicione seu Gel, Fibra e Top Coat.</p>
-               </div>
+          <div className="mb-6 flex-1 space-y-3 overflow-y-auto pr-2">
+            {loading ? (
+              <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-indigo-400" /></div>
+            ) : items.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-white/5 p-6 text-center text-gray-500">
+                <Package size={32} className="mb-3" />
+                <p className="text-sm font-bold text-gray-400">Nenhum custo por uso cadastrado</p>
+                <p className="mt-1 text-xs">Ex.: matéria-prima, embalagem, licença, deslocamento ou insumo.</p>
+              </div>
             ) : (
-              materials.map((mat) => (
-                <div key={mat.id} className="flex items-center justify-between p-3 rounded-2xl bg-[#050505] border border-white/5 hover:border-white/10 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${mat.status === 'ok' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                    <div>
-                       <span className="text-sm font-bold text-gray-300 block">{mat.name}</span>
-                       <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">
-                         Pagou {formatCurrency(mat.purchase_price)} • Rende {mat.estimated_yield} clientes
-                       </span>
-                    </div>
+              items.map((item) => (
+                <div key={item.id} className="group flex items-center justify-between rounded-2xl border border-white/5 bg-[#050505] p-4 hover:border-white/10">
+                  <div>
+                    <p className="font-bold text-white">{item.name}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                      {item.category} · compra {formatCurrency(item.purchase_price)}
+                      {item.estimated_yield ? ` · base ${item.estimated_yield} usos` : ''}
+                    </p>
                   </div>
                   <div className="flex items-center gap-4">
-                     <span className="text-sm font-black text-indigo-400">{formatCurrency(mat.cost_per_application)}</span>
-                     <button onClick={() => handleDelete(mat.id)} className="text-gray-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Trash2 size={14} />
-                     </button>
+                    <p className="text-right text-sm font-black text-indigo-300">
+                      {item.cost_per_use == null ? 'Rendimento não informado' : `${formatCurrency(item.cost_per_use)} / uso`}
+                    </p>
+                    <button type="button" aria-label={`Remover ${item.name}`} onClick={() => void remove(item.id)} className="text-gray-600 opacity-0 transition group-hover:opacity-100 hover:text-rose-400">
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
               ))
             )}
-            
-            {materials.length > 0 && (
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/5 border-dashed">
-                <span className="text-sm font-bold text-gray-500">Rateio Custo Fixo (Aluguel/Energia)</span>
-                <span className="text-sm font-black text-gray-500">{fixedCostPerService === null ? 'Não informado' : formatCurrency(fixedCostPerService)}</span>
+
+            <div className="flex items-center justify-between rounded-2xl border border-dashed border-white/5 bg-white/[0.02] p-4">
+              <div>
+                <p className="text-sm font-bold text-gray-400">Rateio de custos fixos</p>
+                <p className="text-[10px] text-gray-600">
+                  {pricing.revenueEntryCount > 0
+                    ? `${formatCurrency(pricing.fixedCosts)} divididos por ${pricing.revenueEntryCount} lançamentos de receita observados`
+                    : 'Sem lançamentos de receita para formar uma base de rateio'}
+                </p>
               </div>
-            )}
-          </div>
-
-          <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-center justify-between relative z-10">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-widest">Custo total <span className="text-amber-400">{dataState === 'real' ? 'REAL' : dataState === 'estimated' ? 'PARCIAL' : 'DADOS AUSENTES'}</span></span>
-            <span className="text-xl font-black text-indigo-400">{formatCurrency(totalRealCost)}</span>
-          </div>
-        </div>
-
-        {/* PAINEL DIREITO: Simulador */}
-        <div className="bg-[#050505] border border-white/5 rounded-3xl p-6 shadow-inner flex flex-col relative overflow-hidden h-[600px]">
-          <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[100px] pointer-events-none transition-colors duration-500 ${profitMarginPct >= 60 ? 'bg-emerald-500/5' : profitMarginPct >= 40 ? 'bg-amber-500/5' : 'bg-rose-500/5'}`} />
-
-          <div className="flex items-center gap-3 mb-8 relative z-10">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <Sliders size={20} strokeWidth={2.5} />
+              <p className="text-sm font-black text-gray-300">
+                {pricing.fixedAllocation === null ? 'Dados insuficientes' : formatCurrency(pricing.fixedAllocation)}
+              </p>
             </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Custos por uso</p>
+              <p className="mt-1 text-xl font-black text-white">{formatCurrency(pricing.costPerUse)}</p>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Rateio fixo</p>
+              <p className="mt-1 text-xl font-black text-white">{pricing.fixedAllocation === null ? '—' : formatCurrency(pricing.fixedAllocation)}</p>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Custo estimado</p>
+              <p className="mt-1 text-xl font-black text-white">{pricing.estimatedCost === null ? 'Dados insuficientes' : formatCurrency(pricing.estimatedCost)}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative flex min-h-[600px] flex-col overflow-hidden rounded-3xl border border-white/5 bg-[#050505] p-6 shadow-inner">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-2.5 text-blue-400"><Sliders size={20} /></div>
             <div>
-              <h3 className="text-lg font-black text-white tracking-tight">Simulador de Preço</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Baseado nos seus custos reais</p>
+              <h3 className="text-lg font-black text-white">Simulador de preço</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Estimativa baseada nos dados registrados</p>
             </div>
           </div>
 
-          <div className="mb-8 relative z-10">
-            <div className="flex justify-between items-end mb-4">
-              <label className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Preço Cobrado da Cliente</label>
-              <span className="text-3xl font-black text-white tracking-tighter">{formatCurrency(currentPrice)}</span>
-            </div>
-            <input 
-              type="range" min="50" max="350" step="5" value={currentPrice}
-              onChange={(e) => setCurrentPrice(Number(e.target.value))}
-              className="w-full h-2 bg-black/50 rounded-lg appearance-none cursor-pointer accent-blue-500"
-            />
-          </div>
+          <label className="mb-8 block">
+            <span className="mb-3 flex items-end justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Preço informado</span>
+              <span className="text-3xl font-black text-white">{formatCurrency(salePrice)}</span>
+            </span>
+            <input type="range" min="0" max="5000" step="5" value={salePrice} onChange={(event) => setSalePrice(Number(event.target.value))} className="w-full accent-blue-500" />
+          </label>
 
-          <div className="grid grid-cols-2 gap-4 flex-1 relative z-10">
-            <div className={`p-5 rounded-2xl border transition-colors duration-300 flex flex-col justify-center items-center text-center ${getMarginColor(profitMarginPct)}`}>
-              <p className="text-[10px] font-black uppercase tracking-widest mb-2">Margem de Lucro</p>
-              <span className="text-4xl font-black tracking-tighter">{profitMarginPct.toFixed(1)}%</span>
+          <div className="grid flex-1 grid-cols-2 gap-4">
+            <div className={`flex flex-col items-center justify-center rounded-2xl border p-5 text-center ${marginTone}`}>
+              <p className="text-[10px] font-black uppercase tracking-widest">Margem estimada</p>
+              <p className="mt-2 text-4xl font-black">{pricing.estimatedMargin === null ? '—' : `${pricing.estimatedMargin.toFixed(1)}%`}</p>
             </div>
-
-            <div className="p-5 rounded-2xl bg-[#0a0a0c] border border-white/5 flex flex-col justify-center items-center text-center">
-              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">Lucro Limpo no Bolso</p>
-              <span className={`text-3xl font-black tracking-tighter ${netProfit > 0 ? 'text-white' : 'text-rose-500'}`}>
-                {formatCurrency(netProfit)}
-              </span>
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#0a0a0c] p-5 text-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Resultado estimado</p>
+              <p className={`mt-2 text-3xl font-black ${(pricing.estimatedResult ?? 0) >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                {pricing.estimatedResult === null ? 'Dados insuficientes' : formatCurrency(pricing.estimatedResult)}
+              </p>
             </div>
           </div>
 
-          <div className="mt-6 p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-3 relative z-10">
-            {profitMarginPct >= 60 ? <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" /> : profitMarginPct >= 40 ? <TrendingUp size={16} className="text-amber-400 shrink-0 mt-0.5" /> : <AlertTriangle size={16} className="text-rose-400 shrink-0 mt-0.5" />}
-            <p className="text-xs text-gray-400 font-medium leading-relaxed">
-              {profitMarginPct >= 60 ? "Excelente! Sua margem está no padrão Ouro. O seu esforço está sendo muito bem remunerado baseado nos seus insumos." : profitMarginPct >= 40 ? "Sua margem está na média. Cuidado com desperdício de produto para não diminuir seu rendimento." : "Alerta Crítico: Você está pagando para trabalhar. O custo dos seus materiais está engolindo seu preço."}
+          <div className="mt-6 flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs leading-relaxed text-amber-100">
+            {pricing.estimatedCost === null ? <AlertTriangle size={16} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" />}
+            <p>
+              {pricing.estimatedCost === null
+                ? `Dados insuficientes para calcular: ${items.length === 0 ? 'cadastre custos por uso; ' : ''}${pricing.itemsWithoutYield > 0 ? 'informe o rendimento dos itens; ' : ''}${pricing.revenueEntryCount === 0 ? 'registre receitas para formar a base de rateio.' : ''}`
+                : 'A estimativa considera custos por uso e rateio dos custos fixos registrados. Tributos não foram assumidos e outros gastos podem alterar o resultado.'}
             </p>
           </div>
-        </div>
+        </section>
       </motion.div>
 
-      {/* 🟢 MODAL DE ADICIONAR INSUMO */}
       <AnimatePresence>
-        {isModalOpen && (
+        {modalOpen ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-            
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-[#0a0a0c] border border-white/10 rounded-3xl p-6 shadow-2xl w-full max-w-md relative z-10">
-              <div className="flex justify-between items-center mb-6">
-                 <h3 className="text-lg font-black text-white">Novo Insumo</h3>
-                 <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white transition-colors">
-                    <X size={20} />
-                 </button>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+            <motion.form onSubmit={submit} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} className="relative z-10 w-full max-w-md space-y-4 rounded-3xl border border-white/10 bg-[#0a0a0c] p-6">
+              <div className="flex items-center justify-between">
+                <div><h3 className="font-bold text-white">Novo item de custo</h3><p className="text-xs text-gray-500">Use categorias adequadas ao seu negócio.</p></div>
+                <button type="button" onClick={() => setModalOpen(false)} aria-label="Fechar"><X /></button>
               </div>
-
-              <form onSubmit={handleAddMaterial} className="space-y-4">
-                <div>
-                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Nome do Produto</label>
-                  <input required type="text" value={newMat.name} onChange={e => setNewMat({...newMat, name: e.target.value})} placeholder="Ex: Gel Construtor Vòlia" className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500" />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Preço Pago (R$)</label>
-                    <input required type="number" step="0.01" min="0" value={newMat.purchase_price} onChange={e => setNewMat({...newMat, purchase_price: e.target.value})} placeholder="Ex: 120.00" className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Categoria</label>
-                    <select value={newMat.category} onChange={e => setNewMat({...newMat, category: e.target.value})} className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500 appearance-none">
-                      <option value="gel">Gel/Fibra</option>
-                      <option value="prep">Preparadores</option>
-                      <option value="esmalte">Esmaltes</option>
-                      <option value="descartavel">Descartáveis</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Qtd (g/ml)</label>
-                     <input required type="number" step="0.01" min="0" value={newMat.quantity} onChange={e => setNewMat({...newMat, quantity: e.target.value})} placeholder="Ex: 24" className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500" />
-                  </div>
-                  <div>
-                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block">Rende Clientes</label>
-                     <input required type="number" min="1" value={newMat.estimated_yield} onChange={e => setNewMat({...newMat, estimated_yield: e.target.value})} placeholder="Ex: 30" className="w-full bg-[#050505] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-indigo-500" />
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                   <button disabled={isSubmitting} type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-                     {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Salvar Insumo no Cérebro'}
-                   </button>
-                </div>
-              </form>
-            </motion.div>
+              <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Nome, ex.: embalagem" className="w-full rounded-xl border border-white/10 bg-black p-3 text-white" />
+              <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} className="w-full rounded-xl border border-white/10 bg-black p-3 text-white">
+                <option>Matéria-prima</option>
+                <option>Embalagem</option>
+                <option>Licença</option>
+                <option>Deslocamento</option>
+                <option>Insumo</option>
+                <option>Geral</option>
+              </select>
+              <div className="grid grid-cols-2 gap-4">
+                <input required type="number" min="0" step="0.01" value={form.purchase_price} onChange={(event) => setForm({ ...form, purchase_price: event.target.value })} placeholder="Preço de compra" className="rounded-xl border border-white/10 bg-black p-3 text-white" />
+                <input type="number" min="0" step="0.01" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} placeholder="Quantidade (opcional)" className="rounded-xl border border-white/10 bg-black p-3 text-white" />
+              </div>
+              <input type="number" min="0.01" step="0.01" value={form.estimated_yield} onChange={(event) => setForm({ ...form, estimated_yield: event.target.value })} placeholder="Rendimento estimado em usos (opcional)" className="w-full rounded-xl border border-white/10 bg-black p-3 text-white" />
+              <button disabled={submitting} className="w-full rounded-xl bg-indigo-600 p-3 font-bold text-white disabled:opacity-50">
+                {submitting ? 'Salvando…' : 'Salvar item'}
+              </button>
+            </motion.form>
           </div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   )

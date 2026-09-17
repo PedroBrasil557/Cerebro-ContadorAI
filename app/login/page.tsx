@@ -48,7 +48,7 @@ export default function AuthPage() {
         })
         if (error) throw error
         toast.success('Acesso liberado. Bem-vindo de volta!')
-        router.push('/') // 🔥 CORRIGIDO PARA A ROTA PRINCIPAL
+        router.push('/app')
       } 
       else if (view === 'register') {
         if (formData.fullName.trim().length < 2) {
@@ -78,7 +78,7 @@ export default function AuthPage() {
         }
 
         toast.success('Conta criada com sucesso!')
-        router.push('/')
+        router.push('/app')
       }
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Erro na autenticação. Verifique seus dados.')

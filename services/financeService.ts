@@ -2,12 +2,12 @@ import { createClient } from '@/lib/supabase/client'
 import { buildInvestmentPayload } from '@/lib/investments/buildPayload'
 import { DataServiceError } from '@/lib/data/errors'
 import { logger } from '@/lib/logger'
+import { businessFinanceService } from '@/services/businessFinanceService'
 import { 
   ClientAppointment, 
   Transaction, 
   Goal, 
   UserProfile, 
-  CaixaData, 
   NewGoal, 
   NotificationItem, 
   CreditCard,
@@ -221,14 +221,16 @@ export const financeService = {
   },
 
   // ============================================================================
-  // AGENDA SMART / NAIL DESIGN
+  // AGENDA PROFISSIONAL
   // ============================================================================
   getAppointments: async (): Promise<ClientAppointment[]> => {
       const user = await getAuthenticatedUser('appointments')
+      const workspace = await businessFinanceService.getWorkspace()
       const { data, error } = await supabase
         .from('appointments')
         .select('*')
         .eq('user_id', user.id)
+        .eq('workspace_id', workspace.id)
         .order('date', { ascending: true })
       if (error) throw databaseError('appointments', user.id, error)
       return (data as ClientAppointment[]) ?? []
@@ -270,11 +272,13 @@ export const financeService = {
 
   updateAppointmentStatus: async (id: string, status: string) => {
     const user = await getAuthenticatedUser('appointments')
+    const workspace = await businessFinanceService.getWorkspace()
     const { error } = await supabase
       .from('appointments')
       .update({ status })
       .eq('id', id)
       .eq('user_id', user.id)
+      .eq('workspace_id', workspace.id)
     if (error) throw databaseError('appointments', user.id, error)
   },
 
@@ -303,29 +307,4 @@ export const financeService = {
     if (error) throw error
     return data
   },
-
-  // ============================================================================
-  // FLUXO DE CAIXA / CAIXA EMPRESARIAL
-  // ============================================================================
-  getCaixaData: async (): Promise<CaixaData> => {
-        const user = await getAuthenticatedUser('business_cash')
-        const [{ data: settings, error: settingsError }, { data: entries, error: entriesError }] = await Promise.all([
-          supabase.from('business_settings').select('*').eq('user_id', user.id).maybeSingle(),
-          supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('scope', 'business'),
-        ])
-        if (settingsError) throw databaseError('business_settings', user.id, settingsError)
-        if (entriesError) throw databaseError('business_cash', user.id, entriesError)
-
-        return {
-          currentBalance: Number(settings?.current_balance) || 0,
-          monthlyGoal: Number(settings?.monthly_goal) || 0,
-          taxRate: Number(settings?.tax_rate) || 0,
-          reserveRate: Number(settings?.reserve_rate) || 0,
-          entries: (entries as Transaction[]) || []
-        }
-  }
 }

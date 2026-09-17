@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer'
 import ical, { ICalAttendeeRole, ICalAttendeeStatus, ICalCalendarMethod } from 'ical-generator'
 import { errorResponse, successResponse } from '@/lib/api/response'
 import { requireUser } from '@/lib/auth/requireUser'
+import { getOrCreateBusinessWorkspace } from '@/lib/business/workspaces'
 import { serverEnv } from '@/lib/env/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -37,11 +38,13 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser()
     const input = normalizeInput(await request.json())
+    const workspace = await getOrCreateBusinessWorkspace(user.id)
     const supabase = await createClient()
     const { data: appointment, error: insertError } = await supabase
       .from('appointments')
       .insert({
         user_id: user.id,
+        workspace_id: workspace.id,
         client_name: input.clientName,
         client_email: input.clientEmail ?? null,
         service: input.service,
@@ -62,6 +65,7 @@ export async function POST(request: Request) {
         .from('appointments')
         .select('*')
         .eq('user_id', user.id)
+        .eq('workspace_id', workspace.id)
         .eq('idempotency_key', input.idempotencyKey)
         .single()
       if (existingError) throw existingError
@@ -135,6 +139,7 @@ export async function POST(request: Request) {
       })
       .eq('id', appointment.id)
       .eq('user_id', user.id)
+      .eq('workspace_id', workspace.id)
 
     const warning = statusError
       ? 'Agendamento salvo, mas o status do convite não pôde ser atualizado.'

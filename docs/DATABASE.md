@@ -11,7 +11,7 @@ O schema em produção evolui por migrations SQL aditivas em `supabase/migration
 | Identidade | `profiles` | `id = auth.uid()` |
 | Financeiro | `transactions`, `credit_cards`, `debts`, `goals`, `investments` | `user_id` |
 | Compras | `monthly_shopping_sessions`, `shopping_items`, `shopping_receipts` | usuário da sessão |
-| Profissional | `businesses`, `appointments` e tabelas operacionais | `user_id`/empresa |
+| Profissional | `business_workspaces`, membros, capacidades, clientes, catálogo, custos, configurações e transações business | `workspace_id` + associação |
 | Billing | `subscriptions`, `stripe_events` | usuário; eventos só Service Role |
 | Consumo | `api_usage` | usuário; escrita só Service Role |
 
@@ -21,12 +21,15 @@ Transações usam `scope = personal | business`. Transferências permanecem regi
 
 Toda tabela exposta pela Data API deve ter RLS habilitada. Políticas de usuário usam `(select auth.uid())` e não confiam em IDs enviados pelo cliente. `profiles` permite ao usuário alterar somente campos de perfil; `plan`, `plan_tier` e `system_role` não fazem parte do grant de atualização. `subscriptions` e `api_usage` são gerenciadas pelo servidor e legíveis apenas pelo proprietário. `audit_logs` e `stripe_events` são internos e exclusivos da Service Role. Tabelas globais de regras, flags, moedas e inflação são referências read-only para usuários autenticados.
 
-`subscriptions` é a única fonte de autorização paga. FREE não acessa investimentos, dívidas ou recursos profissionais; PRO acessa investimentos e dívidas; PREMIUM também acessa o domínio profissional. Perfil e metadata do Auth não concedem entitlement.
+`subscriptions` é a fonte de autorização paga; `profiles.system_role` concede somente a elevação administrativa controlada pelo servidor. A coluna `product` separa Pessoal de Profissional. FREE e PRO são Pessoal; PREMIUM é Profissional durante a transição. Um cliente Profissional não herda módulos pessoais. `user_metadata` e campos de plano no perfil não concedem entitlement. Cartões, metas, investimentos, dívidas, patrimônio, compras, recibos, insights e arquivos do bucket `receipts` exigem produto Pessoal além da propriedade. Workspaces, clientes, custos, transações business e appointments exigem produto Profissional e membership. Os limites de IA/OCR recebem os entitlements já resolvidos no servidor; o trigger de cartões/metas consulta `system_role` e não reduz `admin`/`founder` aos limites FREE.
+
+Na V1, `business_workspace_members` e `business_workspace_capabilities` são server-managed: `authenticated` recebe somente `SELECT`; escrita é exclusiva de `service_role` e do bootstrap backend. Isso impede que o navegador adicione membros, altere papéis, remova o owner ou habilite capacidades. Team Management dependerá de uma futura API auditada com convite e aceitação.
 
 ## Funções
 
 - `consume_api_usage`: consumo atômico de cota;
-- `process_stripe_subscription_event`: idempotência do webhook e atualização da assinatura;
+- `process_stripe_subscription_event_v2`: idempotência do webhook e atualização atômica de plano + produto;
+- `bootstrap_business_workspace_v2`: cria workspace, proprietário e capacidades iniciais; somente Service Role;
 - `delete_account_data`: remoção transacional dos dados da conta, executável apenas pela Service Role.
 
 Funções privilegiadas devem definir `search_path` explicitamente, receber grants mínimos e permanecer inacessíveis a `anon` e `authenticated` quando forem internas.
@@ -40,6 +43,10 @@ Funções privilegiadas devem definir `search_path` explicitamente, receber gran
 5. executar advisors de segurança e performance;
 6. executar testes RLS com usuários dedicados FREE, PRO e PREMIUM;
 7. confirmar rollback lógico ou plano de recuperação.
+
+Para a fundação V2, aplique `20260916125508_separate_personal_professional_products.sql` antes de publicar o código que consulta `subscriptions.product`. A migration é aditiva, faz backfill de produto/workspace e mantém as tabelas legadas. O nome do workspace vem deterministicamente do `businesses` mais antigo por `created_at/id`, sem sobrescrever workspaces existentes. `clients` e `nail_clients` são copiados para `business_customers` com identidade de origem; `clients` usa UUID namespaced determinístico para não colidir com a outra origem. `tax_regime` e `default_tax_rate` não são importados como valores confirmados. Não execute manualmente contra produção sem backup, janela aprovada e validação prévia em banco local/staging.
+
+Antes da aplicação em produção, audite separadamente os valores 6 em `business_settings.tax_rate` e `businesses.default_tax_rate`. Eles são preservados, mas ficam sem timestamp de confirmação e não são utilizados pelos cálculos atuais. Após disponibilizar uma configuração tributária explícita, grave o valor confirmado junto de `tax_rate_confirmed_at` (ou `default_tax_rate_confirmed_at` no legado). Nunca converta 6 para `NULL` em massa.
 
 ## Reconstrução e validação
 

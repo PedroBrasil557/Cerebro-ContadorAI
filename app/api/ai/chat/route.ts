@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { RateLimitError } from '@/lib/api/errors'
+import { ForbiddenError, RateLimitError } from '@/lib/api/errors'
 import { errorResponse, successResponse } from '@/lib/api/response'
 import { getGroqClient } from '@/lib/ai/groq'
 import { requireUser } from '@/lib/auth/requireUser'
@@ -18,7 +18,10 @@ export async function POST(request: Request) {
     const user = await requireUser()
     const { message } = chatSchema.parse(await request.json())
     const billing = await getUserEntitlements(user.id)
-    const usage = await checkUsageLimit(user.id, 'ai_chat', billing.plan)
+    if (!billing.access.canAccessPersonal) {
+      throw new ForbiddenError('Este assistente pertence ao produto Pessoal.')
+    }
+    const usage = await checkUsageLimit(user.id, 'ai_chat', billing.entitlements)
     if (!usage.allowed) throw new RateLimitError()
 
     const supabase = await createClient()

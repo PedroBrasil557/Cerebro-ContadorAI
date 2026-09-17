@@ -21,11 +21,11 @@ export const cfoRulesEngine = {
     const taxReserve = cfoEngine.calculateTaxReserve(metrics.revenue, metrics.taxRate);
 
     // --- MARGEM LÍQUIDA ---
-    if (netMargin < 0) {
+    if (netMargin !== null && netMargin < 0) {
       alerts.push({ id: 'margin_1', metric: 'Margem Líquida', severity: 'critical', message: 'Operação em prejuízo.', value: netMargin });
-    } else if (netMargin < 15) {
+    } else if (netMargin !== null && netMargin < 15) {
       alerts.push({ id: 'margin_2', metric: 'Margem Líquida', severity: 'medium', message: 'Margem de lucro perigosa.', value: netMargin });
-    } else if (netMargin >= 30) {
+    } else if (netMargin !== null && netMargin >= 30) {
       alerts.push({ id: 'margin_3', metric: 'Margem Líquida', severity: 'success', message: 'Margem de lucro excelente.', value: netMargin });
     }
 
@@ -39,7 +39,7 @@ export const cfoRulesEngine = {
     }
 
     // --- IMPOSTOS ---
-    if (metrics.cashReserve < taxReserve) {
+    if (taxReserve !== null && metrics.cashReserve < taxReserve) {
       alerts.push({ id: 'tax_1', metric: 'Impostos', severity: 'critical', message: 'Caixa não cobre impostos provisionados.', value: taxReserve });
     }
 
@@ -48,6 +48,7 @@ export const cfoRulesEngine = {
 
   calculateSafeDraw: (metrics: BusinessMetrics): number => {
     const taxReserve = cfoEngine.calculateTaxReserve(metrics.revenue, metrics.taxRate);
+    if (taxReserve === null) return 0;
     const netProfit = metrics.revenue - metrics.expenses - taxReserve;
     const runway = cfoEngine.calculateRunway(metrics.cashReserve, metrics.expenses);
 
