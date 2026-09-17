@@ -8,7 +8,7 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
 
   await login(page)
   await page.getByRole('button', { name: /Transações/ }).click()
-  await expect(page.getByRole('heading', { name: 'Transações' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Nova', exact: true }).click()
   await page.getByRole('button', { name: 'Receita' }).click()
   await page.locator('input[name="amount"]').fill('125.50')
