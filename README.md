@@ -60,13 +60,12 @@ Preencha `.env.local`; nunca faça commit desse arquivo.
 | `STRIPE_PRICE_PRO` | servidor | preço permitido do plano PRO |
 | `STRIPE_PRICE_PREMIUM` | servidor | preço permitido do plano PREMIUM |
 | `SMTP_USER`, `SMTP_PASS` | servidor, opcionais | envio de convites |
-| `FOUNDER_USER_ID` | servidor, opcional | bootstrap controlado do fundador |
 
 As variáveis `SUPABASE_TEST_*` e `E2E_USER_*` são opcionais e devem apontar apenas para contas e ambientes de teste.
 
 ## Supabase
 
-As migrations versionadas ficam em `supabase/migrations`. Aplique-as em ordem com a CLI do Supabase ou pelo pipeline controlado da equipe. Depois de qualquer mudança de schema, execute os advisors de segurança e performance e os testes RLS.
+As migrations versionadas ficam em `supabase/migrations`. Aplique-as em ordem com a CLI do Supabase ou pelo pipeline controlado da equipe. Depois de qualquer mudança de schema, execute os advisors de segurança e performance e os testes RLS. A autoridade de plataforma e o bootstrap inicial do Founder estão documentados em `docs/PLATFORM_AUTHORITY.md`.
 
 ## Stripe
 

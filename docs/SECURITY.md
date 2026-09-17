@@ -19,7 +19,9 @@ Somente URL e chave pública Supabase usam `NEXT_PUBLIC_`. Service Role, Stripe,
 
 ## RLS
 
-O teste de integração `tests/integration/supabaseRls.test.ts` exige dois usuários dedicados. Ele verifica que A não lê/edita/exclui linhas de B e que A não altera `plan` ou `system_role`. Execute também os advisors após toda migration.
+O teste de integração `tests/integration/supabaseRls.test.ts` exige usuários dedicados ou provisionamento efêmero via Service Role. Ele verifica isolamento entre usuários e workspaces, bloqueio de alterações diretas de `system_role`, fronteiras de administrador/Founder e leitura dos logs de autoridade. Execute também os advisors após toda migration.
+
+As regras de autoridade da plataforma, bootstrap e recuperação do Founder estão em `PLATFORM_AUTHORITY.md`.
 
 `public.audit_logs` opera como tabela interna: RLS está habilitada e os privilégios de `anon` e `authenticated` foram revogados. Acesso de aplicação é exclusivo da Service Role. A migration também remove a descoberta anônima das tabelas públicas e fixa o `search_path` das funções legadas executadas por triggers.
 
