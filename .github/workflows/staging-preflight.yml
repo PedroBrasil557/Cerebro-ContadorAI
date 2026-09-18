@@ -20,6 +20,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: ${{ secrets.STAGING_PROJECT_ID }}
+      CANONICAL_STAGING_PROJECT_ID: wybnnedsdrtbgxdfinac
       PRODUCTION_PROJECT_ID: ebbvknikigxibqtjibqg
       LEGACY_SANDBOX_PROJECT_ID: aenlidohcgopjkgmqfmc
 
@@ -61,7 +62,12 @@ jobs:
             exit 1
           fi
 
-          echo "Staging target passed the protected-ref guard."
+          if [[ "$SUPABASE_PROJECT_ID" != "$CANONICAL_STAGING_PROJECT_ID" ]]; then
+            echo "Refusing non-canonical staging target."
+            exit 1
+          fi
+
+          echo "Canonical staging target verified."
 
       - name: Show pinned Supabase CLI version
         run: npx supabase --version
