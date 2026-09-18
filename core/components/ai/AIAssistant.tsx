@@ -64,7 +64,7 @@ export default function AIAssistant({ user }: AIAssistantProps) {
         whileHover={{ scale: 1.1, rotate: 5 }}
         whileTap={{ scale: 0.9 }}
         onClick={handleOpenChat}
-        className={`fixed bottom-8 right-8 z-50 h-16 w-16 rounded-[1.25rem] shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-center justify-center transition-all duration-500 group border ${
+        className={`fixed bottom-24 right-4 z-50 h-16 w-16 rounded-[1.25rem] shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-center justify-center transition-all duration-500 group border md:bottom-8 md:right-8 ${
             isOpen ? 'bg-rose-500 border-rose-400' : 'bg-[#09090b] border-white/10'
         }`}
       >
@@ -81,7 +81,7 @@ export default function AIAssistant({ user }: AIAssistantProps) {
             initial={{ opacity: 0, y: 40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
-            className="fixed bottom-28 right-4 md:right-8 w-[95vw] md:w-[480px] h-[75vh] max-h-[750px] bg-[#09090b]/90 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.6)] z-50 flex flex-col overflow-hidden"
+            className="fixed bottom-40 right-4 z-50 flex h-[calc(100dvh-12rem)] max-h-[650px] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#09090b]/90 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-3xl md:bottom-28 md:right-8 md:h-[75vh] md:max-h-[750px] md:w-[480px]"
           >
             {/* HEADER TERMINAL STYLE */}
             <div className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
