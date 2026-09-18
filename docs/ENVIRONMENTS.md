@@ -2,15 +2,19 @@
 
 ## Mapa canônico
 
-| Papel               | Projeto             | Project ref            | Uso permitido                                                 |
-| ------------------- | ------------------- | ---------------------- | ------------------------------------------------------------- |
-| Production          | `Cerebro.ai`        | `ebbvknikigxibqtjibqg` | Produção. **DO NOT USE FOR STAGING TESTS.**                   |
-| Legacy test sandbox | `cerebro-auth-test` | `aenlidohcgopjkgmqfmc` | Preservado somente para investigação. Não é staging canônico. |
-| Canonical staging   | ainda não criado    | a definir              | Homologação da cadeia canônica de migrations e dos previews.  |
+| Papel               | Projeto               | Project ref            | Região      | Uso permitido                                                 |
+| ------------------- | --------------------- | ---------------------- | ----------- | ------------------------------------------------------------- |
+| Production          | `Cerebro.ai`          | `ebbvknikigxibqtjibqg` | `us-west-2` | Produção. **DO NOT USE FOR STAGING TESTS.**                   |
+| Legacy test sandbox | `cerebro-auth-test`   | `aenlidohcgopjkgmqfmc` | `us-west-1` | Preservado somente para investigação. Não é staging canônico. |
+| Canonical staging   | `Cerebro.ai Staging`  | `wybnnedsdrtbgxdfinac` | `us-west-1` | Homologação da cadeia canônica de migrations e dos previews.  |
 
 Os project refs não são secretos. Access tokens, senhas de banco, chaves privadas e Service Role são secretos e nunca devem ser gravados no Git.
 
-## Arquitetura desejada
+O staging canônico foi criado em 18 de setembro de 2026 como projeto Supabase standalone na mesma organização de Production, com custo reportado pelo Supabase de US$ 0/mês no momento da criação. O conector de provisioning disponível não expôs `us-west-2` para novos projetos; por isso o staging foi criado em `us-west-1`. Essa diferença de região é aceitável para homologação de schema, Auth, RLS, CI e previews e não altera a região de Production.
+
+O sandbox legado foi pausado sem exclusão de dados para preservar seu conteúdo e liberar o ambiente de homologação. Ele não deve ser restaurado ou reutilizado como staging sem decisão separada.
+
+## Arquitetura atual
 
 ```text
 LOCAL
@@ -22,9 +26,9 @@ STAGING CANÔNICO
 PRODUCTION
 ```
 
-A opção preferencial para o staging canônico é uma Supabase Persistent Branch derivada de `Cerebro.ai`, condicionada à aprovação de custo e disponibilidade pelo proprietário. Ela oferece banco, credenciais e Auth isolados, não copia dados de produção por padrão e pode ser integrada aos previews do GitHub/Vercel. Se branching não estiver disponível, use um projeto standalone novo; não reutilize o sandbox legado.
+O staging canônico é um projeto standalone dedicado. Ele possui banco, credenciais e Auth independentes e não deve receber cópia de dados reais de Production. Se futuramente a organização migrar para um plano com Branching e houver justificativa operacional/custo, uma Persistent Branch poderá substituir este projeto por decisão explícita.
 
-Nenhum recurso pago deve ser criado sem autorização explícita. A criação do ambiente não faz parte desta PR.
+Nenhum recurso pago deve ser criado sem autorização explícita.
 
 ## Fonte de verdade das migrations
 
@@ -60,22 +64,25 @@ O sandbox legado possui migrations com os mesmos nomes, mas timestamps diferente
 O workflow `.github/workflows/staging-preflight.yml` é exclusivamente manual e somente leitura em relação ao schema:
 
 1. valida a presença dos secrets;
-2. recusa os refs de Production e do sandbox legado;
-3. vincula o runner ao project ref informado;
-4. lista o histórico local/remoto;
-5. executa `db push --dry-run`.
+2. exige exatamente o project ref canônico `wybnnedsdrtbgxdfinac`;
+3. recusa explicitamente Production e o sandbox legado;
+4. vincula o runner ao staging canônico;
+5. lista o histórico local/remoto;
+6. executa `db push --dry-run`.
 
-Ele não contém `db push` real. Depois que o staging canônico existir, configure um GitHub Environment chamado `staging`, com revisão obrigatória, e adicione estes secrets:
+Ele não contém `db push` real. Configure um GitHub Environment chamado `staging`, com revisão obrigatória, e adicione estes secrets:
 
 - `SUPABASE_ACCESS_TOKEN`
 - `STAGING_PROJECT_ID`
 - `STAGING_DB_PASSWORD`
 
+`STAGING_PROJECT_ID` deve conter exatamente `wybnnedsdrtbgxdfinac`.
+
 Antes de qualquer aplicação futura, revise manualmente a identidade do projeto, o histórico e a saída do dry-run. O pipeline de Production permanece fora de escopo.
 
-## Auth e Founder no futuro staging
+## Auth e Founder no staging
 
-O Auth do staging é independente. Não copie UUIDs de Production. Quando o ambiente existir:
+O Auth do staging é independente. Não copie UUIDs de Production.
 
 1. crie ou confirme `pbrasil470@gmail.com` pelo fluxo normal de Auth do staging;
 2. aplique a cadeia canônica de migrations;
@@ -86,4 +93,4 @@ Depois do bootstrap, a autorização continua baseada em UUID + `profiles.system
 
 ## Vercel Preview
 
-Não assuma que Preview significa staging. Depois da criação do ambiente canônico, os previews devem receber a URL e a chave publicável do staging. `SUPABASE_SERVICE_ROLE_KEY` continua restrita ao servidor e nenhuma variável `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` deve existir.
+Não assuma que Preview significa staging. Os previews devem receber a URL e a chave publicável do staging quando a integração for ativada. `SUPABASE_SERVICE_ROLE_KEY` continua restrita ao servidor e nenhuma variável `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` deve existir.
