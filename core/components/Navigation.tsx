@@ -1,367 +1,452 @@
-"use client";
+'use client'
 
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
+import { useMemo, useState } from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
 import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  PieChart,
-  Wallet,
-  Briefcase,
-  User,
-  LogOut,
-  Sparkles,
-  RefreshCw,
-  ShoppingCart,
   Lock,
-  ShieldAlert,
-} from "lucide-react";
-import { ActiveTab } from "@/types";
-import { toast } from "sonner";
-import UpgradeModal from "@/core/components/UpgradeModal";
-import { useRouter } from "next/navigation";
-import type { Entitlements, PlanCode, ProductAccess } from "@/lib/billing/plans";
+  LogOut,
+  MoreHorizontal,
+  RefreshCw,
+  Sparkles,
+  User,
+  X,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import type { ActiveTab, AccountMode } from '@/types_db'
+import type { Entitlements, PlanCode, ProductAccess } from '@/lib/billing/plans'
+import UpgradeModal from '@/core/components/UpgradeModal'
+import { Badge } from '@/core/ui/badge'
+import { Button } from '@/core/ui/button'
+import { IconButton } from '@/core/ui/icon-button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/core/ui/tooltip'
+import { ProductSwitcher } from '@/core/navigation/ProductSwitcher'
+import {
+  getMobilePrimaryItems,
+  getNavigationItems,
+  getPrimaryNavigationItems,
+  getSecondaryNavigationItems,
+  isNavigationItemLocked,
+  type AppNavigationItem,
+} from '@/core/navigation/config'
+import { cn } from '@/lib/utils'
 
 interface NavigationProps {
-  activeTab: ActiveTab;
-  onSelectTab: (tab: ActiveTab) => void;
-  onLogout: () => void;
-  isOpen: boolean;
-  onClose: () => void;
-  accountMode: "personal" | "professional";
-  plan: PlanCode;
-  access: ProductAccess;
-  entitlements: Entitlements;
-  refreshEntitlements: () => Promise<void>;
-  onAccountModeChange?: (mode: "personal" | "professional") => void;
+  activeTab: ActiveTab
+  onSelectTab: (tab: ActiveTab) => void
+  onLogout: () => void
+  accountMode: AccountMode
+  plan: PlanCode
+  access: ProductAccess
+  entitlements: Entitlements
+  refreshEntitlements: () => Promise<void>
+  isSwitchingProduct: boolean
+  onSwitchProduct: () => void
 }
 
-interface MenuItem {
-  id: ActiveTab;
-  label: string;
-  icon: LucideIcon;
-  isPro: boolean;
+function NavigationItem({
+  item,
+  active,
+  locked,
+  compact = false,
+  onSelect,
+}: {
+  item: AppNavigationItem
+  active: boolean
+  locked: boolean
+  compact?: boolean
+  onSelect: () => void
+}) {
+  const Icon = item.icon
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={active ? 'page' : undefined}
+        aria-label={locked ? `${item.label}, recurso bloqueado` : item.label}
+        className={cn(
+          'relative flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-[var(--radius-md)]',
+          'text-[var(--color-text-helper)] transition-colors duration-[var(--motion-duration-fast)]',
+          'hover:bg-[var(--color-action-ghost-hover)] hover:text-[var(--color-text-primary)]',
+          active && 'bg-[var(--color-nav-active-fill)] text-[var(--color-nav-active-text)]',
+        )}
+      >
+        <Icon aria-hidden="true" className="h-5 w-5" />
+        {locked ? (
+          <Lock aria-hidden="true" className="absolute right-2 top-2 h-3 w-3" />
+        ) : null}
+        <span className="sr-only">{item.label}</span>
+      </button>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'group flex h-10 w-full items-center gap-3 rounded-[var(--radius-md)] px-3 text-left text-sm font-medium',
+        'text-[var(--color-text-secondary)] transition-colors duration-[var(--motion-duration-fast)]',
+        'hover:bg-[var(--color-action-ghost-hover)] hover:text-[var(--color-text-primary)]',
+        active && 'bg-[var(--color-nav-active-fill)] text-[var(--color-nav-active-text)]',
+      )}
+    >
+      <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {locked ? <Lock aria-label="Recurso PRO" className="h-3.5 w-3.5 shrink-0" /> : null}
+    </button>
+  )
 }
 
-const THEMES = {
-  personal: {
-    bg: "bg-[#665CFF]/10",
-    border: "border-[#665CFF]/20",
-    icon: "text-[#8B84FF]",
-    text: "text-[#8B84FF]",
-  },
-  professional: {
-    bg: "bg-[#4F8CFF]/10",
-    border: "border-[#4F8CFF]/20",
-    icon: "text-[#69A0FF]",
-    text: "text-[#69A0FF]",
-  },
-};
+function MobileBottomItem({
+  item,
+  active,
+  locked,
+  onSelect,
+}: {
+  item: AppNavigationItem
+  active: boolean
+  locked: boolean
+  onSelect: () => void
+}) {
+  const Icon = item.icon
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2',
+        'text-[10px] font-medium leading-3 text-[var(--color-text-helper)]',
+        'transition-colors duration-[var(--motion-duration-fast)]',
+        active && 'text-[var(--color-nav-active-text)]',
+      )}
+    >
+      <span
+        className={cn(
+          'relative flex h-8 w-11 items-center justify-center rounded-[var(--radius-md)]',
+          active && 'bg-[var(--color-nav-active-fill)]',
+        )}
+      >
+        <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
+        {locked ? <Lock aria-hidden="true" className="absolute right-0 top-0 h-3 w-3" /> : null}
+      </span>
+      <span className="max-w-full truncate">{item.shortLabel ?? item.label}</span>
+    </button>
+  )
+}
 
 export default function Navigation({
   activeTab,
   onSelectTab,
   onLogout,
-  isOpen,
-  onClose,
   accountMode,
   plan,
   access,
   entitlements,
   refreshEntitlements,
-  onAccountModeChange,
+  isSwitchingProduct,
+  onSwitchProduct,
 }: NavigationProps) {
-  const router = useRouter();
-  const [isSwitching, setIsSwitching] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const isFreePlan = plan === "free";
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // ✅ AJUSTE: O modo profissional só aparece para parceiros "premium"
-  const canSwitchProducts = access.canSwitchProducts;
+  const allItems = useMemo(
+    () => getNavigationItems(accountMode, access),
+    [accountMode, access],
+  )
+  const primaryItems = useMemo(
+    () => getPrimaryNavigationItems(accountMode, access),
+    [accountMode, access],
+  )
+  const secondaryItems = useMemo(
+    () => getSecondaryNavigationItems(accountMode, access),
+    [accountMode, access],
+  )
+  const mobileItems = useMemo(
+    () => getMobilePrimaryItems(accountMode, access),
+    [accountMode, access],
+  )
 
-  const theme =
-    accountMode === "personal" ? THEMES.personal : THEMES.professional;
+  const mobileIds = new Set(mobileItems.map((item) => item.id))
+  const moreItems = allItems.filter((item) => !mobileIds.has(item.id))
+  const moreActive = moreItems.some((item) => item.id === activeTab) || activeTab === 'meu perfil'
 
-  // 🔄 Efeito para atualizar sessão após compra (Limpa URL primeiro para evitar loop)
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("success") === "true") {
-      router.replace("/app");
-      void refreshEntitlements();
+  const selectItem = (item: AppNavigationItem) => {
+    if (isNavigationItemLocked(item, entitlements)) {
+      setMoreOpen(false)
+      setShowUpgradeModal(true)
+      return
     }
-  }, [refreshEntitlements, router]);
+    onSelectTab(item.id)
+    setMoreOpen(false)
+  }
 
-  const handleRefreshSession = async (isAutomatic = false) => {
-    setIsRefreshing(true);
+  const handleRefreshSession = async () => {
+    setIsRefreshing(true)
     try {
-      await refreshEntitlements();
-      if (!isAutomatic) toast.success("Dados sincronizados com sucesso!");
-      router.refresh();
+      await refreshEntitlements()
+      toast.success('Dados sincronizados com sucesso!')
     } catch {
-      if (!isAutomatic) toast.error("Erro ao sincronizar.");
+      toast.error('Erro ao sincronizar.')
     } finally {
-      setIsRefreshing(false);
+      setIsRefreshing(false)
     }
-  };
+  }
 
-  const personalMenuItems: MenuItem[] = [
-    {
-      id: "dashboard",
-      label: "Painel Central",
-      icon: LayoutDashboard,
-      isPro: false,
-    },
-    {
-      id: "compras inteligentes",
-      label: "Smart Shopping",
-      icon: ShoppingCart,
-      isPro: false,
-    },
-    {
-      id: "transações",
-      label: "Transações",
-      icon: ArrowLeftRight,
-      isPro: false,
-    },
-    { id: "investimentos", label: "Patrimônio", icon: PieChart, isPro: true },
-    {
-      id: "minha carteira",
-      label: "Carteira de Cartões",
-      icon: Wallet,
-      isPro: false,
-    },
-    {
-      id: "central de dividas",
-      label: "Central de Dívidas",
-      icon: ShieldAlert,
-      isPro: true,
-    },
-    ...(access.canAccessAdmin
-      ? [
-          {
-            id: "admin" as const,
-            label: "Administração",
-            icon: ShieldAlert,
-            isPro: false,
-          },
-        ]
-      : []),
-  ];
-
-  const professionalMenuItems: MenuItem[] = [
-    {
-      id: "visão do negócio",
-      label: "Visão do Negócio",
-      icon: LayoutDashboard,
-      isPro: false,
-    },
-    {
-      id: "caixa empresarial",
-      label: "Financeiro",
-      icon: Briefcase,
-      isPro: false,
-    },
-    ...(access.canAccessAdmin ? [{ id: "admin" as const, label: "Administração", icon: ShieldAlert, isPro: false }] : []),
-  ];
-
-  const activeMenu =
-    accountMode === "personal" ? personalMenuItems : professionalMenuItems;
-
-  const isItemLocked = (item: MenuItem) =>
-    (item.id === 'investimentos' && !entitlements.investments) ||
-    (item.id === 'central de dividas' && !entitlements.debtCenter);
-
-  const handleTabClick = (item: MenuItem) => {
-    if (isItemLocked(item)) {
-      setShowUpgradeModal(true);
-      onClose();
-      return;
-    }
-    onSelectTab(item.id);
-    onClose();
-  };
-
-  const toggleAccountMode = async () => {
-    setIsSwitching(true);
-    const newMode = accountMode === "personal" ? "professional" : "personal";
-    try {
-      const response = await fetch('/api/account/mode', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: newMode }),
-      });
-      if (!response.ok) throw new Error('Mode switch rejected');
-      onAccountModeChange?.(newMode);
-      toast.success(
-        `Cérebro.IA ${newMode === "personal" ? "Pessoal" : "Profissional"} ativado.`,
-      );
-      onSelectTab(newMode === "personal" ? "dashboard" : "visão do negócio");
-      router.refresh();
-    } catch {
-      toast.error("Erro ao alternar modo.");
-    } finally {
-      setIsSwitching(false);
-    }
-  };
+  const accountLabel = accountMode === 'personal' ? 'Personal' : 'Professional'
 
   return (
     <>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[2px] lg:hidden"
-          />
-        )}
-      </AnimatePresence>
-
+      {/* Desktop — Figma Sidebar / 280px */}
       <aside
-        aria-label="Menu principal"
-        className={`fixed left-0 top-0 z-50 flex h-screen w-[232px] flex-col border-r border-white/[0.075] bg-[#080B11] px-4 py-5 text-[#F4F6F8] transition-transform duration-200 ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:sticky lg:translate-x-0`}
+        aria-label="Navegação principal"
+        className="hidden h-screen w-[280px] shrink-0 flex-col border-r border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-5 py-5 xl:flex"
       >
-        <div className="mb-6 flex h-11 items-center px-1">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[11px] border border-[#8B84FF]/25 bg-gradient-to-br from-[#4F46FF] to-[#665CFF] shadow-[0_0_18px_rgba(102,92,255,0.22)]">
-              <Sparkles
-                aria-hidden="true"
-                className="h-5 w-5 text-white"
-              />
-            </div>
-            <div>
-              <h1 className="text-[17px] font-bold leading-none tracking-[-0.02em] text-white">
-                CÉREBRO<span className={theme.text}>.IA</span>
-              </h1>
-              <p className="mt-1 text-[9px] font-medium tracking-[0.2em] text-[#A0A8B5]">
-                DECISION ENGINE
-              </p>
-            </div>
+        <div className="flex h-11 items-center gap-3 px-1">
+          <span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-primary)] text-white">
+            <Sparkles aria-hidden="true" className="h-[18px] w-[18px]" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[var(--color-text-primary)]">Cérebro</p>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-helper)]">{accountLabel}</p>
           </div>
         </div>
 
-        {canSwitchProducts && (
-          <div className="mb-6 border-y border-white/[0.065] py-3">
-            <button
-              onClick={toggleAccountMode}
-              disabled={isSwitching}
-              className="flex min-h-[52px] w-full items-center justify-between rounded-[12px] border border-white/[0.075] bg-[#0D1118] px-3 text-left transition-colors duration-150 hover:border-white/[0.13] hover:bg-[#111722] disabled:opacity-60"
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-[9px] ${accountMode === "personal" ? "bg-[#665CFF]/10 text-[#8B84FF]" : "bg-[#4F8CFF]/10 text-[#69A0FF]"}`}
-                >
-                  {accountMode === "personal" ? (
-                    <User aria-hidden="true" size={16} />
-                  ) : (
-                    <Briefcase aria-hidden="true" size={16} />
-                  )}
-                </div>
-                <div className="text-left">
-                  <p className="text-[11px] text-[#A0A8B5]">Área atual</p>
-                  <p className="mt-0.5 text-sm font-medium text-white">
-                    {accountMode === "personal" ? "Cérebro.IA Pessoal" : "Cérebro.IA Profissional"}
-                  </p>
-                </div>
-              </div>
-              <RefreshCw
-                aria-hidden="true"
-                size={14}
-                className={`text-[#6F7887] ${isSwitching ? "animate-spin" : ""}`}
-              />
-            </button>
-          </div>
-        )}
+        <div className="my-5">
+          <ProductSwitcher
+            accountMode={accountMode}
+            canSwitch={access.canSwitchProducts}
+            isSwitching={isSwitchingProduct}
+            onSwitch={onSwitchProduct}
+          />
+        </div>
 
-        <nav
-          className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar"
-          aria-label={
-            accountMode === "personal"
-              ? "Módulos pessoais"
-              : "Módulos profissionais"
-          }
-        >
-          <p className="mb-2 px-3 text-[11px] font-medium text-[#A0A8B5]">
-            Módulos
-          </p>
-          {activeMenu.map((item) => {
-            const isActive = activeTab === item.id;
-            const Icon = item.icon;
-            const locked = isItemLocked(item);
-            return (
-              <button
+        <nav className="flex min-h-0 flex-1 flex-col" aria-label={`${accountLabel} — módulos`}>
+          <div className="space-y-1">
+            <p className="mb-2 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-helper)]">
+              Principal
+            </p>
+            {primaryItems.map((item) => (
+              <NavigationItem
                 key={item.id}
-                onClick={() => handleTabClick(item)}
-                aria-current={isActive ? "page" : undefined}
-                className={`relative flex h-11 w-full items-center justify-between rounded-[11px] border px-3 transition-colors duration-150 ${isActive ? `${theme.bg} ${theme.border} text-white` : "border-transparent text-[#A0A8B5] hover:border-white/[0.055] hover:bg-white/[0.035] hover:text-white"} ${locked ? "opacity-80" : ""}`}
-              >
-                {isActive && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -left-px top-2.5 h-6 w-0.5 rounded-full bg-[#665CFF]"
-                  />
-                )}
-                <div className="flex min-w-0 items-center gap-3">
-                  <Icon
-                    aria-hidden="true"
-                    className={`h-[19px] w-[19px] shrink-0 ${isActive ? theme.icon : "text-[#6F7887]"}`}
-                  />
-                  <span className="truncate text-sm font-medium">
-                    {item.label}
-                  </span>
-                </div>
-                {locked && (
-                  <Lock
-                    aria-label="Recurso PRO"
-                    size={13}
-                    className="shrink-0 text-[#8B84FF]"
-                  />
-                )}
-              </button>
-            );
-          })}
+                item={item}
+                active={activeTab === item.id}
+                locked={isNavigationItemLocked(item, entitlements)}
+                onSelect={() => selectItem(item)}
+              />
+            ))}
+          </div>
+
+          {secondaryItems.length ? (
+            <div className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto">
+              <p className="mb-2 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-helper)]">
+                Mais recursos
+              </p>
+              {secondaryItems.map((item) => (
+                <NavigationItem
+                  key={item.id}
+                  item={item}
+                  active={activeTab === item.id}
+                  locked={isNavigationItemLocked(item, entitlements)}
+                  onSelect={() => selectItem(item)}
+                />
+              ))}
+            </div>
+          ) : null}
         </nav>
 
-        <div className="mt-4 space-y-1.5 border-t border-white/[0.065] pt-4">
-          {isFreePlan ? (
-            <button
-              onClick={() => setShowUpgradeModal(true)}
-              className="mb-2 flex h-11 w-full items-center gap-3 rounded-[11px] border border-[#665CFF]/20 bg-[#665CFF]/10 px-3 text-sm font-medium text-[#B4AFFF] transition-colors duration-150 hover:border-[#665CFF]/35 hover:bg-[#665CFF]/15"
-            >
-              <Sparkles aria-hidden="true" size={17} />
-              <span>Upgrade para PRO</span>
-            </button>
+        <div className="mt-4 space-y-2 border-t border-[var(--color-border-default)] pt-4">
+          {plan === 'free' ? (
+            <Button variant="ai" className="w-full justify-start gap-2" onClick={() => setShowUpgradeModal(true)}>
+              <Sparkles aria-hidden="true" className="h-4 w-4" />
+              Upgrade para PRO
+            </Button>
           ) : (
-            <button
-              onClick={() => handleRefreshSession(false)}
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
               disabled={isRefreshing}
-              className="mb-2 flex h-11 w-full items-center gap-3 rounded-[11px] border border-transparent px-3 text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:border-white/[0.055] hover:bg-white/[0.035] hover:text-white disabled:opacity-60"
+              onClick={handleRefreshSession}
             >
-              <RefreshCw
-                aria-hidden="true"
-                size={17}
-                className={isRefreshing ? "animate-spin" : ""}
-              />
-              Sincronizar Plano
-            </button>
+              <RefreshCw aria-hidden="true" className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+              Sincronizar plano
+            </Button>
           )}
-          <button
-            onClick={onLogout}
-            className="flex h-11 w-full items-center gap-3 rounded-[11px] border border-transparent px-3 text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:border-[#FF5876]/10 hover:bg-[#FF5876]/[0.06] hover:text-[#FF7890]"
-          >
-            <LogOut aria-hidden="true" size={17} />
+          <Button variant="ghost" className="w-full justify-start gap-2" onClick={onLogout}>
+            <LogOut aria-hidden="true" className="h-4 w-4" />
             Sair do Cérebro
-          </button>
+          </Button>
         </div>
       </aside>
 
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-      />
+      {/* Tablet — Figma Navigation Rail / 80px */}
+      <TooltipProvider delayDuration={200}>
+        <aside
+          aria-label="Navegação principal"
+          className="hidden h-screen w-20 shrink-0 flex-col items-center border-r border-[var(--color-border-default)] bg-[var(--color-bg-surface)] py-4 md:flex xl:hidden"
+        >
+          <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-primary)] text-white">
+            <Sparkles aria-hidden="true" className="h-5 w-5" />
+          </span>
+          <nav className="flex flex-1 flex-col items-center gap-1" aria-label={`${accountLabel} — módulos`}>
+            {primaryItems.map((item) => (
+              <Tooltip key={item.id}>
+                <TooltipTrigger asChild>
+                  <div>
+                    <NavigationItem
+                      item={item}
+                      active={activeTab === item.id}
+                      locked={isNavigationItemLocked(item, entitlements)}
+                      compact
+                      onSelect={() => selectItem(item)}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            ))}
+          </nav>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <IconButton
+                label="Abrir mais recursos"
+                variant={moreActive ? 'secondary' : 'ghost'}
+                size="lg"
+                onClick={() => setMoreOpen(true)}
+              >
+                <MoreHorizontal aria-hidden="true" className="h-5 w-5" />
+              </IconButton>
+            </TooltipTrigger>
+            <TooltipContent side="right">Mais recursos</TooltipContent>
+          </Tooltip>
+        </aside>
+      </TooltipProvider>
+
+      {/* Mobile — Figma Bottom Navigation / 72px */}
+      <nav
+        aria-label="Navegação principal"
+        className="fixed inset-x-0 bottom-0 z-40 flex h-[72px] border-t border-[var(--color-border-default)] bg-[var(--color-bg-surface)] md:hidden"
+      >
+        {mobileItems.map((item) => (
+          <MobileBottomItem
+            key={item.id}
+            item={item}
+            active={activeTab === item.id}
+            locked={isNavigationItemLocked(item, entitlements)}
+            onSelect={() => selectItem(item)}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          aria-current={moreActive ? 'page' : undefined}
+          className={cn(
+            'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px] font-medium leading-3',
+            'text-[var(--color-text-helper)]',
+            moreActive && 'text-[var(--color-nav-active-text)]',
+          )}
+        >
+          <span className={cn('flex h-8 w-11 items-center justify-center rounded-[var(--radius-md)]', moreActive && 'bg-[var(--color-nav-active-fill)]')}>
+            <MoreHorizontal aria-hidden="true" className="h-[18px] w-[18px]" />
+          </span>
+          <span>Mais</span>
+        </button>
+      </nav>
+
+      {/* Secondary modules / account actions for Tablet + Mobile. */}
+      <Dialog.Root open={moreOpen} onOpenChange={setMoreOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--neutral-950)]/60 backdrop-blur-[2px] xl:hidden" />
+          <Dialog.Content
+            aria-describedby={undefined}
+            className={[
+              'fixed inset-x-0 bottom-0 z-[51] max-h-[82vh] overflow-y-auto',
+              'rounded-t-[var(--radius-xl)] border border-b-0 border-[var(--color-card-border)]',
+              'bg-[var(--color-bg-elevated)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl',
+              'focus:outline-none md:left-auto md:right-4 md:bottom-4 md:w-[360px] md:rounded-[var(--radius-xl)] md:border',
+              'xl:hidden',
+            ].join(' ')}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <Dialog.Title className="text-base font-semibold text-[var(--color-text-primary)]">Mais recursos</Dialog.Title>
+                <p className="mt-0.5 text-xs text-[var(--color-text-helper)]">{accountLabel}</p>
+              </div>
+              <Dialog.Close asChild>
+                <IconButton label="Fechar" variant="ghost" size="sm">
+                  <X aria-hidden="true" className="h-4 w-4" />
+                </IconButton>
+              </Dialog.Close>
+            </div>
+
+            <ProductSwitcher
+              accountMode={accountMode}
+              canSwitch={access.canSwitchProducts}
+              isSwitching={isSwitchingProduct}
+              onSwitch={() => {
+                setMoreOpen(false)
+                onSwitchProduct()
+              }}
+              className="mb-4"
+            />
+
+            <div className="space-y-1">
+              {moreItems.map((item) => (
+                <NavigationItem
+                  key={item.id}
+                  item={item}
+                  active={activeTab === item.id}
+                  locked={isNavigationItemLocked(item, entitlements)}
+                  onSelect={() => selectItem(item)}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectTab('meu perfil')
+                  setMoreOpen(false)
+                }}
+                className={cn(
+                  'flex h-10 w-full items-center gap-3 rounded-[var(--radius-md)] px-3 text-sm font-medium',
+                  'text-[var(--color-text-secondary)] hover:bg-[var(--color-action-ghost-hover)] hover:text-[var(--color-text-primary)]',
+                  activeTab === 'meu perfil' && 'bg-[var(--color-nav-active-fill)] text-[var(--color-nav-active-text)]',
+                )}
+              >
+                <User aria-hidden="true" className="h-5 w-5" />
+                Perfil
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2 border-t border-[var(--color-border-default)] pt-4">
+              {plan === 'free' ? (
+                <Button variant="ai" className="w-full" onClick={() => { setMoreOpen(false); setShowUpgradeModal(true) }}>
+                  Upgrade para PRO
+                </Button>
+              ) : (
+                <Button variant="secondary" className="w-full gap-2" disabled={isRefreshing} onClick={handleRefreshSession}>
+                  <RefreshCw aria-hidden="true" className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+                  Sincronizar plano
+                </Button>
+              )}
+              <Button variant="ghost" className="w-full gap-2" onClick={onLogout}>
+                <LogOut aria-hidden="true" className="h-4 w-4" />
+                Sair do Cérebro
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </>
-  );
+  )
 }
