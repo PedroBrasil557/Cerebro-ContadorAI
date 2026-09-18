@@ -133,5 +133,6 @@ describe('billing route security', () => {
       p_stripe_subscription_id: 'sub_test',
       p_stripe_price_id: 'price_pro_server',
     }))
+    expect(mocks.rpc.mock.calls[0]?.[1]).not.toHaveProperty('p_system_role')
   })
 })

@@ -1,15 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ForbiddenError } from '@/lib/api/errors'
 
-const mocks = vi.hoisted(() => ({ requireUser: vi.fn(), role: 'user' }))
+const mocks = vi.hoisted(() => ({ requirePlatformAdmin: vi.fn() }))
 
-vi.mock('@/lib/auth/requireUser', () => ({ requireUser: mocks.requireUser }))
+vi.mock('@/lib/auth/platform', () => ({ requirePlatformAdmin: mocks.requirePlatformAdmin }))
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => ({
     from: (table: string) => ({
       select: (columns: string, options?: { head?: boolean }) => {
-        if (table === 'profiles' && columns === 'system_role') {
-          return { eq: () => ({ single: async () => ({ data: { system_role: mocks.role }, error: null }) }) }
-        }
         if (table === 'profiles' && options?.head) {
           const result = { data: null, count: 3, error: null }
           return {
@@ -31,17 +29,17 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 describe('admin metrics access', () => {
   beforeEach(() => {
-    mocks.requireUser.mockResolvedValue({ id: 'user-1' })
-    mocks.role = 'user'
+    vi.clearAllMocks()
   })
 
   it('denies a common user', async () => {
+    mocks.requirePlatformAdmin.mockRejectedValue(new ForbiddenError('Acesso administrativo necessário.'))
     const { GET } = await import('../../app/api/admin/metrics/route')
     expect((await GET()).status).toBe(403)
   })
 
   it.each(['admin', 'founder'])('allows %s and separates product metrics', async (role) => {
-    mocks.role = role
+    mocks.requirePlatformAdmin.mockResolvedValue({ user: { id: `${role}-id` }, role })
     const { GET } = await import('../../app/api/admin/metrics/route')
     const response = await GET()
     const body = await response.json()

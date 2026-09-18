@@ -69,7 +69,12 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
   let professionalWorkspaceId = ''
   let originalPlan: string | null = null
   let originalRole: string | null = null
+  let originalFullName: string | null = null
   let admin: SupabaseClient | null = null
+  let founder: SupabaseClient | null = null
+  let platformAdmin: SupabaseClient | null = null
+  let founderUser: User | null = null
+  let platformAdminUser: User | null = null
   const provisionedUserIds: string[] = []
 
   beforeAll(async () => {
@@ -120,6 +125,56 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     premiumUser = await signIn(premium, premiumEmail!, premiumPassword!)
     expect(new Set([freeUser.id, proUser.id, premiumUser.id]).size).toBe(3)
 
+    if (releaseRlsRequired && admin) {
+      const founderCreate = await admin.auth.admin.createUser({
+        email: 'pbrasil470@gmail.com',
+        email_confirm: true,
+      })
+      if (founderCreate.error) throw founderCreate.error
+      if (!founderCreate.data.user) throw new Error('Founder test user was not returned.')
+      founderUser = founderCreate.data.user
+
+      const founderBootstrap = await admin.rpc('bootstrap_initial_founder')
+      if (founderBootstrap.error) throw founderBootstrap.error
+      if (founderBootstrap.data !== founderUser.id) throw new Error('Founder bootstrap returned an unexpected UUID.')
+
+      founder = client()
+      const founderLink = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: 'pbrasil470@gmail.com',
+      })
+      if (founderLink.error) throw founderLink.error
+      const founderSession = await founder.auth.verifyOtp({
+        token_hash: founderLink.data.properties.hashed_token,
+        type: 'email',
+      })
+      if (founderSession.error) throw founderSession.error
+      if (founderSession.data.user?.id !== founderUser.id) throw new Error('Founder test session has an unexpected UUID.')
+
+      const adminPassword = `Rls-${crypto.randomUUID()}-Aa1!`
+      const adminEmail = `rls-platform-admin-${crypto.randomUUID()}@example.test`
+      const adminCreate = await admin.auth.admin.createUser({
+        email: adminEmail,
+        password: adminPassword,
+        email_confirm: true,
+      })
+      if (adminCreate.error) throw adminCreate.error
+      if (!adminCreate.data.user) throw new Error('Platform-admin test user was not returned.')
+      platformAdminUser = adminCreate.data.user
+      provisionedUserIds.push(platformAdminUser.id)
+
+      const promote = await admin.rpc('set_platform_admin_role', {
+        p_actor_user_id: founderUser.id,
+        p_target_user_id: platformAdminUser.id,
+        p_new_role: 'admin',
+      })
+      if (promote.error) throw promote.error
+      if (promote.data?.status !== 'changed') throw new Error(`Platform-admin promotion failed: ${JSON.stringify(promote.data)}`)
+
+      platformAdmin = client()
+      await signIn(platformAdmin, adminEmail, adminPassword)
+    }
+
     await Promise.all([
       requirePlan(free, freeUser, 'free'),
       requirePlan(pro, proUser, 'pro'),
@@ -136,12 +191,13 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
 
     const { data: profile, error: profileError } = await free
       .from('profiles')
-      .select('plan, system_role')
+      .select('plan, system_role, full_name')
       .eq('id', freeUser.id)
       .single()
     if (profileError) throw profileError
     originalPlan = profile.plan
     originalRole = profile.system_role
+    originalFullName = profile.full_name
 
     const marker = `rls-${crypto.randomUUID()}`
     const { data: transaction, error: transactionError } = await pro
@@ -211,7 +267,13 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     if (investmentId) await pro.from('investments').delete().eq('id', investmentId)
     if (debtId) await pro.from('debts').delete().eq('id', debtId)
     if (transactionId) await pro.from('transactions').delete().eq('id', transactionId)
-    await Promise.all([free.auth.signOut(), pro.auth.signOut(), premium.auth.signOut()])
+    await Promise.all([
+      free.auth.signOut(),
+      pro.auth.signOut(),
+      premium.auth.signOut(),
+      founder?.auth.signOut(),
+      platformAdmin?.auth.signOut(),
+    ])
     if (admin) {
       await Promise.all(provisionedUserIds.map((id) => admin!.auth.admin.deleteUser(id)))
     }
@@ -245,6 +307,26 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     expect(data).toEqual([])
   })
 
+  it('lets a user read their own platform role but not another profile', async () => {
+    const own = await free.from('profiles').select('id, system_role').eq('id', freeUser.id).single()
+    expect(own.error).toBeNull()
+    expect(own.data).toMatchObject({ id: freeUser.id, system_role: originalRole })
+
+    const other = await free.from('profiles').select('id, system_role').eq('id', proUser.id)
+    expect(other.error).toBeNull()
+    expect(other.data).toEqual([])
+  })
+
+  it('lets a user update normal profile fields without opening platform-role changes', async () => {
+    const marker = `RLS ${crypto.randomUUID()}`
+    const update = await free.from('profiles').update({ full_name: marker }).eq('id', freeUser.id).select('full_name').single()
+    expect(update.error).toBeNull()
+    expect(update.data?.full_name).toBe(marker)
+
+    const restore = await free.from('profiles').update({ full_name: originalFullName }).eq('id', freeUser.id)
+    expect(restore.error).toBeNull()
+  })
+
   it.each([['plan', 'premium'], ['system_role', 'founder']])(
     'prevents a user from changing protected profile column %s',
     async (column, value) => {
@@ -257,6 +339,110 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
       expect(data?.system_role).toBe(originalRole)
     },
   )
+
+  it('blocks a Professional workspace owner from changing any platform role', async () => {
+    const ownBefore = await premium.from('profiles').select('system_role').eq('id', premiumUser.id).single()
+    expect(ownBefore.error).toBeNull()
+
+    const ownRole = await premium.from('profiles').update({ system_role: 'admin' }).eq('id', premiumUser.id)
+    expect(ownRole.error).not.toBeNull()
+    expect(ownRole.error?.code).toBe('42501')
+
+    const ownAfter = await premium.from('profiles').select('system_role').eq('id', premiumUser.id).single()
+    expect(ownAfter.error).toBeNull()
+    expect(ownAfter.data?.system_role).toBe(ownBefore.data?.system_role)
+
+    const targetBefore = await pro.from('profiles').select('system_role').eq('id', proUser.id).single()
+    expect(targetBefore.error).toBeNull()
+
+    const otherRole = await premium.from('profiles').update({ system_role: 'admin' }).eq('id', proUser.id)
+    expect(otherRole.error).not.toBeNull()
+    expect(otherRole.error?.code).toBe('42501')
+
+    const targetAfter = await pro.from('profiles').select('system_role').eq('id', proUser.id).single()
+    expect(targetAfter.error).toBeNull()
+    expect(targetAfter.data?.system_role).toBe(targetBefore.data?.system_role)
+  })
+
+  it('blocks a common user from changing another user platform role', async () => {
+    const attempt = await free.from('profiles').update({ system_role: 'admin' }).eq('id', proUser.id)
+    expect(attempt.error).not.toBeNull()
+  })
+
+  it.runIf(releaseRlsRequired && canProvisionUsers)('blocks direct platform-role writes even for admin and service role', async () => {
+    const adminSelf = await platformAdmin!.from('profiles').update({ system_role: 'user' }).eq('id', platformAdminUser!.id)
+    expect(adminSelf.error).not.toBeNull()
+
+    const adminPromoteUser = await platformAdmin!.from('profiles').update({ system_role: 'admin' }).eq('id', freeUser.id)
+    expect(adminPromoteUser.error).not.toBeNull()
+
+    const adminChangeFounder = await platformAdmin!.from('profiles').update({ system_role: 'user' }).eq('id', founderUser!.id)
+    expect(adminChangeFounder.error).not.toBeNull()
+
+    const serviceDirect = await admin!.from('profiles').update({ system_role: 'admin' }).eq('id', freeUser.id)
+    expect(serviceDirect.error).not.toBeNull()
+  })
+
+  it.runIf(releaseRlsRequired && canProvisionUsers)('lets only the controlled Founder action demote and promote an admin', async () => {
+    const demote = await admin!.rpc('set_platform_admin_role', {
+      p_actor_user_id: founderUser!.id,
+      p_target_user_id: platformAdminUser!.id,
+      p_new_role: 'user',
+    })
+    expect(demote.error).toBeNull()
+    expect(demote.data).toMatchObject({ status: 'changed', previous_role: 'admin', new_role: 'user' })
+
+    const promote = await admin!.rpc('set_platform_admin_role', {
+      p_actor_user_id: founderUser!.id,
+      p_target_user_id: platformAdminUser!.id,
+      p_new_role: 'admin',
+    })
+    expect(promote.error).toBeNull()
+    expect(promote.data).toMatchObject({ status: 'changed', previous_role: 'user', new_role: 'admin' })
+
+    const adminActor = await admin!.rpc('set_platform_admin_role', {
+      p_actor_user_id: platformAdminUser!.id,
+      p_target_user_id: freeUser.id,
+      p_new_role: 'admin',
+    })
+    expect(adminActor.error).toBeNull()
+    expect(adminActor.data).toEqual({ status: 'forbidden' })
+  })
+
+  it.runIf(releaseRlsRequired && canProvisionUsers)('keeps Founder bootstrap idempotent without duplicate audit entries', async () => {
+    const before = await admin!
+      .from('audit_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('action', 'founder_bootstrap')
+      .eq('entity_id', founderUser!.id)
+    expect(before.error).toBeNull()
+    expect(before.count).toBe(1)
+
+    const bootstrap = await admin!.rpc('bootstrap_initial_founder')
+    expect(bootstrap.error).toBeNull()
+    expect(bootstrap.data).toBe(founderUser!.id)
+
+    const after = await admin!
+      .from('audit_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('action', 'founder_bootstrap')
+      .eq('entity_id', founderUser!.id)
+    expect(after.error).toBeNull()
+    expect(after.count).toBe(before.count)
+  })
+
+  it.runIf(releaseRlsRequired && canProvisionUsers)('prevents changing or deleting the Founder identity', async () => {
+    const selfChange = await admin!.rpc('set_platform_admin_role', {
+      p_actor_user_id: founderUser!.id,
+      p_target_user_id: founderUser!.id,
+      p_new_role: 'admin',
+    })
+    expect(selfChange.error).toBeNull()
+    expect(selfChange.data).toEqual({ status: 'self_change_forbidden' })
+
+    const deletion = await admin!.from('profiles').delete().eq('id', founderUser!.id)
+    expect(deletion.error).not.toBeNull()
+  })
 
   it.each([['plan', 'premium'], ['status', 'active']])(
     'prevents authenticated users from changing subscription column %s',
@@ -360,33 +546,25 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     await professionalB.auth.signOut()
   })
 
-  it.runIf(canProvisionUsers)('allows admin and founder to use both products in their authorized context', async () => {
-    for (const systemRole of ['admin', 'founder'] as const) {
-      const password = `Rls-${crypto.randomUUID()}-Aa1!`
-      const email = `rls-${systemRole}-${crypto.randomUUID()}@example.test`
-      const { data: created, error: createError } = await admin!.auth.admin.createUser({ email, password, email_confirm: true })
-      if (createError) throw createError
-      if (!created.user) throw new Error(`${systemRole} test user was not returned.`)
-      provisionedUserIds.push(created.user.id)
-
-      const { error: roleError } = await admin!.from('profiles').update({ system_role: systemRole }).eq('id', created.user.id)
-      if (roleError) throw roleError
-      const { data: workspace, error: workspaceError } = await admin!.rpc('bootstrap_business_workspace_v2', { p_user_id: created.user.id })
+  it.runIf(releaseRlsRequired && canProvisionUsers)('allows controlled admin and Founder identities to use both products', async () => {
+    for (const identity of [
+      { systemRole: 'admin', user: platformAdminUser!, client: platformAdmin! },
+      { systemRole: 'founder', user: founderUser!, client: founder! },
+    ] as const) {
+      const { systemRole, user, client: elevated } = identity
+      const { data: workspace, error: workspaceError } = await admin!.rpc('bootstrap_business_workspace_v2', { p_user_id: user.id })
       if (workspaceError) throw workspaceError
 
-      const elevated = client()
-      await signIn(elevated, email, password)
-      const personalWrite = await elevated.from('credit_cards').insert({ user_id: created.user.id, name: systemRole, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 }).select('id').single()
+      const personalWrite = await elevated.from('credit_cards').insert({ user_id: user.id, name: systemRole, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 }).select('id').single()
       expect(personalWrite.error).toBeNull()
       for (let index = 0; index < 4; index += 1) {
-        const extraCard = await elevated.from('credit_cards').insert({ user_id: created.user.id, name: `${systemRole}-card-${index}`, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 })
+        const extraCard = await elevated.from('credit_cards').insert({ user_id: user.id, name: `${systemRole}-card-${index}`, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 })
         expect(extraCard.error).toBeNull()
-        const extraGoal = await elevated.from('goals').insert({ user_id: created.user.id, title: `${systemRole}-goal-${index}`, target_amount: 10, current_amount: 0, deadline: '2099-01-01' })
+        const extraGoal = await elevated.from('goals').insert({ user_id: user.id, title: `${systemRole}-goal-${index}`, target_amount: 10, current_amount: 0, deadline: '2099-01-01' })
         expect(extraGoal.error).toBeNull()
       }
       const professionalWrite = await elevated.from('business_customers').insert({ workspace_id: workspace.id, name: systemRole }).select('id').single()
       expect(professionalWrite.error).toBeNull()
-      await elevated.auth.signOut()
     }
   })
 
@@ -493,14 +671,34 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     await premium.from('appointments').delete().eq('id', data![0].id).eq('user_id', premiumUser.id)
   })
 
-  it.each(['audit_logs', 'stripe_events'])('does not expose internal table %s to authenticated users', async (table) => {
-    const { data, error } = await pro.from(table).select('*').limit(1)
+  it('keeps platform audit rows hidden from non-Founder users', async () => {
+    const { data, error } = await pro.from('audit_logs').select('*').limit(1)
+    expect(error).toBeNull()
+    expect(data).toEqual([])
+  })
+
+  it.runIf(releaseRlsRequired && canProvisionUsers)('lets the Founder read role-change audit details', async () => {
+    const { data, error } = await founder!
+      .from('audit_logs')
+      .select('user_id, action, entity_id, changes, created_at')
+      .eq('action', 'platform_role_changed')
+      .eq('entity_id', platformAdminUser!.id)
+
+    expect(error).toBeNull()
+    expect(data?.length).toBeGreaterThanOrEqual(3)
+    expect(data?.every((entry) => entry.user_id === founderUser!.id)).toBe(true)
+    expect(data?.some((entry) => entry.changes?.previous_role === 'user' && entry.changes?.new_role === 'admin')).toBe(true)
+    expect(data?.every((entry) => Boolean(entry.created_at))).toBe(true)
+  })
+
+  it('does not expose Stripe event internals to authenticated users', async () => {
+    const { data, error } = await pro.from('stripe_events').select('*').limit(1)
     expect(data ?? []).toEqual([])
     expect(error).not.toBeNull()
   })
 
-  it('does not expose private tables to anonymous requests', async () => {
-    const { data, error } = await anon.from('transactions').select('id').limit(1)
+  it.each(['transactions', 'profiles', 'audit_logs'])('does not expose %s to anonymous requests', async (table) => {
+    const { data, error } = await anon.from(table).select('id').limit(1)
     expect(data ?? []).toEqual([])
     expect(error === null || error.code === '42501').toBe(true)
   })

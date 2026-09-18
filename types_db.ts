@@ -3,6 +3,7 @@
 // ============================================================================
 
 export type SystemRole = 'user' | 'admin' | 'founder'
+export type WorkspaceRole = 'owner' | 'admin' | 'member'
 export type AccountMode = 'personal' | 'professional'
 export type ProductCode = 'personal' | 'professional'
 export type PlanTier = 'free' | 'basic' | 'pro' | 'premium' | 'professional_full'
@@ -331,7 +332,7 @@ export interface BusinessWorkspace {
 export interface BusinessWorkspaceMember {
   workspace_id: string
   user_id: string
-  role: 'owner' | 'admin' | 'member'
+  role: WorkspaceRole
   created_at: string
 }
 

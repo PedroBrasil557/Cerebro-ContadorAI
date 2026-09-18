@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import { ForbiddenError } from '@/lib/api/errors'
 import { errorResponse, successResponse } from '@/lib/api/response'
+import { getPlatformRole } from '@/lib/auth/platform'
 import { requireUser } from '@/lib/auth/requireUser'
 import { getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -41,6 +43,9 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser()
     inputSchema.parse(await request.json())
+    if (await getPlatformRole(user.id) === 'founder') {
+      throw new ForbiddenError('A conta Founder não pode ser excluída por este fluxo.')
+    }
     const admin = createAdminClient()
     const supabase = await createClient()
 

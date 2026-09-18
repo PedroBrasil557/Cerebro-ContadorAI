@@ -16,7 +16,6 @@ const serverEnvSchema = z.object({
   STRIPE_PRICE_PREMIUM: optionalSecret,
   SMTP_USER: optionalSecret,
   SMTP_PASS: optionalSecret,
-  FOUNDER_USER_ID: optionalSecret,
 })
 
 export const serverEnv = serverEnvSchema.parse({
@@ -28,7 +27,6 @@ export const serverEnv = serverEnvSchema.parse({
   STRIPE_PRICE_PREMIUM: process.env.STRIPE_PRICE_PREMIUM,
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
-  FOUNDER_USER_ID: process.env.FOUNDER_USER_ID,
 })
 
 const stripePriceSchema = z.object({

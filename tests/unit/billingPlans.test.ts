@@ -51,6 +51,21 @@ describe('billing plans', () => {
     })
   })
 
+  it.each([
+    { status: undefined, plan: undefined, product: undefined },
+    { status: 'canceled', plan: 'premium', product: 'professional' },
+    { status: 'past_due', plan: 'pro', product: 'personal' },
+    { status: 'active', plan: 'free', product: 'personal' },
+  ] as const)('keeps Founder authority independent from subscription state $status', (subscription) => {
+    const result = resolveProductAccess({ ...subscription, systemRole: 'founder' })
+    expect(result.access).toMatchObject({
+      canAccessPersonal: true,
+      canAccessProfessional: true,
+      canAccessAdmin: true,
+      canSwitchProducts: true,
+    })
+  })
+
   it.each(['past_due', 'canceled', 'unpaid', 'incomplete'] as const)('falls back to Personal FREE for %s', (status) => {
     expect(resolveProductAccess({ plan: 'premium', product: 'professional', status })).toMatchObject({
       plan: 'free',
