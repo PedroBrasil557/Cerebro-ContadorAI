@@ -180,79 +180,13 @@ export interface ClientAppointment {
   created_at?: string
 }
 
-export interface NailService {
-  id: string;
-  name: string;
-  category: 'Alongamento' | 'Manutenção' | 'Esmaltação' | 'Extras';
-  price: number;
-  duration: number; // em minutos
-}
-
-export interface NailProfessional {
-  id: string;
-  name: string;
-  specialty: string;
-  active: boolean;
-}
-
-export interface NailAppointment extends ClientAppointment {
-  service_id: string;
-  professional_id: string;
-  payment_method: string;
-  payment_status: 'pago' | 'pendente';
-  extra_services?: string[];
-}
-
-export interface BusinessSettings {
-  user_id: string
-  workspace_id?: string | null
-  current_balance: number
-  monthly_goal: number
-  tax_rate: number | null
-  tax_rate_confirmed_at?: string | null
-  reserve_rate: number
-  updated_at?: string
-}
-
-export interface CaixaData {
-  currentBalance: number
-  monthlyGoal: number
-  taxRate: number | null
-  reserveRate?: number
-  entries: Transaction[]
-}
-
-// --- 5. SISTEMA & OUTROS ---
-export interface NotificationItem {
-  id: string
-  user_id: string
-  title: string
-  message: string
-  type: 'info' | 'success' | 'warning' | 'alert'
-  read: boolean
-  created_at: string
-}
-
-export interface PatrimonyHistory {
-  id: string
-  user_id: string
-  total_balance: number
-  record_date: string
-  created_at?: string
-}
-
-export interface EmergencyFund {
-  current_amount: number
-  monthly_expenses: number
-  months_covered: number
-  target_months: number 
-  status: 'safe' | 'warning' | 'danger'
-}
-
-export type ActiveTab = 
-  | 'dashboard' 
+export type ActiveTab =
+  | 'dashboard'
   | 'compras inteligentes'
   | 'transações'
+  | 'orçamento'
+  | 'metas'
+  | 'cérebro'
   | 'investimentos'
   | 'minha carteira'
   | 'central de dividas'
@@ -261,134 +195,13 @@ export type ActiveTab =
   | 'agenda smart'
   | 'meu perfil'
   | 'admin'
-  // --- ENGENHARIA DE CUSTOS ---
-export interface NailProduct {
-  id: string;
-  user_id: string;
-  name: string; // Ex: Gel Vòlia Classic Blank
-  category: 'gel' | 'fibra' | 'prep' | 'esmalte' | 'descartavel';
-  purchase_price: number;
-  quantity_ml_g: number;
-  estimated_yield: number; // Quantas clientes atende (ex: 30)
-  cost_per_application: number; // Calculado: purchase_price / estimated_yield
-  status: 'estoque_bom' | 'acabando' | 'critico';
-}
 
-export interface NailServiceEngineering {
-  id: string;
-  service_id: string; // Vincula ao serviço (Ex: Alongamento Fio a Fio)
-  products_used: Array<{ product_id: string; usage_multiplier: number }>;
-  time_cost_per_minute: number; // Baseado no custo fixo do estúdio
-  total_material_cost: number;
-  suggested_price: number;
-  current_price: number;
-  profit_margin_pct: number;
-}
-
-// --- INTELIGÊNCIA DE NEGÓCIO ---
-export interface BusinessHealthSnapshot {
-  id: string;
-  month: string;
-  gross_revenue: number;
-  net_profit: number;
-  total_material_costs: number;
-  average_ticket: number;
-  safe_pro_labore: number; // O que ela pode sacar sem quebrar a empresa
-  stability_index: number; // 0-100 (A Jóia da Coroa)
-  ai_diagnostic_summary: string;
-}
-
-export type BusinessCapability =
-  | 'finance'
-  | 'customers'
-  | 'catalog'
-  | 'pricing'
-  | 'decision_simulator'
-  | 'sales'
-  | 'quotes'
-  | 'receivables'
-  | 'payables'
-  | 'reports'
-  | 'appointments'
-  | 'projects'
-  | 'inventory'
-  | 'purchases'
-  | 'suppliers'
-
-export interface BusinessWorkspace {
+export interface NotificationItem {
   id: string
-  owner_user_id: string
-  name: string
-  business_type: 'service' | 'commerce' | 'appointments' | 'projects' | 'products_and_services' | 'other'
-  document?: string | null
-  base_currency: string
-  timezone: string
-  tax_rate: number | null
-  tax_rate_confirmed_at?: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface BusinessWorkspaceMember {
-  workspace_id: string
   user_id: string
-  role: WorkspaceRole
+  title: string
+  message: string
+  type: 'info' | 'success' | 'warning' | 'alert'
+  read: boolean
   created_at: string
-}
-
-export interface BusinessWorkspaceCapability {
-  workspace_id: string
-  capability: BusinessCapability
-  enabled: boolean
-  created_at: string
-}
-
-export interface BusinessCustomer {
-  id: string
-  workspace_id: string
-  legacy_source?: 'nail_clients' | 'clients' | null
-  legacy_source_id?: string | null
-  name: string
-  email?: string | null
-  phone?: string | null
-  notes?: string | null
-  document?: string | null
-  customer_type: 'person' | 'company'
-  tags: string[]
-  total_spent: number
-  interaction_count: number
-  last_interaction_at?: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface BusinessCatalogItem {
-  id: string
-  workspace_id: string
-  name: string
-  kind: 'product' | 'service'
-  description?: string | null
-  sku?: string | null
-  unit?: string | null
-  sale_price?: number | null
-  cost_price?: number | null
-  active: boolean
-  track_stock: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface BusinessCostItem {
-  id: string
-  workspace_id: string
-  name: string
-  category: string
-  purchase_price: number
-  quantity?: number | null
-  estimated_yield?: number | null
-  cost_per_unit?: number | null
-  cost_per_use?: number | null
-  active: boolean
-  created_at: string
-  updated_at: string
 }
