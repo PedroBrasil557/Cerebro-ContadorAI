@@ -25,6 +25,8 @@ import type {
 } from '@/types_db'
 import { useEntitlements } from '@/core/hooks/useEntitlements'
 
+const PROFESSIONAL_TABS = new Set<ActiveTab>(['visão do negócio', 'caixa empresarial'])
+
 export default function MainAppLayout({ user }: { user: User }) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
@@ -62,11 +64,22 @@ export default function MainAppLayout({ user }: { user: User }) {
         if (dbProfile) {
           setUserProfile(dbProfile)
           const preferred = dbProfile.account_mode
-          setAccountMode(
+          const resolvedMode: AccountMode =
             billing.access.canSwitchProducts && preferred === 'professional'
               ? 'professional'
-              : billing.product,
-          )
+              : billing.product
+
+          setAccountMode(resolvedMode)
+          setActiveTab((current) => {
+            if (current === 'admin' || current === 'meu perfil') return current
+            if (resolvedMode === 'professional' && !PROFESSIONAL_TABS.has(current)) {
+              return 'visão do negócio'
+            }
+            if (resolvedMode === 'personal' && PROFESSIONAL_TABS.has(current)) {
+              return 'dashboard'
+            }
+            return current
+          })
         }
         if (dbTrans) setTransactions(dbTrans)
         if (dbGoals) setGoals(dbGoals)
