@@ -15,7 +15,6 @@ import { toast } from 'sonner'
 import type { ActiveTab, AccountMode } from '@/types_db'
 import type { Entitlements, PlanCode, ProductAccess } from '@/lib/billing/plans'
 import UpgradeModal from '@/core/components/UpgradeModal'
-import { Badge } from '@/core/ui/badge'
 import { Button } from '@/core/ui/button'
 import { IconButton } from '@/core/ui/icon-button'
 import {
