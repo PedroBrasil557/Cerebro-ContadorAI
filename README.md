@@ -65,7 +65,7 @@ As variáveis `SUPABASE_TEST_*` e `E2E_USER_*` são opcionais e devem apontar ap
 
 ## Supabase
 
-As migrations versionadas ficam em `supabase/migrations`. Aplique-as em ordem com a CLI do Supabase ou pelo pipeline controlado da equipe. Depois de qualquer mudança de schema, execute os advisors de segurança e performance e os testes RLS. A autoridade de plataforma e o bootstrap inicial do Founder estão documentados em `docs/PLATFORM_AUTHORITY.md`.
+As migrations versionadas ficam em `supabase/migrations`. Aplique-as em ordem com a CLI do Supabase ou pelo pipeline controlado da equipe. Depois de qualquer mudança de schema, execute os advisors de segurança e performance e os testes RLS. O mapa Production/staging/sandbox e o preflight manual estão em `docs/ENVIRONMENTS.md`; a autoridade de plataforma e o bootstrap inicial do Founder estão documentados em `docs/PLATFORM_AUTHORITY.md`.
 
 ## Stripe
 
