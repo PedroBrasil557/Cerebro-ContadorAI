@@ -14,14 +14,18 @@ const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
+>(({ className, sideOffset = 6, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-80 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className
+        "z-50 min-w-[12rem] overflow-hidden rounded-[var(--radius-md)] border p-1.5 shadow-xl",
+        "border-[var(--color-card-border)] bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)]",
+        "animate-in fade-in-80 data-[side=bottom]:slide-in-from-top-2",
+        "data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2",
+        "data-[side=top]:slide-in-from-bottom-2",
+        className,
       )}
       {...props}
     />
@@ -33,14 +37,20 @@ const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
     inset?: boolean
+    variant?: "default" | "destructive"
   }
->(({ className, inset, ...props }, ref) => (
+>(({ className, inset, variant = "default", ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex min-h-10 cursor-default select-none items-center rounded-[var(--radius-sm)] px-2.5 py-2 text-sm outline-none",
+      "transition-colors duration-[var(--motion-duration-fast)]",
+      "focus:bg-[var(--color-action-ghost-hover)]",
+      "data-[disabled]:pointer-events-none data-[disabled]:text-[var(--color-text-disabled)]",
+      variant === "default" && "text-[var(--color-text-primary)]",
+      variant === "destructive" && "text-[var(--color-status-danger)] focus:bg-[var(--color-status-danger-surface)]",
       inset && "pl-8",
-      className
+      className,
     )}
     {...props}
   />
@@ -56,9 +66,9 @@ const DropdownMenuLabel = React.forwardRef<
   <DropdownMenuPrimitive.Label
     ref={ref}
     className={cn(
-      "px-2 py-1.5 text-sm font-semibold",
+      "px-2.5 py-2 text-xs font-semibold text-[var(--color-text-secondary)]",
       inset && "pl-8",
-      className
+      className,
     )}
     {...props}
   />
@@ -71,7 +81,7 @@ const DropdownMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    className={cn("-mx-1 my-1 h-px bg-[var(--color-border-default)]", className)}
     {...props}
   />
 ))
