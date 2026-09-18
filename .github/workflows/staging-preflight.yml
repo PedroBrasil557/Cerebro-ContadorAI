@@ -2,6 +2,11 @@ name: Supabase Staging Preflight
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/staging-preflight.trigger'
 
 permissions:
   contents: read
