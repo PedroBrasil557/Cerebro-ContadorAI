@@ -27,6 +27,7 @@ O Figma define aparência, hierarquia, estados, responsividade e interação. O 
 8. Estados loading, vazio, erro, disabled e focus fazem parte do componente, não são remendos de tela.
 9. Light e Dark usam a mesma semântica; apenas os aliases mudam.
 10. `npm run check` deve passar antes de abrir uma PR para review.
+11. A migração de navegação não pode remover módulos existentes nem contornar seus gates de entitlement/acesso.
 
 ## 3. Arquitetura atual a preservar
 
@@ -42,6 +43,47 @@ O produto já possui uma base madura:
 - `core/components/ai/*` e `app/api/ai/*`: IA atual.
 
 A migração deve ser incremental. Evitar um rewrite do shell e das views em uma única PR.
+
+### 3.1 Regra de preservação de módulos na nova navegação
+
+As cinco telas auditadas do Figma representam a **navegação primária** do novo produto. Elas não substituem automaticamente todos os módulos que já existem no código.
+
+#### Personal — destino primário
+
+1. Visão geral
+2. Transações
+3. Orçamento
+4. Metas
+5. Cérebro
+
+#### Personal — capacidades existentes que permanecem disponíveis
+
+- Smart Shopping (`compras inteligentes`)
+- Patrimônio / Investimentos (`investimentos`)
+- Carteira de Cartões (`minha carteira`)
+- Central de Dívidas (`central de dividas`)
+- Perfil (`meu perfil`)
+- Administração (`admin`) quando `access.canAccessAdmin`
+
+No Desktop, estes destinos podem viver em uma seção secundária da Sidebar. No Mobile, os cinco destinos principais ocupam a bottom navigation e os módulos adicionais ficam acessíveis por uma superfície de `Mais`/menu apropriada. No Tablet, o rail mantém os destinos principais e um acesso secundário aos demais.
+
+Os gates atuais de PRO/entitlements continuam válidos. Não transformar recurso bloqueado em recurso livre durante uma migração visual.
+
+#### Professional — destino primário
+
+1. Visão geral
+2. Fluxo de caixa
+3. Contas
+4. Obrigações
+5. Cérebro
+
+O código atual possui `FinancialCommandCenter` e `CaixaView`. Eles devem ser reutilizados/adaptados como fonte de comportamento e dados enquanto as novas views são implementadas. Não removê-los antes de existirem adapters e substitutos validados.
+
+`Administração` continua sendo uma capacidade global protegida e não deve ser misturada com a navegação financeira do cliente.
+
+#### ActiveTab
+
+A PR do shell não deve remover valores atuais de `ActiveTab`. Novos valores devem ser introduzidos apenas junto com as views correspondentes, em PRs próprias, para manter o roteamento/renderização compatíveis durante a migração.
 
 ## 4. Tokens
 
@@ -89,12 +131,12 @@ Regra: reorganizar antes de comprimir. Não transformar Desktop em Mobile apenas
 | Badge | `core/ui/badge.tsx` | Novo primitive CVA com tones semantic. |
 | Input | `core/ui/input.tsx` | Novo primitive tokenizado. |
 | Field | `core/ui/field.tsx` | Composição label + input + helper/error. |
-| Select | `core/ui/select.tsx` | Preferir Radix; migrar usos de `CustomSelect` gradualmente. |
+| Select | `core/ui/CustomSelect.tsx` inicialmente | Manter API compatível e comportamento acessível; migrar para um Select Radix quando a necessidade de menu customizado justificar. |
 | Textarea | `core/ui/textarea.tsx` | Novo primitive responsivo. |
 | Checkbox / Radio / Switch | `core/ui/*` | Radix quando aplicável; estados Focus obrigatórios. |
 | Tooltip | `core/ui/tooltip.tsx` | Reutilizar Radix existente, trocar somente tokens. |
 | Menu Item | `core/ui/dropdown-menu.tsx` | Reutilizar Radix existente, alinhar estados. |
-| Dialog | `core/ui/dialog.tsx` | Radix Dialog; Desktop e Mobile com actions responsivas. |
+| Dialog / Modal | `core/ui/Modal.tsx` inicialmente | API legada preservada sobre Radix Dialog; evoluir para primitive genérico sem quebrar consumidores. |
 | Drawer | `core/ui/drawer.tsx` | Superfície lateral contextual; não substituir por página inteira. |
 
 ## 7. Mapeamento de componentes de produto
@@ -140,7 +182,8 @@ Escopo:
 - Tablet Navigation Rail + Tablet Top Bar;
 - Mobile Top Bar + Bottom Navigation;
 - Product switch Personal/Professional;
-- preservar entitlements e `accountMode` existentes.
+- preservar entitlements e `accountMode` existentes;
+- preservar módulos existentes via navegação secundária/`Mais`.
 
 ### PR C — Personal Core
 
