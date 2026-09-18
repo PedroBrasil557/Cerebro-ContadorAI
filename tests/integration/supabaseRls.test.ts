@@ -341,12 +341,27 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
   )
 
   it('blocks a Professional workspace owner from changing any platform role', async () => {
+    const ownBefore = await premium.from('profiles').select('system_role').eq('id', premiumUser.id).single()
+    expect(ownBefore.error).toBeNull()
+
     const ownRole = await premium.from('profiles').update({ system_role: 'admin' }).eq('id', premiumUser.id)
     expect(ownRole.error).not.toBeNull()
+    expect(ownRole.error?.code).toBe('42501')
 
-    const otherRole = await premium.from('profiles').update({ system_role: 'admin' }).eq('id', proUser.id).select('id')
-    expect(otherRole.error).toBeNull()
-    expect(otherRole.data).toEqual([])
+    const ownAfter = await premium.from('profiles').select('system_role').eq('id', premiumUser.id).single()
+    expect(ownAfter.error).toBeNull()
+    expect(ownAfter.data?.system_role).toBe(ownBefore.data?.system_role)
+
+    const targetBefore = await pro.from('profiles').select('system_role').eq('id', proUser.id).single()
+    expect(targetBefore.error).toBeNull()
+
+    const otherRole = await premium.from('profiles').update({ system_role: 'admin' }).eq('id', proUser.id)
+    expect(otherRole.error).not.toBeNull()
+    expect(otherRole.error?.code).toBe('42501')
+
+    const targetAfter = await pro.from('profiles').select('system_role').eq('id', proUser.id).single()
+    expect(targetAfter.error).toBeNull()
+    expect(targetAfter.data?.system_role).toBe(targetBefore.data?.system_role)
   })
 
   it('blocks a common user from changing another user platform role', async () => {
@@ -392,6 +407,28 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     })
     expect(adminActor.error).toBeNull()
     expect(adminActor.data).toEqual({ status: 'forbidden' })
+  })
+
+  it.runIf(releaseRlsRequired && canProvisionUsers)('keeps Founder bootstrap idempotent without duplicate audit entries', async () => {
+    const before = await admin!
+      .from('audit_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('action', 'founder_bootstrap')
+      .eq('entity_id', founderUser!.id)
+    expect(before.error).toBeNull()
+    expect(before.count).toBe(1)
+
+    const bootstrap = await admin!.rpc('bootstrap_initial_founder')
+    expect(bootstrap.error).toBeNull()
+    expect(bootstrap.data).toBe(founderUser!.id)
+
+    const after = await admin!
+      .from('audit_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('action', 'founder_bootstrap')
+      .eq('entity_id', founderUser!.id)
+    expect(after.error).toBeNull()
+    expect(after.count).toBe(before.count)
   })
 
   it.runIf(releaseRlsRequired && canProvisionUsers)('prevents changing or deleting the Founder identity', async () => {

@@ -6,6 +6,9 @@ const migration = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260917234335_founder_platform_authority.sql'),
   'utf8'
 )
+const bootstrap = migration.match(
+  /create or replace function public\.bootstrap_initial_founder\(\)[\s\S]*?\n\$\$;/i,
+)?.[0] ?? ''
 
 describe('Founder platform-authority migration contract', () => {
   it('keeps the initial email confined to the fixed service-role bootstrap', () => {
@@ -15,8 +18,39 @@ describe('Founder platform-authority migration contract', () => {
     expect(migration).toMatch(/revoke all on function public\.bootstrap_initial_founder\(\) from public, anon, authenticated/i)
   })
 
+  it('allows the fixed identity to bootstrap when no Founder exists', () => {
+    const preflightIndex = bootstrap.indexOf("where profile.system_role = 'founder'")
+    const mutationIndex = bootstrap.indexOf("perform set_config('app.platform_role_change_authorized', 'true', true)")
+
+    expect(preflightIndex).toBeGreaterThan(-1)
+    expect(mutationIndex).toBeGreaterThan(preflightIndex)
+    expect(bootstrap).toMatch(/insert into public\.profiles[\s\S]*'founder'[\s\S]*on conflict \(id\) do update/i)
+  })
+
+  it('returns idempotently when the fixed identity is already the Founder', () => {
+    expect(bootstrap).toMatch(
+      /if v_previous_role = 'founder' then\s+return v_founder_id;\s+end if;/i,
+    )
+
+    const idempotentReturnIndex = bootstrap.indexOf("if v_previous_role = 'founder' then")
+    const auditIndex = bootstrap.indexOf("'founder_bootstrap'")
+    expect(auditIndex).toBeGreaterThan(idempotentReturnIndex)
+  })
+
+  it('rejects a different existing Founder before authorizing any mutation', () => {
+    expect(bootstrap).toMatch(/profile\.id <> v_founder_id/i)
+    expect(bootstrap).toContain('A different Founder already exists.')
+
+    const rejectionIndex = bootstrap.indexOf('A different Founder already exists.')
+    const idempotentReturnIndex = bootstrap.indexOf("if v_previous_role = 'founder' then")
+    const mutationIndex = bootstrap.indexOf("perform set_config('app.platform_role_change_authorized', 'true', true)")
+    expect(rejectionIndex).toBeLessThan(idempotentReturnIndex)
+    expect(rejectionIndex).toBeLessThan(mutationIndex)
+  })
+
   it('enforces one Founder and protects role changes and deletion at the database layer', () => {
     expect(migration).toContain('profiles_single_founder_idx')
+    expect(migration).toMatch(/create unique index if not exists profiles_single_founder_idx/i)
     expect(migration).toMatch(/where system_role = 'founder'/)
     expect(migration).toContain('create trigger protect_platform_authority')
     expect(migration).toContain("if old.system_role = 'founder'")

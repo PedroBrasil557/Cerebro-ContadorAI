@@ -65,6 +65,7 @@ as $$
 declare
   v_founder_id uuid;
   v_founder_email text;
+  v_existing_founder_id uuid;
   v_previous_role public.system_role;
 begin
   select auth_user.id, auth_user.email
@@ -83,6 +84,23 @@ begin
   from public.profiles profile
   where profile.id = v_founder_id;
 
+  select profile.id
+    into v_existing_founder_id
+  from public.profiles profile
+  where profile.system_role = 'founder'
+    and profile.id <> v_founder_id
+  limit 1;
+
+  if v_existing_founder_id is not null then
+    raise exception 'A different Founder already exists.'
+      using errcode = '23505',
+            detail = format('Existing Founder UUID: %s.', v_existing_founder_id);
+  end if;
+
+  if v_previous_role = 'founder' then
+    return v_founder_id;
+  end if;
+
   perform set_config('app.platform_role_change_authorized', 'true', true);
 
   insert into public.profiles (id, email, full_name, system_role)
@@ -96,19 +114,17 @@ begin
     set email = excluded.email,
         system_role = 'founder';
 
-  if v_previous_role is distinct from 'founder' then
-    insert into public.audit_logs (user_id, action, entity, entity_id, changes)
-    values (
-      v_founder_id,
-      'founder_bootstrap',
-      'profile',
-      v_founder_id,
-      jsonb_build_object(
-        'previous_role', v_previous_role,
-        'new_role', 'founder'
-      )
-    );
-  end if;
+  insert into public.audit_logs (user_id, action, entity, entity_id, changes)
+  values (
+    v_founder_id,
+    'founder_bootstrap',
+    'profile',
+    v_founder_id,
+    jsonb_build_object(
+      'previous_role', v_previous_role,
+      'new_role', 'founder'
+    )
+  );
 
   return v_founder_id;
 end;
