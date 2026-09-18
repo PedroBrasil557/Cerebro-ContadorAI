@@ -1,48 +1,64 @@
-// components/ui/Modal.tsx
 'use client'
 
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import React from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
+import { X } from 'lucide-react'
 
 type ModalProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-};
+  isOpen: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+}
 
+/**
+ * Backwards-compatible Modal API powered by Radix Dialog.
+ *
+ * This preserves existing consumers while adding focus trapping, Escape close,
+ * accessible labelling and predictable focus restoration.
+ */
 export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
-  if (!isOpen) return null;
-
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800"
-          onClick={(e) => e.stopPropagation()} // Impede que o clique no modal feche-o
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-[var(--neutral-950)] opacity-70" />
+        <Dialog.Content
+          className={[
+            'fixed left-1/2 top-1/2 z-[61] w-[calc(100%-2rem)] max-w-lg',
+            '-translate-x-1/2 -translate-y-1/2',
+            'rounded-[var(--radius-lg)] border border-[var(--color-card-border)]',
+            'bg-[var(--color-bg-elevated)] p-6 text-[var(--color-text-primary)] shadow-2xl',
+            'focus:outline-none',
+          ].join(' ')}
         >
-          <div className="flex justify-between items-start mb-6">
-            <h2 className="text-2xl font-bold text-text-dark dark:text-white">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <Dialog.Title className="text-xl font-semibold leading-7 text-[var(--color-text-primary)]">
               {title}
-            </h2>
-            <button onClick={onClose} className="rounded-full p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <X className="h-6 w-6" />
-            </button>
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                aria-label="Fechar"
+                className={[
+                  'inline-flex h-9 w-9 shrink-0 items-center justify-center',
+                  'rounded-[var(--radius-sm)] text-[var(--color-text-secondary)]',
+                  'transition-colors duration-[var(--motion-duration-fast)]',
+                  'hover:bg-[var(--color-action-ghost-hover)] hover:text-[var(--color-text-primary)]',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]',
+                ].join(' ')}
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </Dialog.Close>
           </div>
           {children}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
