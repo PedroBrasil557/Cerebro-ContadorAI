@@ -120,17 +120,15 @@ export function AppTopBar({
       <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <div className="relative">
-              <IconButton label="Abrir notificações" variant="ghost" size="md">
-                <Bell aria-hidden="true" className="h-5 w-5" />
-              </IconButton>
+            <IconButton label="Abrir notificações" variant="ghost" size="md" className="relative">
+              <Bell aria-hidden="true" className="h-5 w-5" />
               {unreadCount > 0 ? (
                 <span
                   aria-hidden="true"
                   className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[var(--color-status-danger)] ring-2 ring-[var(--color-bg-surface)]"
                 />
               ) : null}
-            </div>
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[min(22rem,calc(100vw-2rem))] p-0">
             <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-3">
