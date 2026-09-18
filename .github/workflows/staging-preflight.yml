@@ -2,11 +2,6 @@ name: Supabase Staging Preflight
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/staging-preflight.trigger'
 
 permissions:
   contents: read
@@ -28,13 +23,10 @@ jobs:
       CANONICAL_STAGING_PROJECT_ID: wybnnedsdrtbgxdfinac
       PRODUCTION_PROJECT_ID: ebbvknikigxibqtjibqg
       LEGACY_SANDBOX_PROJECT_ID: aenlidohcgopjkgmqfmc
-      PREFLIGHT_REF: foundation/founder-platform-authority
 
     steps:
-      - name: Checkout PR #7 candidate
+      - name: Checkout
         uses: actions/checkout@v6
-        with:
-          ref: ${{ env.PREFLIGHT_REF }}
 
       - name: Use Node.js 22
         uses: actions/setup-node@v6
@@ -76,7 +68,6 @@ jobs:
           fi
 
           echo "Canonical staging target verified."
-          echo "Candidate ref: $PREFLIGHT_REF"
 
       - name: Show pinned Supabase CLI version
         run: npx supabase --version
