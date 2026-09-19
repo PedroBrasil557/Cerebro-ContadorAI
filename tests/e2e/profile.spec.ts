@@ -10,7 +10,7 @@ test('shows profile editing, password and data controls', async ({ page }) => {
   test.skip(!hasE2EUser, 'Configure E2E_USER_EMAIL and E2E_USER_PASSWORD.')
   await login(page)
   await page.getByRole('button', { name: /menu do perfil/i }).click()
-  await page.getByRole('button', { name: 'Configurações' }).click()
+  await page.getByRole('menuitem', { name: 'Configurações' }).click()
   await expect(page.getByText('Perímetro do Perfil')).toBeVisible()
   await expect(page.getByRole('button', { name: /Exportar meus dados/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /Excluir minha conta/ })).toBeVisible()

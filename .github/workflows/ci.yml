@@ -82,7 +82,7 @@ jobs:
           npm run test:rls
 
   release-e2e:
-    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening' || github.ref == 'refs/heads/foundation/product-separation-professional-v2' || github.head_ref == 'foundation/product-separation-professional-v2' || github.ref == 'refs/heads/foundation/founder-platform-authority' || github.head_ref == 'foundation/founder-platform-authority' || github.ref == 'refs/heads/hardening/post-production-security' || github.head_ref == 'hardening/post-production-security'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
