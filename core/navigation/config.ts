@@ -97,6 +97,18 @@ const ADMIN_ITEM: AppNavigationItem = {
   section: 'global',
 }
 
+export function resolveAccountMode({
+  preferred,
+  product,
+  canSwitchProducts,
+}: {
+  preferred: AccountMode
+  product: AccountMode
+  canSwitchProducts: boolean
+}): AccountMode {
+  return canSwitchProducts ? preferred : product
+}
+
 export function getNavigationItems(
   accountMode: AccountMode,
   access: ProductAccess,
