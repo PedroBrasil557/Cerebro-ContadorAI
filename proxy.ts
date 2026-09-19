@@ -12,6 +12,21 @@ const PUBLIC_ROUTES = new Set([
 
 // A função PRECISA se chamar proxy para funcionar no Next.js 16+
 export async function proxy(request: NextRequest) {
+  const url = request.nextUrl.clone()
+  const path = url.pathname
+  const isPublicRoute = PUBLIC_ROUTES.has(path)
+  const isPublicFile = Boolean(path.match(/\.(.*)$/))
+
+  // Rotas públicas não dependem de uma chamada remota ao Auth. Isso mantém
+  // login/callback/recuperação disponíveis mesmo durante degradação do Supabase.
+  if (isPublicRoute || isPublicFile) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    })
+  }
+
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -41,20 +56,8 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const url = request.nextUrl.clone()
-  const path = url.pathname
-
-  const isAuthPage = path === '/login'
-  const isPublicRoute = PUBLIC_ROUTES.has(path)
-  const isPublicFile = path.match(/\.(.*)$/) 
-
-  if (!user && !isPublicRoute && !isPublicFile) {
+  if (!user) {
     url.pathname = '/login'
-    return NextResponse.redirect(url)
-  }
-
-  if (user && isAuthPage) {
-    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
