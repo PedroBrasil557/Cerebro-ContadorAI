@@ -12,6 +12,7 @@ import ViewContainer from '@/core/components/ViewContainer'
 import Navigation from '@/core/components/Navigation'
 import AIAssistant from '@/core/components/ai/AIAssistant'
 import { AppTopBar } from '@/core/navigation/AppTopBar'
+import { resolveAccountMode } from '@/core/navigation/config'
 import { checkAndTriggerSystemNotifications } from '@/core/action/notifications'
 import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
 import type { ActiveTab } from '@/types'
@@ -63,11 +64,11 @@ export default function MainAppLayout({ user }: { user: User }) {
 
         if (dbProfile) {
           setUserProfile(dbProfile)
-          const preferred = dbProfile.account_mode
-          const resolvedMode: AccountMode =
-            billing.access.canSwitchProducts && preferred === 'professional'
-              ? 'professional'
-              : billing.product
+          const resolvedMode = resolveAccountMode({
+            preferred: dbProfile.account_mode,
+            product: billing.product,
+            canSwitchProducts: billing.access.canSwitchProducts,
+          })
 
           setAccountMode(resolvedMode)
           setActiveTab((current) => {
