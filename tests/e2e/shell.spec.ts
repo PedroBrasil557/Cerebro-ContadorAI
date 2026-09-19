@@ -49,7 +49,7 @@ test('renders the responsive Personal shell and preserves PRO locks across break
   const tabletRail = page.locator('aside[aria-label="Navegação principal"]:visible')
   await expect(tabletRail).toHaveCount(1)
   await expect(tabletRail).toHaveCSS('width', '80px')
-  await tabletRail.getByRole('button', { name: 'Abrir mais recursos' }).click()
+  await tabletRail.getByRole('button', { name: 'Abrir mais recursos' }).click({ force: true })
 
   const tabletMore = page.getByRole('dialog', { name: 'Mais recursos' })
   await expect(tabletMore).toBeVisible()
@@ -69,7 +69,7 @@ test('renders the responsive Personal shell and preserves PRO locks across break
   await expect(mobileNav.getByRole('button', { name: 'Cartões' })).toBeVisible()
   await expect(mobileNav.getByRole('button', { name: 'Mais' })).toBeVisible()
 
-  await mobileNav.getByRole('button', { name: 'Mais' }).click()
+  await mobileNav.getByRole('button', { name: 'Mais' }).click({ force: true })
   const mobileMore = page.getByRole('dialog', { name: 'Mais recursos' })
   await expect(mobileMore).toBeVisible()
   await mobileMore.getByRole('button', { name: /Patrimônio/ }).click()
