@@ -18,7 +18,8 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
   await createDialog.getByLabel('Descrição').fill(description)
   await createDialog.getByRole('button', { name: 'Salvar transação', exact: true }).click()
 
-  await expect(page.getByText(description, { exact: true })).toBeVisible()
+  await expect(createDialog).toBeHidden({ timeout: 10_000 })
+  await expect(page.getByText(description, { exact: true })).toBeVisible({ timeout: 15_000 })
   await page.getByText(description, { exact: true }).click()
 
   const detailDialog = page.getByRole('dialog', { name: 'Detalhes da transação' })
@@ -30,7 +31,8 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
   await editDialog.getByLabel(/Motivo da edição/).fill('Correção validada pelo teste E2E')
   await editDialog.getByRole('button', { name: 'Salvar alterações', exact: true }).click()
 
-  await expect(page.getByText(updatedDescription, { exact: true })).toBeVisible()
+  await expect(editDialog).toBeHidden({ timeout: 10_000 })
+  await expect(page.getByText(updatedDescription, { exact: true })).toBeVisible({ timeout: 15_000 })
   await page.getByText(updatedDescription, { exact: true }).click()
 
   const updatedDetailDialog = page.getByRole('dialog', { name: 'Detalhes da transação' })
@@ -40,5 +42,6 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
   await expect(deleteDialog).toBeVisible()
   await deleteDialog.getByRole('button', { name: 'Excluir', exact: true }).click()
 
-  await expect(page.getByText(updatedDescription, { exact: true })).toHaveCount(0)
+  await expect(deleteDialog).toBeHidden({ timeout: 10_000 })
+  await expect(page.getByText(updatedDescription, { exact: true })).toHaveCount(0, { timeout: 15_000 })
 })
