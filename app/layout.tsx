@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner"; 
+import { Toaster } from "sonner";
 import { BRAND } from '@/lib/branding'
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: `${BRAND.name} | ${BRAND.tagline}`,
   description: "A inteligência financeira definitiva com IA cognitiva integrada.",
   icons: {
-    // Truque mestre: Um SVG gerado por código usando um emoji como logo temporária!
+    // TODO(brand): replace the temporary emoji with the final Cérebro mark.
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>",
   }
 };
@@ -22,9 +25,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${inter.className} bg-[#050505] text-white antialiased`} suppressHydrationWarning>
+      <body
+        className={`${inter.variable} bg-background text-foreground font-sans antialiased`}
+        suppressHydrationWarning
+      >
         {children}
-        <Toaster position="top-center" richColors theme="dark" />
+        <Toaster position="top-center" richColors theme="system" />
       </body>
     </html>
   );
