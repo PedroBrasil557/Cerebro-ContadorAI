@@ -5,6 +5,7 @@ import {
   getPrimaryNavigationItems,
   getSecondaryNavigationItems,
   isNavigationItemLocked,
+  resolveAccountMode,
 } from '../../core/navigation/config'
 import {
   getEntitlementsForPlan,
@@ -95,5 +96,21 @@ describe('responsive navigation config', () => {
     expect(isNavigationItemLocked(debts, free)).toBe(true)
     expect(isNavigationItemLocked(investments, pro)).toBe(false)
     expect(isNavigationItemLocked(debts, pro)).toBe(false)
+  })
+
+  it('honors the persisted Personal preference for Founder/Admin even when the billing product is Professional', () => {
+    expect(resolveAccountMode({
+      preferred: 'personal',
+      product: 'professional',
+      canSwitchProducts: true,
+    })).toBe('personal')
+  })
+
+  it('uses the billing product for users who cannot switch products', () => {
+    expect(resolveAccountMode({
+      preferred: 'professional',
+      product: 'personal',
+      canSwitchProducts: false,
+    })).toBe('personal')
   })
 })
