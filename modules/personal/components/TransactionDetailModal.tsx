@@ -154,7 +154,7 @@ export default function TransactionDetailModal({
         )}
       </Modal>
 
-      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Excluir transação?">
+      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Excluir transação?" role="alertdialog">
         <div className="space-y-5">
           <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-status-danger)] bg-[var(--color-status-danger-surface)] p-4">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-status-danger)]" aria-hidden="true" />
