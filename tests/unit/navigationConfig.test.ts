@@ -30,7 +30,7 @@ describe('responsive navigation config', () => {
     systemRole: 'founder',
   }).access
 
-  it('keeps current Personal modules reachable after the audited Personal Core migration', () => {
+  it('keeps only implemented Personal modules reachable after the audited Personal Core migration', () => {
     const ids = getNavigationItems('personal', personalAccess).map((item) => item.id)
 
     expect(ids).toEqual([
@@ -38,7 +38,6 @@ describe('responsive navigation config', () => {
       'transações',
       'orçamento',
       'metas',
-      'cérebro',
       'compras inteligentes',
       'minha carteira',
       'investimentos',
@@ -59,7 +58,7 @@ describe('responsive navigation config', () => {
     expect(getNavigationItems('professional', founderAccess).some((item) => item.id === 'admin')).toBe(true)
   })
 
-  it('uses the five audited Personal core destinations in mobile navigation', () => {
+  it('uses only implemented Personal destinations in mobile navigation', () => {
     const ids = getMobilePrimaryItems('personal', personalAccess).map((item) => item.id)
 
     expect(ids).toEqual([
@@ -67,7 +66,6 @@ describe('responsive navigation config', () => {
       'transações',
       'orçamento',
       'metas',
-      'cérebro',
     ])
   })
 
