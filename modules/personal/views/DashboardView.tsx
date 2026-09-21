@@ -5,7 +5,11 @@ import { useReducedMotion } from "framer-motion";
 import { BarChart3, ChevronRight, Landmark, LineChart as LineChartIcon, Lock, TrendingUp } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ActiveTab, Investment, Transaction } from "@/types_db";
-import { calculateExpenses, calculateIncome } from "@/core/finance/transactionMath";
+import {
+  calculateRealizedExpenses,
+  calculateRealizedIncome,
+  isRealizedTransaction,
+} from "@/core/finance/transactionMath";
 import { formatCurrency } from "@/lib/utils";
 import UpgradeModal from "@/core/components/UpgradeModal";
 import { useEntitlements } from "@/core/hooks/useEntitlements";
@@ -58,19 +62,14 @@ export default function DashboardView({
       const date = new Date(transaction.date);
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     });
-    const income = calculateIncome(monthTransactions);
-    const expense = calculateExpenses(monthTransactions);
-    const localBanks =
-      typeof window !== "undefined"
-        ? (JSON.parse(localStorage.getItem("cerebro_banks") || "[]") as Array<{ balance?: number }>)
-        : [];
-    const bankBalance = localBanks.reduce((total, bank) => total + Number(bank.balance ?? 0), 0);
+    const income = calculateRealizedIncome(monthTransactions);
+    const expense = calculateRealizedExpenses(monthTransactions);
     const totalInvestments = investments.reduce(
       (total, investment) => total + Number(investment.amount_invested || 0),
       0,
     );
     const score = expense > 0 ? Math.min(Math.round((income / expense) * 100), 100) : income > 0 ? 100 : 0;
-    const balance = initialSummary.balance + bankBalance;
+    const balance = initialSummary.balance;
     return {
       income,
       expense,
@@ -79,6 +78,7 @@ export default function DashboardView({
       balance,
       patrimony: balance + totalInvestments,
       monthCount: monthTransactions.length,
+      realizedMonthCount: monthTransactions.filter(isRealizedTransaction).length,
     };
   }, [initialTransactions, initialSummary.balance, investments]);
 
@@ -89,6 +89,7 @@ export default function DashboardView({
       despesa: 0,
     }));
     initialTransactions.forEach((transaction) => {
+      if (!isRealizedTransaction(transaction)) return;
       const date = new Date(transaction.date);
       if (date.getFullYear() !== selectedYear) return;
       const amount = Math.abs(Number(transaction.amount || 0));
@@ -104,11 +105,11 @@ export default function DashboardView({
   const displayedTransactions = recentTransactions.slice(0, 5);
   const healthState = stats.score >= 100 ? "healthy" : stats.score >= 50 ? "attention" : "critical";
   const healthDescription =
-    stats.monthCount === 0
-      ? "Registre movimentações para acompanhar sua cobertura financeira mensal."
+    stats.realizedMonthCount === 0
+      ? "Registre ou confirme movimentações realizadas para acompanhar sua cobertura financeira mensal."
       : stats.score >= 100
-        ? "As receitas registradas no mês cobrem as despesas atuais."
-        : "As despesas registradas estão acima da cobertura atual das receitas do mês.";
+        ? "As receitas realizadas no mês cobrem as despesas realizadas até agora."
+        : "As despesas realizadas estão acima da cobertura atual das receitas realizadas no mês.";
 
   return (
     <div className="min-h-full bg-[var(--color-bg-canvas)] text-[var(--color-text-primary)]">
@@ -121,8 +122,8 @@ export default function DashboardView({
         {!hasFlowHistory ? (
           <SmartAlert
             tone="info"
-            title="Seu histórico ainda está em formação"
-            description="Continue registrando movimentações para tornar os indicadores e o fluxo de caixa mais completos."
+            title="Seu histórico realizado ainda está em formação"
+            description="Continue registrando e confirmando movimentações para tornar os indicadores e o fluxo de caixa mais completos."
             actionLabel="Ver transações"
             onAction={() => onNavigate("transações")}
           />
@@ -133,7 +134,7 @@ export default function DashboardView({
             total={stats.patrimony}
             available={stats.balance}
             invested={stats.totalInvestments}
-            description="Visão consolidada do saldo disponível e dos investimentos registrados"
+            description="Saldo realizado disponível somado aos investimentos registrados"
           />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             <FinancialMetricCard
@@ -152,17 +153,17 @@ export default function DashboardView({
         </section>
 
         <section className="grid gap-4 md:grid-cols-3">
-          <FinancialMetricCard label="Saldo disponível" value={formatCurrency(stats.balance)} helper="Saldo consolidado atual" />
-          <FinancialMetricCard label="Receitas" value={formatCurrency(stats.income)} helper="Neste mês" tone="positive" />
-          <FinancialMetricCard label="Despesas" value={formatCurrency(stats.expense)} helper="Neste mês" tone="negative" />
+          <FinancialMetricCard label="Saldo disponível" value={formatCurrency(stats.balance)} helper="Somente movimentações realizadas" />
+          <FinancialMetricCard label="Receitas realizadas" value={formatCurrency(stats.income)} helper="Neste mês" tone="positive" />
+          <FinancialMetricCard label="Despesas realizadas" value={formatCurrency(stats.expense)} helper="Neste mês" tone="negative" />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
           <article className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-5 md:p-[22px]">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-base font-semibold">Fluxo de caixa</h2>
-                <p className="mt-1 text-xs text-[var(--color-text-helper)]">Receitas e despesas em {selectedYear}</p>
+                <h2 className="text-base font-semibold">Fluxo de caixa realizado</h2>
+                <p className="mt-1 text-xs text-[var(--color-text-helper)]">Receitas e despesas confirmadas em {selectedYear}</p>
               </div>
               <div className="flex rounded-[var(--radius-sm)] bg-[var(--color-action-ghost-hover)] p-1" aria-label="Formato do gráfico">
                 <Button
@@ -197,7 +198,7 @@ export default function DashboardView({
               </span>
             </div>
 
-            <div className="h-[280px] w-full" role="img" aria-label={`Fluxo de caixa anual de ${selectedYear}: receitas e despesas por mês`}>
+            <div className="h-[280px] w-full" role="img" aria-label={`Fluxo de caixa realizado de ${selectedYear}: receitas e despesas por mês`}>
               {hasFlowHistory ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType === "area" ? (
@@ -266,7 +267,7 @@ export default function DashboardView({
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-ghost-hover)] px-6 text-center text-sm text-[var(--color-text-helper)]">
-                  Ainda não há movimentações suficientes para visualizar o fluxo anual.
+                  Ainda não há movimentações realizadas suficientes para visualizar o fluxo anual.
                 </div>
               )}
             </div>

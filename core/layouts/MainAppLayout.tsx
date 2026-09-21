@@ -14,7 +14,11 @@ import AIAssistant from '@/core/components/ai/AIAssistant'
 import { AppTopBar } from '@/core/navigation/AppTopBar'
 import { resolveAccountMode } from '@/core/navigation/config'
 import { checkAndTriggerSystemNotifications } from '@/core/action/notifications'
-import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
+import {
+  calculateRealizedBalance,
+  calculateRealizedExpenses,
+  calculateRealizedIncome,
+} from '@/core/finance/transactionMath'
 import type { ActiveTab } from '@/types'
 import type {
   AccountMode,
@@ -144,10 +148,10 @@ export default function MainAppLayout({ user }: { user: User }) {
   }
 
   const financialSummary = useMemo(() => {
-    const income = calculateIncome(transactions)
-    const expense = calculateExpenses(transactions)
+    const income = calculateRealizedIncome(transactions)
+    const expense = calculateRealizedExpenses(transactions)
     return {
-      balance: calculateBalance(transactions),
+      balance: calculateRealizedBalance(transactions),
       income,
       expense,
       emergencyTotal: 0,
