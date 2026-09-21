@@ -1,5 +1,9 @@
+'use client'
+
 import type { ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import { Badge } from '@/core/ui/badge'
+import { listItemMotionVariants, motionTransition } from '@/core/motion/presets'
 import { cn } from '@/lib/utils'
 
 type MetricTone = 'neutral' | 'positive' | 'negative' | 'warning'
@@ -29,7 +33,12 @@ export function FinancialMetricCard({
   className,
 }: FinancialMetricCardProps) {
   return (
-    <section
+    <motion.section
+      layout="position"
+      variants={listItemMotionVariants}
+      initial="initial"
+      animate="enter"
+      transition={motionTransition.standard}
       className={cn(
         'flex min-h-[156px] min-w-0 flex-1 flex-col gap-2.5 rounded-[var(--radius-lg)] border p-5',
         'border-[var(--color-card-border)] bg-[var(--color-card-fill)]',
@@ -46,6 +55,6 @@ export function FinancialMetricCard({
           {helper ? <span className="text-xs leading-[18px] text-[var(--color-text-helper)]">{helper}</span> : null}
         </div>
       ) : null}
-    </section>
+    </motion.section>
   )
 }
