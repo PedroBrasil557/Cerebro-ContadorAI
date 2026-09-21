@@ -163,8 +163,9 @@ export default function GoalsView({ goals, onAddGoal, handleRedirect }: GoalsVie
           />
           <CerebroAICard
             title="Quer entender como encaixar esta meta no seu mês?"
-            description={`A meta “${highlightedGoal.title}” está em ${Math.round((Number(highlightedGoal.current_amount || 0) / Math.max(Number(highlightedGoal.target_amount || 1), 1)) * 100)}%. O Cérebro pode analisar suas movimentações antes de sugerir qualquer ajuste.`}
-            onAction={() => handleRedirect('cérebro')}
+            description={`A meta “${highlightedGoal.title}” está em ${Math.round((Number(highlightedGoal.current_amount || 0) / Math.max(Number(highlightedGoal.target_amount || 1), 1)) * 100)}%. Revise suas movimentações antes de decidir qualquer ajuste.`}
+            actionLabel="Ver transações"
+            onAction={() => handleRedirect('transações')}
           />
         </div>
       ) : null}
