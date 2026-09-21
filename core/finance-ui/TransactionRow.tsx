@@ -1,5 +1,9 @@
+'use client'
+
+import { motion } from 'framer-motion'
 import { ArrowDownLeft, ArrowUpRight, ArrowRightLeft } from 'lucide-react'
 import type { Transaction, TransactionType } from '@/types_db'
+import { listItemMotionVariants, motionTransition } from '@/core/motion/presets'
 import { cn } from '@/lib/utils'
 
 type TransactionRowProps = {
@@ -75,7 +79,12 @@ export function TransactionRow({ transaction, onClick, className }: TransactionR
   )
 
   return onClick ? (
-    <button
+    <motion.button
+      layout="position"
+      variants={listItemMotionVariants}
+      initial="initial"
+      animate="enter"
+      transition={motionTransition.fast}
       type="button"
       onClick={onClick}
       className={cn(
@@ -86,9 +95,14 @@ export function TransactionRow({ transaction, onClick, className }: TransactionR
       )}
     >
       {content}
-    </button>
+    </motion.button>
   ) : (
-    <div
+    <motion.div
+      layout="position"
+      variants={listItemMotionVariants}
+      initial="initial"
+      animate="enter"
+      transition={motionTransition.fast}
       className={cn(
         'flex min-h-[68px] w-full items-center gap-3 rounded-[var(--radius-md)] border px-3.5 py-3',
         'border-[var(--color-card-border)] bg-[var(--color-card-fill)]',
@@ -96,6 +110,6 @@ export function TransactionRow({ transaction, onClick, className }: TransactionR
       )}
     >
       {content}
-    </div>
+    </motion.div>
   )
 }
