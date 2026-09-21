@@ -23,6 +23,11 @@ export async function POST(request: Request) {
       throw new ValidationError('A imagem deve ter no máximo 5 MB.')
     }
 
+    const billing = await getUserEntitlements(user.id)
+    if (!billing.access.canAccessPersonal) {
+      throw new ForbiddenError('O reconhecimento de cupons pertence ao produto Pessoal.')
+    }
+
     const imageBytes = new Uint8Array(await file.arrayBuffer())
     try {
       validateOcrImagePayload(file.type, file.size, imageBytes)
@@ -30,10 +35,6 @@ export async function POST(request: Request) {
       throw new ValidationError(error instanceof Error ? error.message : 'Imagem inválida.')
     }
 
-    const billing = await getUserEntitlements(user.id)
-    if (!billing.access.canAccessPersonal) {
-      throw new ForbiddenError('O reconhecimento de cupons pertence ao produto Pessoal.')
-    }
     const usage = await checkUsageLimit(user.id, 'ocr', billing.entitlements)
     if (!usage.allowed) throw new RateLimitError('Limite mensal de OCR atingido.')
 
