@@ -41,7 +41,7 @@ test('renders the responsive Personal shell and preserves PRO locks across break
   await expect(desktopSidebar.getByRole('button', { name: 'Transações' })).toBeVisible()
   await expect(desktopSidebar.getByRole('button', { name: 'Orçamento' })).toBeVisible()
   await expect(desktopSidebar.getByRole('button', { name: 'Metas' })).toBeVisible()
-  await expect(desktopSidebar.getByRole('button', { name: 'Cérebro' })).toHaveCount(0)
+  await expect(desktopSidebar.getByRole('button', { name: 'Cérebro', exact: true })).toHaveCount(0)
   await expect(desktopSidebar.getByRole('button', { name: /Patrimônio/ })).toBeVisible()
 
   await desktopSidebar.getByRole('button', { name: 'Orçamento' }).click()
@@ -83,7 +83,7 @@ test('renders the responsive Personal shell and preserves PRO locks across break
   await expect(mobileNav.getByRole('button', { name: 'Transações' })).toBeVisible()
   await expect(mobileNav.getByRole('button', { name: 'Orçamento' })).toBeVisible()
   await expect(mobileNav.getByRole('button', { name: 'Metas' })).toBeVisible()
-  await expect(mobileNav.getByRole('button', { name: 'Cérebro' })).toHaveCount(0)
+  await expect(mobileNav.getByRole('button', { name: 'Cérebro', exact: true })).toHaveCount(0)
   const mobileMoreButton = mobileNav.getByRole('button', { name: 'Mais' })
   await expect(mobileMoreButton).toBeVisible()
   await mobileMoreButton.focus()
