@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { AlertCircle, AlertTriangle, Calendar, CheckCircle2, Edit, FileText, Landmark, Save, Tag, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Transaction } from '@/core/action/transactions'
@@ -42,20 +42,8 @@ export default function TransactionDetailModal({
   const [amount, setAmount] = useState(transaction ? Math.abs(transaction.amount).toFixed(2) : '')
   const [category, setCategory] = useState(transaction?.category ?? '')
   const [date, setDate] = useState(transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : '')
-  const [type, setType] = useState(transaction?.type ?? '')
+  const [type] = useState(transaction?.type ?? '')
   const [editReason, setEditReason] = useState('')
-
-  useEffect(() => {
-    if (!transaction) return
-    setDescription(transaction.description)
-    setAmount(Math.abs(transaction.amount).toFixed(2))
-    setCategory(transaction.category)
-    setDate(new Date(transaction.date).toISOString().split('T')[0])
-    setType(transaction.type)
-    setEditReason('')
-    setIsEditing(false)
-    setShowDeleteConfirm(false)
-  }, [transaction])
 
   if (!transaction) return null
 
