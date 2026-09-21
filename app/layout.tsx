@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { BRAND } from '@/lib/branding'
+import { CerebroMotionProvider } from '@/core/motion/CerebroMotionProvider'
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,7 +30,9 @@ export default function RootLayout({
         className={`${inter.variable} bg-background text-foreground font-sans antialiased`}
         suppressHydrationWarning
       >
-        {children}
+        <CerebroMotionProvider>
+          {children}
+        </CerebroMotionProvider>
         <Toaster position="top-center" richColors theme="system" />
       </body>
     </html>

@@ -2,11 +2,12 @@
 
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
+import {
   Transaction, Goal, NewGoal, Investment, ActiveTab
 } from '@/types_db'
 import dynamic from 'next/dynamic'
 import type { ProductAccess } from '@/lib/billing/plans'
+import { motionTransition, pageMotionVariants } from '@/core/motion/presets'
 
 // ==========================================
 // 📦 CAMADA 2: MÓDULOS PESSOAIS
@@ -32,7 +33,7 @@ const FounderDashboard = dynamic(() => import('@/modules/admin/views/FounderDash
 interface ViewContainerProps {
   activeTab: ActiveTab
   handleRedirect: (tab: ActiveTab) => void
-  
+
   // Resumo Financeiro
   summary: {
     balance: number
@@ -40,11 +41,11 @@ interface ViewContainerProps {
     expense: number
     emergencyTotal: number
   }
-  
+
   // Dados
   goals: Goal[]
   transactions: Transaction[]
-  investments: Investment[] 
+  investments: Investment[]
   access: ProductAccess
   accountMode: 'personal' | 'professional'
 
@@ -52,52 +53,44 @@ interface ViewContainerProps {
   onAddGoal: (goal: NewGoal) => Promise<void>
 }
 
-export default function ViewContainer({ 
+export default function ViewContainer({
   activeTab, handleRedirect, summary, transactions = [], goals = [],
   onAddGoal, investments = [], access, accountMode
 }: ViewContainerProps) {
   // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
-  
-  // Prioriza investimentos vindo das props, senão usa o local do container
-  // 🛡️ CONTROLE DE ACESSO DA CAMADA
-  const pageVariants = { 
-    initial: { opacity: 0, scale: 0.98 }, 
-    enter: { opacity: 1, scale: 1 }, 
-    exit: { opacity: 0, scale: 1.02 } 
-  }
 
   return (
-    <AnimatePresence mode='wait'>
-      <motion.div 
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
         key={`${accountMode}-${activeTab}`}
-        initial="initial" 
-        animate="enter" 
-        exit="exit" 
-        variants={pageVariants} 
-        transition={{ duration: 0.3, ease: "easeInOut" }} 
+        initial="initial"
+        animate="enter"
+        exit="exit"
+        variants={pageMotionVariants}
+        transition={motionTransition.standard}
         className="w-full h-full relative p-4 md:p-8"
       >
-        
+
         {/* ========================================== */}
         {/* 🟢 RENDERIZAÇÃO MODO PESSOAL (CPF)          */}
         {/* ========================================== */}
         {accountMode === 'personal' && access.canAccessPersonal && (
           <>
             {currentTab === 'dashboard' && (
-              <DashboardView 
+              <DashboardView
                 summary={summary}
                 recentTransactions={transactions.slice(0, 5)}
                 onNavigate={handleRedirect}
                 transactions={transactions}
-                investments={investments} 
+                investments={investments}
               />
             )}
 
             {(currentTab === 'compras inteligentes' || currentTab === 'compras') && (
               <SmartShoppingView />
             )}
-            
+
             {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
               <TransactionsView />
             )}
@@ -116,18 +109,18 @@ export default function ViewContainer({
                 handleRedirect={handleRedirect}
               />
             )}
-            
+
             {currentTab === 'investimentos' && (
-              <InvestmentsView 
-                goals={goals} 
-                onAddGoal={onAddGoal} 
+              <InvestmentsView
+                goals={goals}
+                onAddGoal={onAddGoal}
               />
             )}
-            
+
             {(currentTab === 'minha carteira' || currentTab === 'carteira') && (
               <WalletView />
             )}
-            
+
             {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
               <DebtCenterView />
             )}
