@@ -1,6 +1,5 @@
 'use client'
 
-import { useMemo } from 'react'
 import Image from 'next/image'
 import type { User } from '@supabase/supabase-js'
 import {
@@ -24,7 +23,6 @@ import {
 } from '@/core/ui/dropdown-menu'
 import { ProductSwitcher } from '@/core/navigation/ProductSwitcher'
 import type { ProductAccess } from '@/lib/billing/plans'
-import { getNavigationItems } from '@/core/navigation/config'
 
 interface AppTopBarProps {
   user: User
@@ -74,17 +72,12 @@ export function AppTopBar({
   onLogout,
 }: AppTopBarProps) {
   const unreadCount = notifications.filter((notification) => !notification.read).length
-  const items = useMemo(
-    () => getNavigationItems(accountMode, access),
-    [accountMode, access],
-  )
-  const activeLabel = items.find((item) => item.id === activeTab)?.label
-    ?? (activeTab === 'meu perfil' ? 'Perfil' : activeTab === 'admin' ? 'Administração' : 'Cérebro')
   const firstName = profile?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'Usuário'
   const modeLabel = accountMode === 'personal' ? 'Personal' : 'Professional'
 
   return (
     <header
+      data-active-view={activeTab}
       className={[
         'sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 px-4',
         'border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)]/95 backdrop-blur-xl',
@@ -96,12 +89,11 @@ export function AppTopBar({
           <div className="min-w-0">
             <p className="truncate text-[15px] font-semibold leading-5 text-[var(--color-text-primary)] md:text-base">
               <span className="md:hidden">Cérebro</span>
-              <span className="hidden md:inline">{activeLabel}</span>
+              <span className="hidden md:inline">{getGreeting()}, {firstName}</span>
             </p>
             <p className="mt-0.5 truncate text-[11px] leading-4 text-[var(--color-text-helper)] md:text-xs">
               <span className="md:hidden">{modeLabel}</span>
-              <span className="hidden xl:inline">{getGreeting()}, {firstName}</span>
-              <span className="hidden md:inline xl:hidden">Seu contexto financeiro</span>
+              <span className="hidden md:inline">Seu contexto financeiro</span>
             </p>
           </div>
 
