@@ -73,7 +73,7 @@ export default function BudgetView({ transactions, handleRedirect }: BudgetViewP
       <div>
         <h1 className="text-[28px] font-bold leading-9 tracking-[-0.5px] text-[var(--color-text-primary)]">Orçamento</h1>
         <p className="mt-1 text-sm leading-5 text-[var(--color-text-secondary)]">
-          Entenda o consumo do mês por categoria antes de definir limites personalizados.
+          Entenda o consumo do mês por categoria e acompanhe como seus gastos estão mudando.
         </p>
       </div>
 
@@ -90,8 +90,8 @@ export default function BudgetView({ transactions, handleRedirect }: BudgetViewP
 
       <SmartAlert
         tone="info"
-        title="Limites personalizados ainda não estão configurados"
-        description="O Cérebro já consegue mostrar seu consumo real por categoria. A definição e persistência de limites será adicionada quando o contrato de orçamento existir no backend."
+        title="Limites personalizados ainda não estão disponíveis"
+        description="Por enquanto, você pode acompanhar o consumo real por categoria. Em uma próxima etapa, será possível definir limites personalizados para comparar o planejado com o realizado."
       />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
@@ -99,18 +99,12 @@ export default function BudgetView({ transactions, handleRedirect }: BudgetViewP
         <CerebroAICard
           title={analysis.top ? `${analysis.top.label} concentra ${analysis.topShare}% das despesas do mês` : 'Adicione despesas para receber contexto do seu mês'}
           description={analysis.top
-            ? `Foram registrados ${brl(analysis.top.value)} nessa categoria. Pergunte ao Cérebro para entender quais movimentações mais contribuíram para esse valor.`
+            ? `Foram registrados ${brl(analysis.top.value)} nessa categoria. Revise as transações para entender quais movimentações mais contribuíram para esse valor.`
             : 'Quando houver movimentações suficientes, o Cérebro destacará as categorias que mais influenciam seu resultado mensal.'}
-          onAction={() => handleRedirect('cérebro')}
+          actionLabel="Ver transações"
+          onAction={() => handleRedirect('transações')}
         />
       </div>
-
-      <section className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-5 md:p-6">
-        <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Como esta tela evolui</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--color-text-secondary)]">
-          Nesta versão, Orçamento é uma leitura confiável das transações reais. Quando limites por categoria forem persistidos no backend, este mesmo espaço passa a comparar planejado × realizado sem alterar a fonte dos gastos.
-        </p>
-      </section>
     </div>
   )
 }
