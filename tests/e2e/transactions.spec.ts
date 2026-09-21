@@ -7,8 +7,10 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
   const updatedDescription = `${description} Editada`
 
   await login(page)
-  await page.getByRole('button', { name: /Transações/ }).click()
-  await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible()
+  const transactionsNav = page.getByRole('button', { name: /Transações/ })
+  await expect(transactionsNav).toBeVisible({ timeout: 15_000 })
+  await transactionsNav.click()
+  await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible({ timeout: 15_000 })
 
   await page.getByRole('button', { name: 'Nova transação', exact: true }).first().click()
   const createDialog = page.getByRole('dialog', { name: 'Nova transação' })
