@@ -1,23 +1,13 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Calendar,
-  CheckCircle2,
-  Edit,
-  FileText,
-  Landmark,
-  Save,
-  Tag,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { AlertCircle, AlertTriangle, Calendar, CheckCircle2, Edit, FileText, Landmark, Save, Tag, Trash2 } from 'lucide-react'
 import type { Transaction } from '@/core/action/transactions'
+import { Modal } from '@/core/ui/Modal'
+import { Button } from '@/core/ui/button'
+import { Input } from '@/core/ui/input'
+import { Textarea } from '@/core/ui/textarea'
+import CustomSelect from '@/core/ui/CustomSelect'
 
 const CATEGORIES = {
   income: ['Salário', 'Investimentos', 'Freelance', 'Presente', 'Outros'],
@@ -26,9 +16,6 @@ const CATEGORIES = {
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-
-const inputClassName =
-  'min-h-11 w-full rounded-[11px] border border-white/[0.09] bg-[#111722] px-3.5 text-sm text-[#F4F6F8] outline-none transition-colors duration-150 placeholder:text-[#6F7887] hover:border-white/[0.14] focus:border-[#665CFF]/60 focus:ring-2 focus:ring-[#665CFF]/15 disabled:cursor-not-allowed disabled:opacity-60'
 
 type TransactionDetailModalProps = {
   isOpen: boolean
@@ -53,34 +40,26 @@ export default function TransactionDetailModal({
   const [description, setDescription] = useState(transaction?.description ?? '')
   const [amount, setAmount] = useState(transaction ? Math.abs(transaction.amount).toFixed(2) : '')
   const [category, setCategory] = useState(transaction?.category ?? '')
-  const [date, setDate] = useState(
-    transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : '',
-  )
-  const [type] = useState(transaction?.type ?? '')
+  const [date, setDate] = useState(transaction?.date ? new Date(transaction.date).toISOString().split('T')[0] : '')
+  const [type, setType] = useState(transaction?.type ?? '')
   const [editReason, setEditReason] = useState('')
 
   useEffect(() => {
-    if (!isOpen) return
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (showDeleteConfirm) {
-        setShowDeleteConfirm(false)
-      } else {
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose, showDeleteConfirm])
+    if (!transaction) return
+    setDescription(transaction.description)
+    setAmount(Math.abs(transaction.amount).toFixed(2))
+    setCategory(transaction.category)
+    setDate(new Date(transaction.date).toISOString().split('T')[0])
+    setType(transaction.type)
+    setEditReason('')
+    setIsEditing(false)
+    setShowDeleteConfirm(false)
+  }, [transaction])
 
-  if (!isOpen || !transaction) return null
+  if (!transaction) return null
 
   const isIncome = type === 'receita'
   const categoryOptions = isIncome ? CATEGORIES.income : CATEGORIES.expense
-  const toneText = isIncome ? 'text-[#28D7A1]' : 'text-[#FF5876]'
-  const toneSurface = isIncome
-    ? 'border-[#28D7A1]/18 bg-[#28D7A1]/10 text-[#28D7A1]'
-    : 'border-[#FF5876]/18 bg-[#FF5876]/10 text-[#FF7890]'
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -120,164 +99,93 @@ export default function TransactionDetailModal({
 
   return (
     <>
-      <AnimatePresence>
-        {isOpen ? (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[3px]"
-            onMouseDown={event => {
-              if (event.target === event.currentTarget) onClose()
-            }}
-          >
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="transaction-detail-title"
-              aria-describedby="transaction-detail-description"
-              initial={{ opacity: 0, scale: 0.98, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 8 }}
-              transition={{ duration: 0.18 }}
-              className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[16px] border border-white/[0.09] bg-[#0D1118] shadow-2xl shadow-black/40 custom-scrollbar"
-            >
-              <header className="flex items-start justify-between border-b border-white/[0.075] px-5 py-4 sm:px-6">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border ${toneSurface}`}>
-                    {isIncome ? <ArrowUpRight aria-hidden="true" className="h-5 w-5" /> : <ArrowDownLeft aria-hidden="true" className="h-5 w-5" />}
-                  </span>
-                  <div className="min-w-0">
-                    <h2 id="transaction-detail-title" className="text-lg font-semibold text-[#F4F6F8]">
-                      {isEditing ? 'Editar transação' : 'Detalhes da transação'}
-                    </h2>
-                    <p id="transaction-detail-description" className="mt-1 text-sm text-[#A0A8B5]">
-                      {isIncome ? 'Receita' : 'Despesa'} registrada no seu fluxo.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Fechar detalhes da transação"
-                  onClick={onClose}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus-visible:ring-2 focus-visible:ring-[#665CFF]/50"
-                >
-                  <X aria-hidden="true" className="h-5 w-5" />
-                </button>
-              </header>
+      <Modal isOpen={isOpen && !showDeleteConfirm} onClose={onClose} title={isEditing ? 'Editar transação' : 'Detalhes da transação'}>
+        {isEditing ? (
+          <form onSubmit={handleSave} className="space-y-4">
+            <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+              <span>Descrição</span>
+              <Input required value={description} onChange={event => setDescription(event.target.value)} />
+            </label>
 
-              <div className="p-5 sm:p-6">
-                {isEditing ? (
-                  <form onSubmit={handleSave} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label htmlFor="edit-transaction-description" className="block text-xs font-medium text-[#A0A8B5]">Descrição</label>
-                      <input id="edit-transaction-description" name="description" type="text" required value={description} onChange={event => setDescription(event.target.value)} className={inputClassName} />
-                    </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+                <span>Valor (R$)</span>
+                <Input type="number" required step="0.01" value={amount} onChange={event => setAmount(event.target.value)} className="tabular-nums" />
+              </label>
+              <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+                <span>Data</span>
+                <Input type="date" required value={date} onChange={event => setDate(event.target.value)} />
+              </label>
+            </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <label htmlFor="edit-transaction-amount" className="block text-xs font-medium text-[#A0A8B5]">Valor (R$)</label>
-                        <input id="edit-transaction-amount" type="number" required step="0.01" value={amount} onChange={event => setAmount(event.target.value)} className={`${inputClassName} tabular-nums`} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label htmlFor="edit-transaction-date" className="block text-xs font-medium text-[#A0A8B5]">Data</label>
-                        <input id="edit-transaction-date" type="date" required value={date} onChange={event => setDate(event.target.value)} className={`${inputClassName} [color-scheme:dark]`} />
-                      </div>
-                    </div>
+            <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+              <span>Categoria</span>
+              <CustomSelect value={category} options={categoryOptions} onChange={setCategory} aria-label="Categoria da transação" />
+            </label>
 
-                    <div className="space-y-1.5">
-                      <label htmlFor="edit-transaction-category" className="block text-xs font-medium text-[#A0A8B5]">Categoria</label>
-                      <select id="edit-transaction-category" value={category} onChange={event => setCategory(event.target.value)} className={`${inputClassName} cursor-pointer appearance-none [&>option]:bg-[#111722]`}>
-                        {categoryOptions.map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </div>
+            <label className="block space-y-1.5 border-t border-[var(--color-card-border)] pt-4 text-xs font-medium text-[var(--color-status-warning)]">
+              <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />Motivo da edição (obrigatório)</span>
+              <Textarea value={editReason} onChange={event => setEditReason(event.target.value)} placeholder="Ex.: Digitei o valor errado..." rows={3} required className="min-h-[84px] resize-none" />
+            </label>
 
-                    <div className="space-y-1.5 border-t border-white/[0.075] pt-4">
-                      <label htmlFor="edit-transaction-reason" className="flex items-center gap-1.5 text-xs font-medium text-[#F5B942]">
-                        <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />
-                        Motivo da edição (obrigatório)
-                      </label>
-                      <textarea id="edit-transaction-reason" value={editReason} onChange={event => setEditReason(event.target.value)} placeholder="Ex.: Digitei o valor errado..." rows={3} required className={`${inputClassName} min-h-[84px] resize-none py-3`} />
-                    </div>
-
-                    <div className="flex flex-col-reverse gap-3 border-t border-white/[0.075] pt-5 sm:flex-row sm:justify-end">
-                      <button type="button" disabled={isSaving} onClick={() => setIsEditing(false)} className="min-h-11 rounded-[10px] border border-white/[0.09] px-4 text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:bg-white/[0.05] hover:text-white disabled:opacity-50">Cancelar</button>
-                      <button type="submit" disabled={isSaving} className="flex min-h-11 min-w-[132px] items-center justify-center gap-2 rounded-[10px] bg-[#665CFF] px-5 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#756CFF] focus-visible:ring-2 focus-visible:ring-[#8B84FF]/60 disabled:opacity-50">
-                        <Save aria-hidden="true" className="h-4 w-4" />
-                        {isSaving ? 'Salvando...' : 'Salvar alterações'}
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="space-y-5">
-                    <div className="border-b border-white/[0.075] pb-5">
-                      <p className={`text-[30px] font-bold tracking-[-0.03em] tabular-nums ${toneText}`}>
-                        {isIncome ? '+' : '−'} {formatCurrency(Math.abs(transaction.amount))}
-                      </p>
-                      <p className="mt-1 break-words text-base font-semibold text-[#F4F6F8]">{transaction.description}</p>
-                    </div>
-
-                    <dl className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
-                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><Tag aria-hidden="true" className="h-4 w-4" />Categoria</dt>
-                        <dd className="mt-2 text-sm font-medium text-[#F4F6F8]">{transaction.category}</dd>
-                      </div>
-                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
-                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><CheckCircle2 aria-hidden="true" className="h-4 w-4" />Status</dt>
-                        <dd className="mt-2 flex items-center gap-2 text-sm font-medium text-[#F4F6F8]">
-                          <span aria-hidden="true" className={`h-2 w-2 rounded-full ${transaction.is_paid ? 'bg-[#28D7A1]' : 'bg-[#F5B942]'}`} />
-                          {transaction.is_paid ? 'Pago / recebido' : 'Pendente'}
-                        </dd>
-                      </div>
-                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
-                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><Calendar aria-hidden="true" className="h-4 w-4" />Data</dt>
-                        <dd className="mt-2 text-sm font-medium tabular-nums text-[#F4F6F8]">{new Date(transaction.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</dd>
-                      </div>
-                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
-                        <dt className="flex items-center gap-2 text-xs text-[#A0A8B5]"><Landmark aria-hidden="true" className="h-4 w-4" />Forma / cartão</dt>
-                        <dd className="mt-2 truncate text-sm font-medium text-[#F4F6F8]">{transaction.payment_method || 'Conta'}</dd>
-                      </div>
-                    </dl>
-
-                    {transaction.edit_note ? (
-                      <div className="rounded-[12px] border border-white/[0.075] bg-[#111722] p-4">
-                        <p className="flex items-center gap-2 text-xs text-[#A0A8B5]"><FileText aria-hidden="true" className="h-4 w-4" />Nota de edição</p>
-                        <p className="mt-2 text-sm leading-5 text-[#F4F6F8]">&quot;{transaction.edit_note}&quot;</p>
-                      </div>
-                    ) : null}
-
-                    <div className="grid grid-cols-2 gap-3 border-t border-white/[0.075] pt-5">
-                      <button type="button" onClick={() => setIsEditing(true)} disabled={loading || isSaving} className="flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-white/[0.09] bg-[#111722] text-sm font-medium text-white outline-none transition-colors duration-150 hover:bg-[#151C29] focus-visible:ring-2 focus-visible:ring-[#665CFF]/50 disabled:opacity-50">
-                        <Edit aria-hidden="true" className="h-4 w-4" />Editar
-                      </button>
-                      <button type="button" onClick={() => setShowDeleteConfirm(true)} disabled={loading || isSaving} className="flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#FF5876]/18 bg-[#FF5876]/8 text-sm font-medium text-[#FF7890] outline-none transition-colors duration-150 hover:bg-[#FF5876]/14 focus-visible:ring-2 focus-visible:ring-[#FF5876]/50 disabled:opacity-50">
-                        <Trash2 aria-hidden="true" className="h-4 w-4" />Excluir
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showDeleteConfirm ? (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-[3px]">
-            <motion.div role="alertdialog" aria-modal="true" aria-labelledby="delete-transaction-title" aria-describedby="delete-transaction-description" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.16 }} className="w-full max-w-sm rounded-[16px] border border-[#FF5876]/25 bg-[#0D1118] p-6 shadow-2xl shadow-black/45">
-              <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#FF5876]/10 text-[#FF5876]">
-                <AlertCircle aria-hidden="true" className="h-5 w-5" />
-              </span>
-              <h2 id="delete-transaction-title" className="mt-4 text-lg font-semibold text-[#F4F6F8]">Excluir transação?</h2>
-              <p id="delete-transaction-description" className="mt-2 text-sm leading-5 text-[#A0A8B5]">
-                Você está prestes a excluir <strong className="font-semibold text-white">&quot;{transaction.description}&quot;</strong>. Esta ação não pode ser desfeita.
+            <div className="flex flex-col-reverse gap-3 border-t border-[var(--color-card-border)] pt-5 sm:flex-row sm:justify-end">
+              <Button type="button" variant="secondary" disabled={isSaving} onClick={() => setIsEditing(false)}>Cancelar</Button>
+              <Button type="submit" disabled={isSaving} className="gap-2"><Save className="h-4 w-4" aria-hidden="true" />{isSaving ? 'Salvando...' : 'Salvar alterações'}</Button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-5">
+            <div className="border-b border-[var(--color-card-border)] pb-5">
+              <p className={`text-[30px] font-bold tracking-[-0.03em] tabular-nums ${isIncome ? 'text-[var(--color-status-success)]' : 'text-[var(--color-text-primary)]'}`}>
+                {isIncome ? '+' : '−'} {formatCurrency(Math.abs(transaction.amount))}
               </p>
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <button type="button" onClick={() => setShowDeleteConfirm(false)} disabled={isSaving} className="min-h-11 rounded-[10px] border border-white/[0.09] text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:bg-white/[0.05] hover:text-white disabled:opacity-50">Cancelar</button>
-                <button type="button" onClick={confirmDelete} disabled={isSaving} className="min-h-11 rounded-[10px] bg-[#FF5876] px-4 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#FF6B84] focus-visible:ring-2 focus-visible:ring-[#FF5876]/55 disabled:opacity-50">{isSaving ? 'Excluindo...' : 'Excluir'}</button>
+              <p className="mt-1 break-words text-base font-semibold">{transaction.description}</p>
+              <p className="mt-1 text-xs text-[var(--color-text-helper)]">{isIncome ? 'Receita' : 'Despesa'} registrada no seu fluxo.</p>
+            </div>
+
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <Detail label="Categoria" value={transaction.category} icon={Tag} />
+              <Detail label="Status" value={transaction.is_paid ? 'Pago / recebido' : 'Pendente'} icon={CheckCircle2} />
+              <Detail label="Data" value={new Date(transaction.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} icon={Calendar} />
+              <Detail label="Forma / cartão" value={transaction.payment_method || 'Conta'} icon={Landmark} />
+            </dl>
+
+            {transaction.edit_note ? (
+              <div className="rounded-[var(--radius-md)] border border-[var(--color-card-border)] bg-[var(--color-action-ghost-hover)] p-4">
+                <p className="flex items-center gap-2 text-xs text-[var(--color-text-helper)]"><FileText className="h-4 w-4" aria-hidden="true" />Nota de edição</p>
+                <p className="mt-2 text-sm leading-5">&quot;{transaction.edit_note}&quot;</p>
               </div>
-            </motion.div>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-3 border-t border-[var(--color-card-border)] pt-5">
+              <Button type="button" variant="secondary" onClick={() => setIsEditing(true)} disabled={loading || isSaving} className="gap-2"><Edit className="h-4 w-4" aria-hidden="true" />Editar</Button>
+              <Button type="button" variant="destructive" onClick={() => setShowDeleteConfirm(true)} disabled={loading || isSaving} className="gap-2"><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir</Button>
+            </div>
           </div>
-        ) : null}
-      </AnimatePresence>
+        )}
+      </Modal>
+
+      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Excluir transação?">
+        <div className="space-y-5">
+          <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-status-danger)] bg-[var(--color-status-danger-surface)] p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-status-danger)]" aria-hidden="true" />
+            <p className="text-sm leading-5 text-[var(--color-text-secondary)]">Você está prestes a excluir <strong className="font-semibold text-[var(--color-text-primary)]">&quot;{transaction.description}&quot;</strong>. Esta ação não pode ser desfeita.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Button type="button" variant="secondary" onClick={() => setShowDeleteConfirm(false)} disabled={isSaving}>Cancelar</Button>
+            <Button type="button" variant="destructive" onClick={confirmDelete} disabled={isSaving}>{isSaving ? 'Excluindo...' : 'Excluir'}</Button>
+          </div>
+        </div>
+      </Modal>
     </>
+  )
+}
+
+function Detail({ label, value, icon: Icon }: { label: string; value: string; icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--color-card-border)] bg-[var(--color-action-ghost-hover)] p-4">
+      <dt className="flex items-center gap-2 text-xs text-[var(--color-text-helper)]"><Icon aria-hidden="true" className="h-4 w-4" />{label}</dt>
+      <dd className="mt-2 truncate text-sm font-medium text-[var(--color-text-primary)]">{value}</dd>
+    </div>
   )
 }
