@@ -3,17 +3,24 @@ import {
   calculateBalance,
   calculateExpenses,
   calculateIncome,
+  calculateProjectedBalance,
+  calculateRealizedBalance,
+  calculateRealizedExpenses,
+  calculateRealizedIncome,
   calculateTransfers,
   groupTransactionsByMonth,
+  isRealizedTransaction,
   normalizeTransactionAmount,
+  realizedTransactions,
 } from '../../core/finance/transactionMath'
 import type { Transaction } from '../../types_db'
 
 const transaction = (
   type: Transaction['type'],
   amount: number,
-  date = '2026-09-08'
-) => ({ type, amount, date }) as Pick<Transaction, 'type' | 'amount' | 'date'>
+  date = '2026-09-08',
+  isPaid?: boolean,
+) => ({ type, amount, date, ...(isPaid === undefined ? {} : { is_paid: isPaid }) }) as Pick<Transaction, 'type' | 'amount' | 'date'> & Partial<Pick<Transaction, 'is_paid'>>
 
 describe('transactionMath', () => {
   const transactions = [
@@ -31,6 +38,28 @@ describe('transactionMath', () => {
 
   it('não trata transferência como renda ou consumo', () => {
     expect(calculateBalance(transactions)).toBe(700)
+    expect(calculateProjectedBalance(transactions)).toBe(700)
+  })
+
+  it('separa saldo realizado de movimentos pendentes', () => {
+    const cashFlow = [
+      transaction('receita', 2000, '2026-09-01', true),
+      transaction('despesa_fixa', 500, '2026-09-05', true),
+      transaction('receita', 900, '2026-09-30', false),
+      transaction('despesa_variavel', 300, '2026-09-30', false),
+    ]
+
+    expect(calculateProjectedBalance(cashFlow)).toBe(2100)
+    expect(calculateRealizedBalance(cashFlow)).toBe(1500)
+    expect(calculateRealizedIncome(cashFlow)).toBe(2000)
+    expect(calculateRealizedExpenses(cashFlow)).toBe(500)
+    expect(realizedTransactions(cashFlow)).toHaveLength(2)
+    expect(isRealizedTransaction(cashFlow[2])).toBe(false)
+  })
+
+  it('mantém compatibilidade para dados legados sem is_paid', () => {
+    expect(isRealizedTransaction(transaction('receita', 100))).toBe(true)
+    expect(calculateRealizedBalance([transaction('receita', 100)])).toBe(100)
   })
 
   it('agrupa saldo por mês em ordem cronológica', () => {
