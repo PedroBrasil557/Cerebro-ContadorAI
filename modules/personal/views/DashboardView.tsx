@@ -10,6 +10,7 @@ import {
   calculateRealizedIncome,
   isRealizedTransaction,
 } from "@/core/finance/transactionMath";
+import { calculateInvestmentPortfolioValue } from "@/core/finance/patrimony";
 import { formatCurrency } from "@/lib/utils";
 import UpgradeModal from "@/core/components/UpgradeModal";
 import { useEntitlements } from "@/core/hooks/useEntitlements";
@@ -64,10 +65,7 @@ export default function DashboardView({
     });
     const income = calculateRealizedIncome(monthTransactions);
     const expense = calculateRealizedExpenses(monthTransactions);
-    const totalInvestments = investments.reduce(
-      (total, investment) => total + Number(investment.amount_invested || 0),
-      0,
-    );
+    const totalInvestments = calculateInvestmentPortfolioValue(investments);
     const score = expense > 0 ? Math.min(Math.round((income / expense) * 100), 100) : income > 0 ? 100 : 0;
     const balance = initialSummary.balance;
     return {
@@ -134,13 +132,13 @@ export default function DashboardView({
             total={stats.patrimony}
             available={stats.balance}
             invested={stats.totalInvestments}
-            description="Saldo realizado disponível somado aos investimentos registrados"
+            description="Saldo realizado disponível somado ao valor atual dos investimentos"
           />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             <FinancialMetricCard
               label="Investimentos"
               value={formatCurrency(stats.totalInvestments)}
-              helper={stats.totalInvestments === 0 ? "Sem investimentos registrados" : "Total investido"}
+              helper={stats.totalInvestments === 0 ? "Sem investimentos registrados" : "Valor atual da carteira"}
               tone="neutral"
             />
             <FinancialMetricCard
@@ -314,7 +312,7 @@ export default function DashboardView({
           <article className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-5">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-status-info-surface)] text-[var(--color-status-info)]"><TrendingUp className="h-5 w-5" aria-hidden="true" /></span>
-              <div><h2 className="font-semibold">Investimentos</h2><p className="text-xs text-[var(--color-text-helper)]">Patrimônio investido registrado</p></div>
+              <div><h2 className="font-semibold">Investimentos</h2><p className="text-xs text-[var(--color-text-helper)]">Valor atual da carteira registrada</p></div>
             </div>
             <p className="mt-5 text-2xl font-semibold">{formatCurrency(stats.totalInvestments)}</p>
           </article>

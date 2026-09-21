@@ -6,7 +6,8 @@ import { Plus, X, Loader2, Trash2, TrendingUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Investment } from '@/types_db'
-import { financeService } from '@/services/financeService'
+import { patrimonyService } from '@/services/patrimonyService'
+import { getInvestmentCurrentValue } from '@/core/finance/patrimony'
 
 export default function PortfolioManager({ investments, onUpdate }: { investments: Investment[], onUpdate: () => void }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -23,7 +24,7 @@ export default function PortfolioManager({ investments, onUpdate }: { investment
     
     setLoading(true)
     try {
-      await financeService.createInvestment({
+      await patrimonyService.createInvestment({
         name,
         ticker,
         type: assetType,
@@ -44,7 +45,7 @@ export default function PortfolioManager({ investments, onUpdate }: { investment
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja remover este ativo?")) return
     try {
-      await financeService.deleteInvestment(id)
+      await patrimonyService.deleteInvestment(id)
       toast.success('Ativo removido.')
       onUpdate()
     } catch {
@@ -79,7 +80,7 @@ export default function PortfolioManager({ investments, onUpdate }: { investment
               <th className="pb-3">Tipo</th>
               <th className="pb-3 text-right">Qtd</th>
               <th className="pb-3 text-right">Preço Médio</th>
-              <th className="pb-3 text-right">Total</th>
+              <th className="pb-3 text-right">Valor Atual</th>
               <th className="pb-3"></th>
             </tr>
           </thead>
@@ -97,7 +98,7 @@ export default function PortfolioManager({ investments, onUpdate }: { investment
                   </td>
                   <td className="py-4 text-right font-mono text-gray-300">{inv.quantity}</td>
                   <td className="py-4 text-right font-mono text-gray-300">{formatCurrency(inv.average_price)}</td>
-                  <td className="py-4 text-right font-bold text-white">{formatCurrency(inv.amount_invested)}</td>
+                  <td className="py-4 text-right font-bold text-white">{formatCurrency(getInvestmentCurrentValue(inv))}</td>
                   <td className="py-4 text-right pr-2">
                     <button onClick={() => handleDelete(inv.id)} className="p-2 text-gray-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition opacity-0 group-hover:opacity-100">
                       <Trash2 size={16} />

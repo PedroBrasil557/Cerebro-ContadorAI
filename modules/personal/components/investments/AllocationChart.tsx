@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import { Investment } from '@/types_db'
+import { getInvestmentCurrentValue } from '@/core/finance/patrimony'
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#6366f1'];
 
@@ -18,8 +19,7 @@ export default function AllocationChart({ investments }: Props) {
   // 1. Agrupar investimentos por tipo e somar os valores
   const data = investments.reduce<AllocationItem[]>((acc, curr) => {
     const existing = acc.find(i => i.name === curr.type)
-    // Calcula o valor total deste ativo (Quantidade * Preço Atual)
-    const value = curr.quantity * curr.current_price
+    const value = getInvestmentCurrentValue(curr)
     
     if (existing) {
       existing.value += value
@@ -56,7 +56,7 @@ export default function AllocationChart({ investments }: Props) {
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={80} // Aumentei um pouco para ficar mais moderno (Donut Chart)
+                  innerRadius={80}
                   outerRadius={100}
                   paddingAngle={5}
                   dataKey="value"
@@ -68,8 +68,6 @@ export default function AllocationChart({ investments }: Props) {
                </Pie>
                
                <Tooltip 
-                  // CORREÇÃO DO ERRO AQUI:
-                  // Aceitamos 'any' ou 'number | string' para evitar conflito com a tipagem do Recharts
                   formatter={(value: number | string | undefined) => `R$ ${Number(value ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                   contentStyle={{ 
                      backgroundColor: '#18181b', 
