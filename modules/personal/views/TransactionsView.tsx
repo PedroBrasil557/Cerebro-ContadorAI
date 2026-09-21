@@ -1,26 +1,7 @@
 'use client'
 
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Landmark,
-  Loader2,
-  Lock,
-  Plus,
-  Search,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-  X,
-} from 'lucide-react'
-import { AnimatePresence, motion } from 'framer-motion'
+import React, { useEffect, useMemo, useState } from 'react'
+import { CheckCircle2, ChevronLeft, ChevronRight, Download, Filter, Loader2, Lock, Plus, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
   createTransaction,
@@ -37,241 +18,19 @@ import { financeService } from '@/services/financeService'
 import type { CreditCard as CreditCardRecord } from '@/types_db'
 import { toast } from 'sonner'
 import { useEntitlements } from '@/core/hooks/useEntitlements'
-
-interface FilterOption<T extends string> {
-  id: T
-  label: string
-}
-
-interface CustomFilterProps<T extends string> {
-  label: string
-  value: T
-  options: FilterOption<T>[]
-  onChange: (value: T) => void
-  isPro?: boolean
-  onProClick?: () => void
-}
-
-interface CustomSelectProps {
-  label: string
-  value: string
-  options: string[]
-  onChange: (value: string) => void
-  name: string
-}
-
-interface SummaryCardProps {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: string
-  tone: 'balance' | 'income' | 'expense'
-  isNegative?: boolean
-}
+import { FinancialMetricCard } from '@/core/finance-ui/FinancialMetricCard'
+import { TransactionRow } from '@/core/finance-ui/TransactionRow'
+import { Button } from '@/core/ui/button'
+import { Input } from '@/core/ui/input'
+import { Modal } from '@/core/ui/Modal'
+import CustomSelect from '@/core/ui/CustomSelect'
 
 const CATEGORIES = {
   income: ['Salário', 'Investimentos', 'Freelance', 'Presente', 'Outros'],
   expense: ['Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros'],
 }
 
-const fieldClassName =
-  'min-h-11 w-full rounded-[11px] border border-white/[0.09] bg-[#111722] px-3.5 text-sm text-[#F4F6F8] outline-none transition-colors duration-150 placeholder:text-[#6F7887] hover:border-white/[0.14] focus:border-[#665CFF]/60 focus:ring-2 focus:ring-[#665CFF]/15 disabled:cursor-not-allowed disabled:opacity-60'
-
-function CustomFilter<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-  isPro = false,
-  onProClick,
-}: CustomFilterProps<T>) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const menuId = useId()
-  const activeOption = options.find(option => option.id === value)
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false)
-    }
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [])
-
-  const handleButtonClick = () => {
-    if (isPro) {
-      onProClick?.()
-      return
-    }
-    setIsOpen(open => !open)
-  }
-
-  return (
-    <div className="relative min-w-0" ref={containerRef}>
-      <span className="mb-1.5 block text-xs font-medium text-[#A0A8B5]">{label}</span>
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-label={`${label}: ${isPro ? 'recurso PRO' : activeOption?.label || label}`}
-        onClick={handleButtonClick}
-        className="flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-[11px] border border-white/[0.09] bg-[#111722] px-3.5 text-sm font-medium text-[#F4F6F8] outline-none transition-colors duration-150 hover:border-white/[0.15] hover:bg-[#151C29] focus-visible:ring-2 focus-visible:ring-[#665CFF]/50"
-      >
-        <span className="truncate">{isPro ? `${label} (PRO)` : activeOption?.label || label}</span>
-        {isPro ? (
-          <Lock aria-hidden="true" className="h-4 w-4 shrink-0 text-[#8B84FF]" />
-        ) : (
-          <ChevronDown
-            aria-hidden="true"
-            className={`h-4 w-4 shrink-0 text-[#A0A8B5] transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
-          />
-        )}
-      </button>
-
-      <AnimatePresence>
-        {isOpen && !isPro ? (
-          <motion.div
-            id={menuId}
-            role="listbox"
-            aria-label={label}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-50 mt-2 w-full min-w-[168px] overflow-hidden rounded-[12px] border border-white/[0.1] bg-[#111722] p-1 shadow-xl shadow-black/30"
-          >
-            {options.map(option => (
-              <button
-                key={option.id}
-                type="button"
-                role="option"
-                aria-selected={value === option.id}
-                onClick={() => {
-                  onChange(option.id)
-                  setIsOpen(false)
-                }}
-                className={`min-h-10 w-full rounded-[9px] px-3 text-left text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#665CFF]/50 ${value === option.id ? 'bg-[#665CFF]/12 text-white' : 'text-[#A0A8B5] hover:bg-white/[0.05] hover:text-white'}`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-function CustomSelect({ label, value, options, onChange, name }: CustomSelectProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const menuId = useId()
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false)
-    }
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [])
-
-  return (
-    <div className="relative space-y-1.5" ref={containerRef}>
-      <label className="block text-xs font-medium text-[#A0A8B5]">{label}</label>
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-label={`${label}: ${value || 'Selecione'}`}
-        onClick={() => setIsOpen(open => !open)}
-        className={`${fieldClassName} flex items-center justify-between gap-3 text-left`}
-      >
-        <span className="truncate">{value || 'Selecione...'}</span>
-        <ChevronDown
-          aria-hidden="true"
-          className={`h-4 w-4 shrink-0 text-[#A0A8B5] transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
-        />
-      </button>
-      <input type="hidden" name={name} value={value} />
-
-      <AnimatePresence>
-        {isOpen ? (
-          <motion.div
-            id={menuId}
-            role="listbox"
-            aria-label={label}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="absolute z-[70] mt-2 max-h-48 w-full overflow-y-auto rounded-[12px] border border-white/[0.1] bg-[#111722] p-1 shadow-xl shadow-black/30 custom-scrollbar"
-          >
-            {options.map(option => (
-              <button
-                key={option}
-                type="button"
-                role="option"
-                aria-selected={value === option}
-                onClick={() => {
-                  onChange(option)
-                  setIsOpen(false)
-                }}
-                className={`min-h-10 w-full rounded-[9px] px-3 text-left text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#665CFF]/50 ${value === option ? 'bg-[#665CFF]/12 text-white' : 'text-[#A0A8B5] hover:bg-white/[0.05] hover:text-white'}`}
-              >
-                {option}
-              </button>
-            ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-function SummaryCard({ icon: Icon, label, value, tone, isNegative = false }: SummaryCardProps) {
-  const palette = {
-    balance: {
-      icon: 'bg-[#4F8CFF]/12 text-[#69A0FF]',
-      border: 'border-[#4F8CFF]/20',
-      value: isNegative ? 'text-[#FF5876]' : 'text-[#F4F6F8]',
-    },
-    income: {
-      icon: 'bg-[#28D7A1]/10 text-[#28D7A1]',
-      border: 'border-[#28D7A1]/18',
-      value: 'text-[#28D7A1]',
-    },
-    expense: {
-      icon: 'bg-[#FF5876]/10 text-[#FF5876]',
-      border: 'border-[#FF5876]/18',
-      value: 'text-[#FF5876]',
-    },
-  }[tone]
-
-  return (
-    <article className={`flex h-[108px] items-center gap-4 rounded-[16px] border bg-[#0D1118] p-5 ${palette.border}`}>
-      <span aria-hidden="true" className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] ${palette.icon}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-medium text-[#A0A8B5]">{label}</p>
-        <p className={`mt-1 truncate text-[24px] font-bold tracking-[-0.02em] tabular-nums ${palette.value}`}>{value}</p>
-      </div>
-    </article>
-  )
-}
+const PAGE_SIZE = 10
 
 function NewTransactionModal({
   isOpen,
@@ -296,15 +55,6 @@ function NewTransactionModal({
     if (isOpen) void fetchCards()
   }, [isOpen])
 
-  useEffect(() => {
-    if (!isOpen) return
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
-
   const paymentOptions = useMemo(
     () => ['Dinheiro / Pix', ...userCards.map(card => card.name)],
     [userCards],
@@ -315,6 +65,8 @@ function NewTransactionModal({
     setLoading(true)
     const formData = new FormData(event.currentTarget)
     formData.set('type', type)
+    formData.set('category', category)
+    formData.set('payment_method', paymentMethod)
     const isFixed = (event.currentTarget.elements.namedItem('is_fixed') as HTMLInputElement).checked
     formData.set('is_fixed', isFixed ? 'true' : 'false')
 
@@ -329,116 +81,106 @@ function NewTransactionModal({
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-[3px]"
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-    >
-      <motion.div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-transaction-title"
-        aria-describedby="new-transaction-description"
-        initial={{ opacity: 0, scale: 0.98, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.98, y: 8 }}
-        transition={{ duration: 0.18 }}
-        className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[16px] border border-white/[0.09] bg-[#0D1118] shadow-2xl shadow-black/40 custom-scrollbar"
-      >
-        <header className="flex items-start justify-between border-b border-white/[0.075] px-5 py-4 sm:px-6">
-          <div>
-            <h2 id="new-transaction-title" className="text-lg font-semibold text-[#F4F6F8]">Nova transação</h2>
-            <p id="new-transaction-description" className="mt-1 text-sm text-[#A0A8B5]">
-              Registre uma receita ou despesa no seu fluxo.
-            </p>
+    <Modal isOpen={isOpen} onClose={onClose} title="Nova transação">
+      <p className="-mt-3 mb-5 text-sm text-[var(--color-text-secondary)]">
+        Registre uma receita ou despesa no seu fluxo.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <fieldset>
+          <legend className="mb-2 text-xs font-medium text-[var(--color-text-secondary)]">Tipo da transação</legend>
+          <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-md)] bg-[var(--color-action-ghost-hover)] p-1">
+            <Button
+              type="button"
+              variant={type === 'despesa_variavel' ? 'secondary' : 'ghost'}
+              aria-pressed={type === 'despesa_variavel'}
+              onClick={() => {
+                setType('despesa_variavel')
+                setCategory('Alimentação')
+              }}
+            >
+              Despesa
+            </Button>
+            <Button
+              type="button"
+              variant={type === 'receita' ? 'secondary' : 'ghost'}
+              aria-pressed={type === 'receita'}
+              onClick={() => {
+                setType('receita')
+                setCategory('Salário')
+              }}
+            >
+              Receita
+            </Button>
           </div>
-          <button
-            type="button"
-            aria-label="Fechar nova transação"
-            onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.06] hover:text-white focus-visible:ring-2 focus-visible:ring-[#665CFF]/50"
-          >
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </header>
+        </fieldset>
 
-        <form onSubmit={handleSubmit} className="space-y-5 p-5 sm:p-6">
-          <fieldset>
-            <legend className="mb-2 text-xs font-medium text-[#A0A8B5]">Tipo da transação</legend>
-            <div className="grid grid-cols-2 rounded-[12px] border border-white/[0.075] bg-[#080B11] p-1">
-              <button
-                type="button"
-                aria-pressed={type !== 'receita'}
-                onClick={() => {
-                  setType('despesa_variavel')
-                  setCategory('Alimentação')
-                }}
-                className={`flex min-h-10 items-center justify-center gap-2 rounded-[9px] text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#FF5876]/50 ${type !== 'receita' ? 'bg-[#FF5876]/12 text-[#FF7890]' : 'text-[#A0A8B5] hover:text-white'}`}
-              >
-                <ArrowDownLeft aria-hidden="true" className="h-4 w-4" />
-                Despesa
-              </button>
-              <button
-                type="button"
-                aria-pressed={type === 'receita'}
-                onClick={() => {
-                  setType('receita')
-                  setCategory('Salário')
-                }}
-                className={`flex min-h-10 items-center justify-center gap-2 rounded-[9px] text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#28D7A1]/50 ${type === 'receita' ? 'bg-[#28D7A1]/10 text-[#28D7A1]' : 'text-[#A0A8B5] hover:text-white'}`}
-              >
-                <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
-                Receita
-              </button>
-            </div>
-          </fieldset>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label htmlFor="new-transaction-amount" className="block text-xs font-medium text-[#A0A8B5]">Valor</label>
-              <input id="new-transaction-amount" name="amount" required type="number" step="0.01" placeholder="0,00" className={`${fieldClassName} text-base font-semibold tabular-nums`} />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="new-transaction-description-field" className="block text-xs font-medium text-[#A0A8B5]">Descrição</label>
-              <input id="new-transaction-description-field" name="description" required type="text" placeholder="Ex.: Aluguel" className={fieldClassName} />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <CustomSelect label="Categoria" value={category} options={CATEGORIES[type === 'receita' ? 'income' : 'expense']} onChange={setCategory} name="category" />
-            <CustomSelect label="Forma / Cartão" value={paymentMethod} options={paymentOptions} onChange={setPaymentMethod} name="payment_method" />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="new-transaction-date" className="block text-xs font-medium text-[#A0A8B5]">Data</label>
-            <input id="new-transaction-date" name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className={`${fieldClassName} [color-scheme:dark]`} />
-          </div>
-
-          <label htmlFor="is_fixed" className="flex min-h-14 cursor-pointer items-center gap-3 rounded-[12px] border border-white/[0.075] bg-[#080B11] px-4 transition-colors duration-150 hover:border-white/[0.13]">
-            <input id="is_fixed" name="is_fixed" type="checkbox" className="peer sr-only" />
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-white/[0.18] text-transparent transition-colors peer-checked:border-[#665CFF] peer-checked:bg-[#665CFF] peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-[#665CFF]/50">
-              <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
-            </span>
-            <span className="text-sm font-medium text-[#A0A8B5]">Adicionar ao cronograma mensal</span>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+            <span>Valor</span>
+            <Input name="amount" required type="number" step="0.01" placeholder="0,00" className="text-base font-semibold tabular-nums" />
           </label>
+          <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+            <span>Descrição</span>
+            <Input name="description" required type="text" placeholder="Ex.: Aluguel" />
+          </label>
+        </div>
 
-          <div className="flex justify-end gap-3 border-t border-white/[0.075] pt-5">
-            <button type="button" onClick={onClose} disabled={loading} className="min-h-11 rounded-[10px] border border-white/[0.09] px-4 text-sm font-medium text-[#A0A8B5] transition-colors duration-150 hover:bg-white/[0.05] hover:text-white disabled:opacity-50">
-              Cancelar
-            </button>
-            <button disabled={loading} type="submit" className="flex min-h-11 min-w-[154px] items-center justify-center gap-2 rounded-[10px] bg-[#665CFF] px-5 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#756CFF] focus-visible:ring-2 focus-visible:ring-[#8B84FF]/60 disabled:cursor-not-allowed disabled:opacity-50">
-              {loading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <CheckCircle2 aria-hidden="true" className="h-4 w-4" />}
-              {loading ? 'Salvando...' : 'Salvar transação'}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+            <span>Categoria</span>
+            <CustomSelect
+              value={category}
+              options={CATEGORIES[type === 'receita' ? 'income' : 'expense']}
+              onChange={setCategory}
+              name="category"
+              aria-label="Categoria"
+            />
+          </label>
+          <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+            <span>Forma / Cartão</span>
+            <CustomSelect
+              value={paymentMethod}
+              options={paymentOptions}
+              onChange={setPaymentMethod}
+              name="payment_method"
+              aria-label="Forma ou cartão"
+            />
+          </label>
+        </div>
+
+        <label className="space-y-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+          <span>Data</span>
+          <Input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+        </label>
+
+        <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-card-border)] bg-[var(--color-action-ghost-hover)] px-4">
+          <input id="is_fixed" name="is_fixed" type="checkbox" className="h-4 w-4 accent-[var(--color-action-primary)]" />
+          <span className="text-sm font-medium text-[var(--color-text-secondary)]">Adicionar ao cronograma mensal</span>
+        </label>
+
+        <div className="flex justify-end gap-3 border-t border-[var(--color-card-border)] pt-5">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button disabled={loading} type="submit" className="min-w-[154px] gap-2">
+            {loading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <CheckCircle2 aria-hidden="true" className="h-4 w-4" />}
+            {loading ? 'Salvando...' : 'Salvar transação'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
+}
+
+function groupLabel(dateValue: string) {
+  const date = new Date(`${dateValue.slice(0, 10)}T12:00:00`)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  if (sameDay(date, today)) return 'Hoje'
+  if (sameDay(date, yesterday)) return 'Ontem'
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
 }
 
 export default function TransactionsView() {
@@ -454,6 +196,7 @@ export default function TransactionsView() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
+  const [page, setPage] = useState(1)
 
   const { plan: userPlan } = useEntitlements()
   const isFreePlan = userPlan !== 'pro' && userPlan !== 'premium'
@@ -478,14 +221,8 @@ export default function TransactionsView() {
   const filteredData = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLocaleLowerCase('pt-BR')
     return monthTransactions.filter(transaction => {
-      const matchesType =
-        filterType === 'all'
-          ? true
-          : filterType === 'receita'
-            ? transaction.type === 'receita'
-            : transaction.type !== 'receita'
-      const matchesStatus =
-        filterStatus === 'all' ? true : filterStatus === 'pago' ? transaction.is_paid : !transaction.is_paid
+      const matchesType = filterType === 'all' ? true : filterType === 'receita' ? transaction.type === 'receita' : transaction.type !== 'receita'
+      const matchesStatus = filterStatus === 'all' ? true : filterStatus === 'pago' ? transaction.is_paid : !transaction.is_paid
       const matchesSearch =
         normalizedSearch === '' ||
         transaction.description.toLocaleLowerCase('pt-BR').includes(normalizedSearch) ||
@@ -493,6 +230,8 @@ export default function TransactionsView() {
       return matchesType && matchesStatus && matchesSearch
     })
   }, [monthTransactions, filterType, filterStatus, searchTerm])
+
+  useEffect(() => setPage(1), [currentMonthStr, filterType, filterStatus, searchTerm])
 
   const totals = useMemo(
     () => ({
@@ -511,21 +250,15 @@ export default function TransactionsView() {
     router.refresh()
   }
 
-  const handlePrevMonth = () =>
-    setCurrentDate(date => new Date(date.getFullYear(), date.getMonth() - 1, 1))
-
-  const handleNextMonth = () =>
-    setCurrentDate(date => new Date(date.getFullYear(), date.getMonth() + 1, 1))
+  const handlePrevMonth = () => setCurrentDate(date => new Date(date.getFullYear(), date.getMonth() - 1, 1))
+  const handleNextMonth = () => setCurrentDate(date => new Date(date.getFullYear(), date.getMonth() + 1, 1))
 
   const generatePDF = async () => {
     if (isFreePlan) {
       setShowUpgradeModal(true)
       return
     }
-    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
-      import('jspdf'),
-      import('jspdf-autotable'),
-    ])
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
     const doc = new jsPDF()
     doc.setFillColor(10, 10, 15)
     doc.rect(0, 0, 210, 45, 'F')
@@ -578,150 +311,147 @@ export default function TransactionsView() {
 
   if (loadingData) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center bg-[#07090D] text-[#A0A8B5]">
-        <Loader2 aria-label="Carregando transações" className="h-7 w-7 animate-spin text-[#4F8CFF]" />
+      <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg-canvas)] text-[var(--color-text-helper)]">
+        <Loader2 aria-label="Carregando transações" className="h-7 w-7 animate-spin text-[var(--color-action-primary)]" />
       </div>
     )
   }
 
-  const hasActiveFilters = searchTerm.trim() !== '' || filterType !== 'all' || filterStatus !== 'all'
+  const typeLabel = filterType === 'all' ? 'Todos os tipos' : filterType === 'receita' ? 'Receitas' : 'Despesas'
+  const statusLabel = filterStatus === 'all' ? 'Todos os status' : filterStatus === 'pago' ? 'Pagos' : 'Pendentes'
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pageData = filteredData.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const groups = pageData.reduce<Array<{ label: string; items: Transaction[] }>>((acc, transaction) => {
+    const label = groupLabel(transaction.date)
+    const last = acc[acc.length - 1]
+    if (last?.label === label) last.items.push(transaction)
+    else acc.push({ label, items: [transaction] })
+    return acc
+  }, [])
 
   return (
-    <div className="-m-4 min-h-[calc(100vh-6rem)] bg-[#07090D] p-4 pb-32 text-[#F4F6F8] md:-m-8 md:p-8 md:pb-32">
-      <div className="mx-auto w-full max-w-[1480px] space-y-4">
-        <header className="flex min-h-[68px] flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+    <div className="min-h-full bg-[var(--color-bg-canvas)] pb-24 text-[var(--color-text-primary)] md:pb-8">
+      <div className="mx-auto w-full max-w-[1180px] space-y-6 px-4 py-5 sm:px-6 md:py-7 lg:px-8">
+        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-[26px] font-bold tracking-[-0.03em] text-white">Transações</h1>
-            <p className="mt-1 text-sm text-[#A0A8B5]">Acompanhe, filtre e organize seu fluxo financeiro.</p>
+            <h1 className="text-2xl font-bold tracking-[-0.02em] md:text-[28px]">Transações</h1>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Acompanhe entradas, saídas e transferências em um só lugar.</p>
           </div>
-
-          <div className="grid gap-2 sm:grid-cols-[auto_auto_1fr] xl:flex xl:items-center">
-            <div className="flex min-h-11 items-center overflow-hidden rounded-[11px] border border-white/[0.09] bg-[#0D1118] sm:col-span-1">
-              <button type="button" aria-label="Mês anterior" onClick={handlePrevMonth} className="flex h-11 w-11 items-center justify-center text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.05] hover:text-white focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#665CFF]/50">
-                <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-              </button>
-              <span className="min-w-[150px] border-x border-white/[0.075] px-3 text-center text-sm font-medium capitalize text-[#F4F6F8] sm:min-w-[176px]">{currentMonthLabel}</span>
-              <button type="button" aria-label="Próximo mês" onClick={handleNextMonth} className="flex h-11 w-11 items-center justify-center text-[#A0A8B5] outline-none transition-colors duration-150 hover:bg-white/[0.05] hover:text-white focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#665CFF]/50">
-                <ChevronRight aria-hidden="true" className="h-4 w-4" />
-              </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)]">
+              <Button variant="ghost" size="icon" aria-label="Mês anterior" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="min-w-[150px] px-2 text-center text-sm font-medium capitalize">{currentMonthLabel}</span>
+              <Button variant="ghost" size="icon" aria-label="Próximo mês" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
             </div>
-            <button type="button" onClick={generatePDF} className="flex min-h-11 items-center justify-center gap-2 rounded-[11px] border border-white/[0.1] bg-[#111722] px-4 text-sm font-medium text-[#F4F6F8] outline-none transition-colors duration-150 hover:border-white/[0.16] hover:bg-[#151C29] focus-visible:ring-2 focus-visible:ring-[#665CFF]/50">
-              {isFreePlan ? <Lock aria-hidden="true" className="h-4 w-4 text-[#8B84FF]" /> : <Download aria-hidden="true" className="h-4 w-4" />}
-              {isFreePlan ? 'Relatório PRO' : 'Exportar PDF'}
-            </button>
-            <button type="button" onClick={() => setIsCreateModalOpen(true)} className="flex min-h-11 items-center justify-center gap-2 rounded-[11px] bg-[#665CFF] px-5 text-sm font-semibold text-white outline-none transition-colors duration-150 hover:bg-[#756CFF] focus-visible:ring-2 focus-visible:ring-[#8B84FF]/60">
-              <Plus aria-hidden="true" className="h-4 w-4" />
-              Nova transação
-            </button>
+            <Button variant="secondary" onClick={generatePDF} className="gap-2">
+              {isFreePlan ? <Lock className="h-4 w-4" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
+              <span className="hidden sm:inline">{isFreePlan ? 'Relatório PRO' : 'Exportar PDF'}</span>
+            </Button>
+            <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2"><Plus className="h-4 w-4" aria-hidden="true" />Adicionar transação</Button>
           </div>
         </header>
 
-        <section aria-label="Resumo financeiro" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [&>article:last-child]:sm:col-span-2 [&>article:last-child]:xl:col-span-1">
-          <SummaryCard icon={Wallet} label="Saldo projetado" value={formatCurrency(totals.balance)} tone="balance" isNegative={totals.balance < 0} />
-          <SummaryCard icon={TrendingUp} label="Entradas" value={formatCurrency(totals.income)} tone="income" />
-          <SummaryCard icon={TrendingDown} label="Saídas" value={formatCurrency(Math.abs(totals.expense))} tone="expense" />
+        <section aria-label="Resumo financeiro" className="grid gap-4 md:grid-cols-3">
+          <FinancialMetricCard label="Saldo do período" value={formatCurrency(totals.balance)} helper={currentMonthLabel} tone={totals.balance < 0 ? 'negative' : 'neutral'} />
+          <FinancialMetricCard label="Entradas" value={formatCurrency(totals.income)} helper="No período selecionado" tone="positive" />
+          <FinancialMetricCard label="Saídas" value={formatCurrency(Math.abs(totals.expense))} helper="No período selecionado" tone="negative" />
         </section>
 
         <FixedExpensesList transactions={transactions} currentDate={currentDate} />
 
-        <section aria-label="Filtros de transações" className="grid gap-3 rounded-[16px] border border-white/[0.075] bg-[#0D1118] p-3 md:grid-cols-2 lg:grid-cols-[minmax(280px,1fr)_180px_180px] lg:items-end">
-          <div className="relative md:col-span-2 lg:col-span-1">
-            <label htmlFor="transaction-search" className="mb-1.5 block text-xs font-medium text-[#A0A8B5]">Buscar</label>
-            <Search aria-hidden="true" className="absolute bottom-3.5 left-3.5 h-4 w-4 text-[#A0A8B5]" />
-            <input id="transaction-search" type="search" placeholder="Buscar por descrição ou categoria" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} className={`${fieldClassName} pl-10`} />
+        <section aria-labelledby="transaction-filters-title" className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-[18px]">
+          <h2 id="transaction-filters-title" className="text-[15px] font-semibold">Buscar e filtrar</h2>
+          <div className="mt-3 grid gap-3 md:grid-cols-[minmax(260px,1fr)_190px_190px]">
+            <div className="relative">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-helper)]" />
+              <Input
+                id="transaction-search"
+                type="search"
+                aria-label="Buscar transações"
+                placeholder="Buscar por descrição ou categoria"
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <CustomSelect
+              value={typeLabel}
+              options={['Todos os tipos', 'Receitas', 'Despesas']}
+              aria-label="Filtrar por tipo"
+              onChange={value => setFilterType(value === 'Receitas' ? 'receita' : value === 'Despesas' ? 'despesa' : 'all')}
+            />
+            {isFreePlan ? (
+              <Button variant="secondary" onClick={() => setShowUpgradeModal(true)} className="justify-between"><span>Todos os status (PRO)</span><Lock className="h-4 w-4 text-[var(--color-nav-active-text)]" /></Button>
+            ) : (
+              <CustomSelect
+                value={statusLabel}
+                options={['Todos os status', 'Pagos', 'Pendentes']}
+                aria-label="Filtrar por status"
+                onChange={value => setFilterStatus(value === 'Pagos' ? 'pago' : value === 'Pendentes' ? 'pendente' : 'all')}
+              />
+            )}
           </div>
-          <CustomFilter label="Tipo" value={filterType} options={[{ id: 'all', label: 'Todas' }, { id: 'receita', label: 'Receitas' }, { id: 'despesa', label: 'Despesas' }]} onChange={setFilterType} />
-          <CustomFilter label="Status" value={filterStatus} isPro={isFreePlan} onProClick={() => setShowUpgradeModal(true)} options={[{ id: 'all', label: 'Todos' }, { id: 'pago', label: 'Pagos' }, { id: 'pendente', label: 'Pendentes' }]} onChange={setFilterStatus} />
         </section>
 
-        <section aria-labelledby="transactions-list-title" className="overflow-hidden rounded-[16px] border border-white/[0.075] bg-[#0D1118]">
-          <header className="flex min-h-16 items-center justify-between gap-4 border-b border-white/[0.075] px-4 sm:px-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#665CFF]/10 text-[#8B84FF]">
-                <CalendarDays aria-hidden="true" className="h-[18px] w-[18px]" />
-              </span>
-              <div>
-                <h2 id="transactions-list-title" className="text-base font-semibold">Movimentações do mês</h2>
-                <p className="mt-0.5 text-xs text-[#A0A8B5]">{filteredData.length} {filteredData.length === 1 ? 'transação' : 'transações'}</p>
-              </div>
+        <section aria-labelledby="transactions-list-title" className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-[18px]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-card-border)] pb-4">
+            <div>
+              <h2 id="transactions-list-title" className="text-base font-semibold">{filteredData.length} {filteredData.length === 1 ? 'transação' : 'transações'}</h2>
+              <p className="mt-1 text-xs text-[var(--color-text-helper)]">Movimentações de {currentMonthLabel}</p>
             </div>
-          </header>
+            <div className="flex items-center gap-2 text-xs text-[var(--color-text-helper)]"><Filter className="h-4 w-4" aria-hidden="true" />Página {safePage} de {totalPages}</div>
+          </div>
 
-          {filteredData.length === 0 ? (
+          {pageData.length === 0 ? (
             <div className="flex min-h-[220px] flex-col items-center justify-center px-5 text-center">
-              <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-white/[0.04] text-[#A0A8B5]">
-                <CalendarDays aria-hidden="true" className="h-5 w-5" />
-              </span>
-              <h3 className="mt-4 text-sm font-semibold text-[#F4F6F8]">
-                {monthTransactions.length === 0 ? 'Sem transações neste mês' : 'Nenhuma transação encontrada'}
-              </h3>
-              <p className="mt-1 max-w-sm text-sm text-[#A0A8B5]">
-                {monthTransactions.length === 0
-                  ? 'Adicione uma nova transação para começar a acompanhar seu fluxo.'
-                  : 'Tente ajustar os filtros.'}
-              </p>
-              {monthTransactions.length === 0 ? (
-                <button type="button" onClick={() => setIsCreateModalOpen(true)} className="mt-5 min-h-10 rounded-[10px] border border-white/[0.1] bg-[#111722] px-4 text-sm font-medium transition-colors duration-150 hover:bg-[#151C29]">
-                  Nova transação
-                </button>
-              ) : null}
-              {hasActiveFilters ? <span className="sr-only">Existem filtros ativos.</span> : null}
+              <h3 className="text-sm font-semibold">{monthTransactions.length === 0 ? 'Sem transações neste mês' : 'Nenhuma transação encontrada'}</h3>
+              <p className="mt-1 max-w-sm text-sm text-[var(--color-text-helper)]">{monthTransactions.length === 0 ? 'Adicione uma nova transação para começar a acompanhar seu fluxo.' : 'Tente ajustar os filtros.'}</p>
+              {monthTransactions.length === 0 ? <Button variant="secondary" className="mt-5" onClick={() => setIsCreateModalOpen(true)}>Nova transação</Button> : null}
             </div>
           ) : (
-            <>
-              <div aria-hidden="true" className="hidden min-h-11 grid-cols-[minmax(180px,1.45fr)_minmax(120px,0.9fr)_minmax(140px,1fr)_110px_105px_minmax(120px,0.8fr)] items-center gap-4 border-b border-white/[0.06] bg-[#080B11]/55 px-5 text-[11px] font-medium text-[#A0A8B5] xl:grid">
-                <span>Descrição</span><span>Categoria</span><span>Conta / forma</span><span>Data</span><span>Status</span><span className="text-right">Valor</span>
-              </div>
-              <div className="divide-y divide-white/[0.06]">
-                {filteredData.map(transaction => {
-                  const isIncome = transaction.type === 'receita'
-                  const formattedDate = new Date(transaction.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
-                  return (
-                    <button
-                      key={transaction.id}
-                      type="button"
-                      onClick={() => handleTransactionClick(transaction)}
-                      aria-label={`Abrir detalhes de ${transaction.description}, ${formatCurrency(Math.abs(Number(transaction.amount)))}`}
-                      className="group block min-h-[84px] w-full px-4 py-4 text-left outline-none transition-colors duration-150 hover:bg-white/[0.025] focus-visible:bg-[#665CFF]/[0.06] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#665CFF]/45 xl:grid xl:min-h-[64px] xl:grid-cols-[minmax(180px,1.45fr)_minmax(120px,0.9fr)_minmax(140px,1fr)_110px_105px_minmax(120px,0.8fr)] xl:items-center xl:gap-4 xl:px-5 xl:py-0"
-                    >
-                      <span className="flex min-w-0 items-center justify-between gap-3 overflow-hidden xl:block">
-                        <span className="min-w-0 truncate text-sm font-semibold text-[#F4F6F8]">{transaction.description}</span>
-                        <span className={`shrink-0 text-sm font-semibold tabular-nums xl:hidden ${isIncome ? 'text-[#28D7A1]' : 'text-[#FF5876]'}`}>
-                          {isIncome ? '+' : '−'} {formatCurrency(Math.abs(Number(transaction.amount)))}
-                        </span>
-                      </span>
-                      <span className="mt-1 block min-w-0 truncate text-xs text-[#A0A8B5] xl:mt-0 xl:text-sm">{transaction.category}</span>
-                      <span className="mt-2 flex min-w-0 items-center gap-1.5 truncate text-xs text-[#A0A8B5] xl:mt-0 xl:text-sm">
-                        <Landmark aria-hidden="true" className="h-3.5 w-3.5 shrink-0 xl:hidden" />
-                        {transaction.payment_method || 'Conta'}
-                      </span>
-                      <span className="mt-1 block text-xs tabular-nums text-[#A0A8B5] xl:mt-0 xl:text-sm">{formattedDate}</span>
-                      <span className={`mt-2 inline-flex min-h-6 w-fit items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium xl:mt-0 ${transaction.is_paid ? 'border-[#28D7A1]/20 bg-[#28D7A1]/8 text-[#28D7A1]' : 'border-[#F5B942]/20 bg-[#F5B942]/8 text-[#F5B942]'}`}>
-                        <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${transaction.is_paid ? 'bg-[#28D7A1]' : 'bg-[#F5B942]'}`} />
-                        {transaction.is_paid ? 'Pago' : 'Pendente'}
-                      </span>
-                      <span className={`hidden text-right text-sm font-semibold tabular-nums xl:block ${isIncome ? 'text-[#28D7A1]' : 'text-[#FF5876]'}`}>
-                        {isIncome ? '+' : '−'} {formatCurrency(Math.abs(Number(transaction.amount)))}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </>
+            <div className="py-2">
+              {groups.map(group => (
+                <div key={group.label} className="py-2">
+                  <h3 className="mb-2 text-xs font-medium text-[var(--color-text-helper)]">{group.label}</h3>
+                  <div className="space-y-2">
+                    {group.items.map(transaction => (
+                      <TransactionRow
+                        key={transaction.id}
+                        transaction={transaction}
+                        onClick={() => handleTransactionClick(transaction)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
+
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--color-card-border)] pt-4">
+              <span className="text-xs text-[var(--color-text-helper)]">Página {safePage} de {totalPages}</span>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" disabled={safePage <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}>Anterior</Button>
+                <Button variant="secondary" size="sm" disabled={safePage >= totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}>Próxima</Button>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
 
-      <AnimatePresence>
-        {isCreateModalOpen ? (
-          <NewTransactionModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={handleSuccessAction} />
-        ) : null}
-      </AnimatePresence>
-      <AnimatePresence>
-        {isEditModalOpen && selectedTransaction ? (
-          <TransactionDetailModal key={selectedTransaction.id} isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} transaction={selectedTransaction} onUpdate={handleUpdate} onDelete={handleDelete} loading={loadingAction} />
-        ) : null}
-      </AnimatePresence>
+      <NewTransactionModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={handleSuccessAction} />
+      {isEditModalOpen && selectedTransaction ? (
+        <TransactionDetailModal
+          key={selectedTransaction.id}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          transaction={selectedTransaction}
+          onUpdate={handleUpdate}
+          onDelete={handleDelete}
+          loading={loadingAction}
+        />
+      ) : null}
       <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </div>
   )
