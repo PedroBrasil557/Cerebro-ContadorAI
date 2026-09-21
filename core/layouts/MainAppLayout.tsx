@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { financeService } from '@/services/financeService'
+import { goalsService } from '@/services/goalsService'
 import AppLoadingScreen from '@/core/ui/AppLoadingScreen'
 import ViewContainer from '@/core/components/ViewContainer'
 import Navigation from '@/core/components/Navigation'
@@ -203,6 +204,21 @@ export default function MainAppLayout({ user }: { user: User }) {
             onAddGoal={(goal) =>
               financeService.createGoal(goal).then((createdGoal) =>
                 setGoals((current) => [...current, createdGoal]),
+              )
+            }
+            onAdjustGoal={(id, delta) =>
+              goalsService.adjustAmount(id, delta).then((updated) =>
+                setGoals((current) => current.map((goal) => goal.id === id ? updated : goal)),
+              )
+            }
+            onUpdateGoal={(id, updates) =>
+              goalsService.updateGoal(id, updates).then((updated) =>
+                setGoals((current) => current.map((goal) => goal.id === id ? updated : goal)),
+              )
+            }
+            onDeleteGoal={(id) =>
+              goalsService.deleteGoal(id).then(() =>
+                setGoals((current) => current.filter((goal) => goal.id !== id)),
               )
             }
           />
