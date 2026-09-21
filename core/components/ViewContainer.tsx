@@ -51,11 +51,15 @@ interface ViewContainerProps {
 
   // Handlers
   onAddGoal: (goal: NewGoal) => Promise<void>
+  onAdjustGoal: (id: string, delta: number) => Promise<void>
+  onUpdateGoal: (id: string, updates: Pick<Goal, 'title' | 'target_amount' | 'deadline'>) => Promise<void>
+  onDeleteGoal: (id: string) => Promise<void>
 }
 
 export default function ViewContainer({
   activeTab, handleRedirect, summary, transactions = [], goals = [],
-  onAddGoal, investments = [], access, accountMode
+  onAddGoal, onAdjustGoal, onUpdateGoal, onDeleteGoal,
+  investments = [], access, accountMode
 }: ViewContainerProps) {
   // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
@@ -106,6 +110,9 @@ export default function ViewContainer({
               <GoalsView
                 goals={goals}
                 onAddGoal={onAddGoal}
+                onAdjustGoal={onAdjustGoal}
+                onUpdateGoal={onUpdateGoal}
+                onDeleteGoal={onDeleteGoal}
                 handleRedirect={handleRedirect}
               />
             )}
