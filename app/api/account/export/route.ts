@@ -28,8 +28,9 @@ export async function GET() {
 
     let personal: Record<string, unknown> = {}
     if (billing.access.canAccessPersonal) {
-      const [transactions, creditCards, debts, goals, investments, patrimonyHistory, shoppingSessions] = await Promise.all([
+      const [transactions, personalAccounts, creditCards, debts, goals, investments, patrimonyHistory, shoppingSessions] = await Promise.all([
         supabase.from('transactions').select('*').eq('user_id', user.id).eq('scope', 'personal'),
+        supabase.from('personal_accounts').select('*').eq('user_id', user.id),
         supabase.from('credit_cards').select('id,name,brand,last_4_digits,limit_amount,current_invoice,due_day,closing_day,created_at').eq('user_id', user.id),
         supabase.from('debts').select('*').eq('user_id', user.id),
         supabase.from('goals').select('*').eq('user_id', user.id),
@@ -37,7 +38,7 @@ export async function GET() {
         supabase.from('patrimony_history').select('*').eq('user_id', user.id),
         supabase.from('monthly_shopping_sessions').select('*').eq('user_id', user.id),
       ])
-      assertQueries([transactions, creditCards, debts, goals, investments, patrimonyHistory, shoppingSessions])
+      assertQueries([transactions, personalAccounts, creditCards, debts, goals, investments, patrimonyHistory, shoppingSessions])
 
       const sessionIds = (shoppingSessions.data ?? []).map((session) => session.id)
       const [shoppingItems, shoppingReceipts, shoppingInsights] = sessionIds.length > 0
@@ -51,6 +52,7 @@ export async function GET() {
 
       personal = {
         transactions: transactions.data ?? [],
+        personal_accounts: personalAccounts.data ?? [],
         credit_cards: creditCards.data ?? [],
         debts: debts.data ?? [],
         goals: goals.data ?? [],

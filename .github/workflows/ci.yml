@@ -14,6 +14,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      release_rls: ${{ steps.release_rls.outputs.changed }}
+    steps:
+      - name: Checkout full history for change detection
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect database security changes
+        id: release_rls
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          changed_files="$(git diff --name-only "$base" "$head")"
+          printf '%s\n' "$changed_files"
+
+          if grep -Eq '^(supabase/migrations/|supabase/config\.toml$|tests/integration/)' <<<"$changed_files"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -55,7 +88,8 @@ jobs:
         run: npm run build
 
   release-rls:
-    if: github.ref == 'refs/heads/release/v1-hardening' || github.head_ref == 'release/v1-hardening' || github.ref == 'refs/heads/foundation/product-separation-professional-v2' || github.head_ref == 'foundation/product-separation-professional-v2' || github.ref == 'refs/heads/foundation/founder-platform-authority' || github.head_ref == 'foundation/founder-platform-authority' || github.ref == 'refs/heads/hardening/post-production-security' || github.head_ref == 'hardening/post-production-security'
+    needs: changes
+    if: needs.changes.outputs.release_rls == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
