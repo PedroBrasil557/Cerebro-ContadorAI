@@ -244,7 +244,7 @@ export default function GoalsView({ goals, onAddGoal, onAdjustGoal, onUpdateGoal
           {formError ? <p role="alert" className="text-sm text-[var(--color-text-error)]">{formError}</p> : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" disabled={isSaving} onClick={closeAction}>Cancelar</Button>
-            <Button type="submit" disabled={isSaving} variant={action === 'delete' ? 'destructive' : 'primary'}>{isSaving ? 'Salvando…' : action === 'delete' ? 'Excluir meta' : 'Confirmar'}</Button>
+            <Button type="submit" disabled={isSaving} variant={action === 'delete' ? 'destructive' : 'default'}>{isSaving ? 'Salvando…' : action === 'delete' ? 'Excluir meta' : 'Confirmar'}</Button>
           </div>
         </form>
       </Modal>
