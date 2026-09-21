@@ -10,7 +10,11 @@ import {
   type Transaction,
   updateTransaction,
 } from '@/core/action/transactions'
-import { calculateBalance, calculateExpenses, calculateIncome } from '@/core/finance/transactionMath'
+import {
+  calculateRealizedBalance,
+  calculateRealizedExpenses,
+  calculateRealizedIncome,
+} from '@/core/finance/transactionMath'
 import UpgradeModal from '@/core/components/UpgradeModal'
 import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
 import TransactionDetailModal from '@/modules/personal/components/TransactionDetailModal'
@@ -235,9 +239,9 @@ export default function TransactionsView() {
 
   const totals = useMemo(
     () => ({
-      income: calculateIncome(monthTransactions),
-      expense: calculateExpenses(monthTransactions),
-      balance: calculateBalance(monthTransactions),
+      income: calculateRealizedIncome(monthTransactions),
+      expense: calculateRealizedExpenses(monthTransactions),
+      balance: calculateRealizedBalance(monthTransactions),
     }),
     [monthTransactions],
   )
@@ -352,10 +356,10 @@ export default function TransactionsView() {
           </div>
         </header>
 
-        <section aria-label="Resumo financeiro" className="grid gap-4 md:grid-cols-3">
-          <FinancialMetricCard label="Saldo do período" value={formatCurrency(totals.balance)} helper={currentMonthLabel} tone={totals.balance < 0 ? 'negative' : 'neutral'} />
-          <FinancialMetricCard label="Entradas" value={formatCurrency(totals.income)} helper="No período selecionado" tone="positive" />
-          <FinancialMetricCard label="Saídas" value={formatCurrency(Math.abs(totals.expense))} helper="No período selecionado" tone="negative" />
+        <section aria-label="Resumo financeiro realizado" className="grid gap-4 md:grid-cols-3">
+          <FinancialMetricCard label="Saldo realizado" value={formatCurrency(totals.balance)} helper="Somente movimentações confirmadas" tone={totals.balance < 0 ? 'negative' : 'neutral'} />
+          <FinancialMetricCard label="Entradas realizadas" value={formatCurrency(totals.income)} helper={currentMonthLabel} tone="positive" />
+          <FinancialMetricCard label="Saídas realizadas" value={formatCurrency(Math.abs(totals.expense))} helper={currentMonthLabel} tone="negative" />
         </section>
 
         <FixedExpensesList transactions={transactions} currentDate={currentDate} />
