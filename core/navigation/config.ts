@@ -1,7 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   ArrowLeftRight,
-  BrainCircuit,
   BriefcaseBusiness,
   CircleDollarSign,
   CreditCard,
@@ -53,13 +52,6 @@ const PERSONAL_ITEMS: AppNavigationItem[] = [
     id: 'metas',
     label: 'Metas',
     icon: Target,
-    section: 'primary',
-    mobilePrimary: true,
-  },
-  {
-    id: 'cérebro',
-    label: 'Cérebro',
-    icon: BrainCircuit,
     section: 'primary',
     mobilePrimary: true,
   },
