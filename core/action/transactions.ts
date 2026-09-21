@@ -27,18 +27,35 @@ export interface Transaction {
 async function resolveOwnedCardId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  candidate: FormDataEntryValue | null,
+  candidate: FormDataEntryValue | string | null | undefined,
+  paymentMethod?: string,
 ) {
-  if (typeof candidate !== 'string' || !candidate.trim()) return null
-  const { data, error } = await supabase
-    .from('credit_cards')
-    .select('id')
-    .eq('id', candidate)
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (error) return { error: 'Não foi possível validar o cartão selecionado.' } as const
-  if (!data) return { error: 'Cartão inválido para esta conta.' } as const
-  return data.id
+  if (typeof candidate === 'string' && candidate.trim()) {
+    const { data, error } = await supabase
+      .from('credit_cards')
+      .select('id')
+      .eq('id', candidate)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (error) return { error: 'Não foi possível validar o cartão selecionado.' } as const
+    if (!data) return { error: 'Cartão inválido para esta conta.' } as const
+    return data.id
+  }
+
+  // Backwards compatibility for the existing selector, which historically stored
+  // only the card name in payment_method. Link by name only when it is unambiguous.
+  if (paymentMethod && paymentMethod !== 'Dinheiro / Pix') {
+    const { data, error } = await supabase
+      .from('credit_cards')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', paymentMethod)
+      .limit(2)
+    if (error) return { error: 'Não foi possível validar a forma de pagamento.' } as const
+    if (data?.length === 1) return data[0].id
+  }
+
+  return null
 }
 
 export async function getTransactions() {
@@ -96,7 +113,7 @@ export async function createTransaction(formData: FormData) {
   const type = formData.get('type') as string
   const description = formData.get('description') as string
   const paymentMethod = formData.get('payment_method') as string
-  const ownedCardId = await resolveOwnedCardId(supabase, user.id, formData.get('card_id'))
+  const ownedCardId = await resolveOwnedCardId(supabase, user.id, formData.get('card_id'), paymentMethod)
   if (ownedCardId && typeof ownedCardId === 'object' && 'error' in ownedCardId) return ownedCardId
   const today = new Date().toISOString().split('T')[0]
 
@@ -139,12 +156,8 @@ export async function updateTransaction(data: Transaction, reason: string) {
   if (!user) return { error: 'Auth required' }
   if (!reason || reason.trim().length < 3) return { error: 'Motivo obrigatório.' }
 
-  let cardId: string | null = null
-  if (data.card_id) {
-    const ownedCardId = await resolveOwnedCardId(supabase, user.id, data.card_id)
-    if (ownedCardId && typeof ownedCardId === 'object' && 'error' in ownedCardId) return ownedCardId
-    cardId = typeof ownedCardId === 'string' ? ownedCardId : null
-  }
+  const ownedCardId = await resolveOwnedCardId(supabase, user.id, data.card_id, data.payment_method)
+  if (ownedCardId && typeof ownedCardId === 'object' && 'error' in ownedCardId) return ownedCardId
 
   const { error } = await supabase.from('transactions').update({
     description: data.description,
@@ -154,7 +167,7 @@ export async function updateTransaction(data: Transaction, reason: string) {
     date: data.date,
     edit_note: reason,
     payment_method: data.payment_method,
-    card_id: cardId,
+    card_id: typeof ownedCardId === 'string' ? ownedCardId : null,
   })
     .eq('id', data.id)
     .eq('user_id', user.id)
