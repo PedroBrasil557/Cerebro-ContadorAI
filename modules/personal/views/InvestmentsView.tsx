@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
 import { Goal, Investment, NewGoal, PatrimonyHistory } from '@/types_db'
+import { calculateInvestmentPortfolioValue } from '@/core/finance/patrimony'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import UpgradeModal from '@/core/components/UpgradeModal'
@@ -105,12 +106,17 @@ export default function InvestmentsView({ goals, onAddGoal }: InvestmentsViewPro
       if (invData) {
          const items = invData as Investment[]
          setInvestments(items)
-         setTotalPatrimony(items.reduce((acc, curr) => acc + (curr.quantity * curr.current_price), 0))
+         setTotalPatrimony(calculateInvestmentPortfolioValue(items))
       }
 
-      const { data: histData } = await supabase.from('patrimony_history').select('*').eq('user_id', authUser.id).order('record_date', { ascending: true }).limit(30)
+      const { data: histData } = await supabase
+        .from('patrimony_history')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .order('record_date', { ascending: false })
+        .limit(30)
       if (histData && histData.length > 0) {
-        setHistoryData(histData as PatrimonyHistory[])
+        setHistoryData((histData as PatrimonyHistory[]).slice().reverse())
       } else {
         setHistoryData([])
       }
