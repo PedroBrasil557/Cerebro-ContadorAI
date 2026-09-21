@@ -45,6 +45,7 @@ export const Modal = ({ isOpen, onClose, title, children, role = 'dialog' }: Mod
             <Dialog.Content
               forceMount
               role={role}
+              aria-describedby={undefined}
               className={[
                 'fixed left-1/2 top-1/2 z-[61] w-[calc(100%-2rem)] max-w-lg',
                 '-translate-x-1/2 -translate-y-1/2 focus:outline-none',
