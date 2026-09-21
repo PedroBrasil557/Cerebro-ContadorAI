@@ -72,6 +72,13 @@ test('renders the responsive Personal shell and preserves PRO locks across break
   await expect(page.getByRole('button', { name: 'Criar meta' })).toBeVisible()
   await expect(page.getByText('Suas metas')).toBeVisible()
 
+  await page.getByRole('button', { name: 'Criar meta' }).click()
+  const goalDialog = page.getByRole('dialog', { name: 'Criar meta' })
+  await expect(goalDialog).toBeVisible()
+  await expect(goalDialog.getByLabel('Nome da meta')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(goalDialog).toHaveCount(0)
+
   await desktopSidebar.getByRole('button', { name: /Patrimônio/ }).click()
   await expect(page.getByRole('heading', { name: 'Cérebro.IA PRO' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar com limitações' }).click()
