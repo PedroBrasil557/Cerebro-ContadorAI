@@ -2,11 +2,13 @@ import type { LucideIcon } from 'lucide-react'
 import {
   ArrowLeftRight,
   BriefcaseBusiness,
+  CircleDollarSign,
   CreditCard,
   LayoutDashboard,
   PieChart,
   ShieldAlert,
   ShoppingCart,
+  Target,
 } from 'lucide-react'
 import type { ActiveTab, AccountMode } from '@/types_db'
 import type { Entitlements, ProductAccess } from '@/lib/billing/plans'
@@ -19,7 +21,7 @@ export interface AppNavigationItem {
   shortLabel?: string
   icon: LucideIcon
   section: NavigationSection
-  /** Temporary mobile destinations while the final five core views are introduced. */
+  /** Primary destinations shown directly in responsive product navigation. */
   mobilePrimary?: boolean
   entitlement?: keyof Pick<Entitlements, 'investments' | 'debtCenter'>
 }
@@ -40,12 +42,25 @@ const PERSONAL_ITEMS: AppNavigationItem[] = [
     mobilePrimary: true,
   },
   {
+    id: 'orçamento',
+    label: 'Orçamento',
+    icon: CircleDollarSign,
+    section: 'primary',
+    mobilePrimary: true,
+  },
+  {
+    id: 'metas',
+    label: 'Metas',
+    icon: Target,
+    section: 'primary',
+    mobilePrimary: true,
+  },
+  {
     id: 'compras inteligentes',
     label: 'Smart Shopping',
     shortLabel: 'Compras',
     icon: ShoppingCart,
     section: 'secondary',
-    mobilePrimary: true,
   },
   {
     id: 'minha carteira',
@@ -53,7 +68,6 @@ const PERSONAL_ITEMS: AppNavigationItem[] = [
     shortLabel: 'Cartões',
     icon: CreditCard,
     section: 'secondary',
-    mobilePrimary: true,
   },
   {
     id: 'investimentos',

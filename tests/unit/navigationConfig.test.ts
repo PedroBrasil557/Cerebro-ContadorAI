@@ -30,12 +30,14 @@ describe('responsive navigation config', () => {
     systemRole: 'founder',
   }).access
 
-  it('keeps current Personal modules reachable during the visual migration', () => {
+  it('keeps only implemented Personal modules reachable after the audited Personal Core migration', () => {
     const ids = getNavigationItems('personal', personalAccess).map((item) => item.id)
 
     expect(ids).toEqual([
       'dashboard',
       'transações',
+      'orçamento',
+      'metas',
       'compras inteligentes',
       'minha carteira',
       'investimentos',
@@ -56,14 +58,14 @@ describe('responsive navigation config', () => {
     expect(getNavigationItems('professional', founderAccess).some((item) => item.id === 'admin')).toBe(true)
   })
 
-  it('keeps the transitional Personal mobile navigation at four destinations plus More', () => {
+  it('uses only implemented Personal destinations in mobile navigation', () => {
     const ids = getMobilePrimaryItems('personal', personalAccess).map((item) => item.id)
 
     expect(ids).toEqual([
       'dashboard',
       'transações',
-      'compras inteligentes',
-      'minha carteira',
+      'orçamento',
+      'metas',
     ])
   })
 

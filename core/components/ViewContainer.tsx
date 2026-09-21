@@ -14,6 +14,8 @@ import type { ProductAccess } from '@/lib/billing/plans'
 const moduleLoading = () => <div role="status" aria-live="polite" className="p-8 text-sm text-gray-400">Carregando módulo…</div>
 const DashboardView = dynamic(() => import('@/modules/personal/views/DashboardView'), { loading: moduleLoading })
 const TransactionsView = dynamic(() => import('@/modules/personal/views/TransactionsView'), { loading: moduleLoading })
+const BudgetView = dynamic(() => import('@/modules/personal/views/BudgetView'), { loading: moduleLoading })
+const GoalsView = dynamic(() => import('@/modules/personal/views/GoalsView'), { loading: moduleLoading })
 const InvestmentsView = dynamic(() => import('@/modules/personal/views/InvestmentsView'), { loading: moduleLoading })
 const WalletView = dynamic(() => import('@/modules/personal/views/WalletView'), { loading: moduleLoading })
 const DebtCenterView = dynamic(() => import('@/modules/personal/views/DebtCenterView'), { loading: moduleLoading })
@@ -98,6 +100,21 @@ export default function ViewContainer({
             
             {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
               <TransactionsView />
+            )}
+
+            {currentTab === 'orçamento' && (
+              <BudgetView
+                transactions={transactions}
+                handleRedirect={handleRedirect}
+              />
+            )}
+
+            {currentTab === 'metas' && (
+              <GoalsView
+                goals={goals}
+                onAddGoal={onAddGoal}
+                handleRedirect={handleRedirect}
+              />
             )}
             
             {currentTab === 'investimentos' && (
