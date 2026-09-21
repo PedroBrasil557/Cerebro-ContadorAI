@@ -44,6 +44,24 @@ test('renders the responsive Personal shell and preserves PRO locks across break
   await expect(desktopSidebar.getByRole('button', { name: 'Cérebro', exact: true })).toHaveCount(0)
   await expect(desktopSidebar.getByRole('button', { name: /Patrimônio/ })).toBeVisible()
 
+  await desktopSidebar.getByRole('button', { name: 'Visão geral' }).click()
+  await expect(page.getByRole('heading', { name: 'Visão geral', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Fluxo de caixa' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Movimentações recentes' })).toBeVisible()
+
+  await desktopSidebar.getByRole('button', { name: 'Transações' }).click()
+  await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Buscar e filtrar' })).toBeVisible()
+  await expect(page.getByRole('searchbox', { name: 'Buscar transações' })).toBeVisible()
+  await expect(page.getByLabel('Filtrar por tipo')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Adicionar transação' }).click()
+  const createDialog = page.getByRole('dialog', { name: 'Nova transação' })
+  await expect(createDialog).toBeVisible()
+  await expect(createDialog.getByLabel('Categoria')).toBeVisible()
+  await createDialog.getByRole('button', { name: 'Fechar' }).click()
+  await expect(createDialog).toHaveCount(0)
+
   await desktopSidebar.getByRole('button', { name: 'Orçamento' }).click()
   await expect(page.getByRole('heading', { name: 'Orçamento', exact: true })).toBeVisible()
   await expect(page.getByText('Limites personalizados ainda não estão disponíveis')).toBeVisible()
