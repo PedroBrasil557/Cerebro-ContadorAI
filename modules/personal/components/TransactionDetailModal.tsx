@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { AlertCircle, AlertTriangle, Calendar, CheckCircle2, Edit, FileText, Landmark, Save, Tag, Trash2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { Transaction } from '@/core/action/transactions'
 import { Modal } from '@/core/ui/Modal'
 import { Button } from '@/core/ui/button'
@@ -181,7 +182,7 @@ export default function TransactionDetailModal({
   )
 }
 
-function Detail({ label, value, icon: Icon }: { label: string; value: string; icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }> }) {
+function Detail({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--color-card-border)] bg-[var(--color-action-ghost-hover)] p-4">
       <dt className="flex items-center gap-2 text-xs text-[var(--color-text-helper)]"><Icon aria-hidden="true" className="h-4 w-4" />{label}</dt>
