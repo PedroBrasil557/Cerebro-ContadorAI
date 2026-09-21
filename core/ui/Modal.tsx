@@ -9,15 +9,18 @@ type ModalProps = {
   onClose: () => void
   title: string
   children: React.ReactNode
+  role?: 'dialog' | 'alertdialog'
 }
 
 /**
  * Backwards-compatible Modal API powered by Radix Dialog.
  *
  * This preserves existing consumers while adding focus trapping, Escape close,
- * accessible labelling and predictable focus restoration.
+ * accessible labelling and predictable focus restoration. Destructive
+ * confirmations can opt into alertdialog semantics without duplicating the
+ * modal primitive.
  */
-export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+export const Modal = ({ isOpen, onClose, title, children, role = 'dialog' }: ModalProps) => {
   return (
     <Dialog.Root
       open={isOpen}
@@ -28,6 +31,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-[var(--neutral-950)] opacity-70" />
         <Dialog.Content
+          role={role}
           className={[
             'fixed left-1/2 top-1/2 z-[61] w-[calc(100%-2rem)] max-w-lg',
             '-translate-x-1/2 -translate-y-1/2',
