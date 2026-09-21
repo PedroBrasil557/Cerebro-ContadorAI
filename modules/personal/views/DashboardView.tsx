@@ -122,7 +122,7 @@ export default function DashboardView({
             title="Seu histórico ainda está em formação"
             description="Continue registrando movimentações para tornar os indicadores e o fluxo de caixa mais completos."
             actionLabel="Ver transações"
-            onAction={() => onNavigate("transactions")}
+            onAction={() => onNavigate("transações")}
           />
         ) : null}
 
@@ -163,20 +163,10 @@ export default function DashboardView({
                 <p className="mt-1 text-xs text-[var(--color-text-helper)]">Receitas e despesas em {selectedYear}</p>
               </div>
               <div className="flex rounded-[var(--radius-sm)] bg-[var(--color-action-ghost-hover)] p-1" aria-label="Formato do gráfico">
-                <Button
-                  variant={chartType === "area" ? "secondary" : "ghost"}
-                  size="icon-sm"
-                  aria-label="Gráfico de linhas"
-                  onClick={() => setChartType("area")}
-                >
+                <Button variant={chartType === "area" ? "secondary" : "ghost"} size="icon-sm" aria-label="Gráfico de linhas" onClick={() => setChartType("area")}>
                   <LineChartIcon className="h-4 w-4" aria-hidden="true" />
                 </Button>
-                <Button
-                  variant={chartType === "bar" ? "secondary" : "ghost"}
-                  size="icon-sm"
-                  aria-label="Gráfico de barras"
-                  onClick={() => setChartType("bar")}
-                >
+                <Button variant={chartType === "bar" ? "secondary" : "ghost"} size="icon-sm" aria-label="Gráfico de barras" onClick={() => setChartType("bar")}>
                   <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
@@ -190,7 +180,7 @@ export default function DashboardView({
                       <XAxis dataKey="label" stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} />
                       <YAxis stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} tickFormatter={formatCompactCurrency} width={72} />
                       <Tooltip
-                        formatter={(value: number | string) => formatCurrency(Number(value))}
+                        formatter={(value) => formatCurrency(Number(value ?? 0))}
                         contentStyle={{ background: "var(--color-bg-elevated)", border: "1px solid var(--color-card-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)" }}
                       />
                       <Area type="monotone" dataKey="receita" stroke="var(--color-chart-primary)" fill="var(--color-chart-primary)" fillOpacity={0.12} strokeWidth={2} />
@@ -202,7 +192,7 @@ export default function DashboardView({
                       <XAxis dataKey="label" stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} />
                       <YAxis stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} tickFormatter={formatCompactCurrency} width={72} />
                       <Tooltip
-                        formatter={(value: number | string) => formatCurrency(Number(value))}
+                        formatter={(value) => formatCurrency(Number(value ?? 0))}
                         contentStyle={{ background: "var(--color-bg-elevated)", border: "1px solid var(--color-card-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)" }}
                       />
                       <Bar dataKey="receita" fill="var(--color-chart-primary)" radius={[5, 5, 0, 0]} />
@@ -244,7 +234,7 @@ export default function DashboardView({
               <h2 className="text-base font-semibold">Movimentações recentes</h2>
               <p className="mt-1 text-xs text-[var(--color-text-helper)]">Seus últimos lançamentos registrados</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate("transactions")}>Ver todas <ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => onNavigate("transações")}>Ver todas <ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" /></Button>
           </div>
           {displayedTransactions.length ? (
             <div className="space-y-2">
@@ -268,11 +258,7 @@ export default function DashboardView({
               <span className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-ghost-hover)] text-[var(--color-text-secondary)]"><Landmark className="h-5 w-5" aria-hidden="true" /></span>
               <div><h2 className="font-semibold">Central de Dívidas</h2><p className="text-xs text-[var(--color-text-helper)]">Acompanhe compromissos e organização de dívidas</p></div>
             </div>
-            <Button
-              className="mt-5"
-              variant="secondary"
-              onClick={() => (isFreePlan ? setShowUpgradeModal(true) : onNavigate("debts"))}
-            >
+            <Button className="mt-5" variant="secondary" onClick={() => (isFreePlan ? setShowUpgradeModal(true) : onNavigate("central de dividas"))}>
               {isFreePlan ? <><Lock className="mr-2 h-4 w-4" aria-hidden="true" />Recurso PRO</> : "Abrir Central de Dívidas"}
             </Button>
           </article>
