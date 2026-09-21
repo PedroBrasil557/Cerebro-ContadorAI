@@ -49,6 +49,14 @@ test('renders the responsive Personal shell and preserves PRO locks across break
   await expect(page.getByRole('heading', { name: 'Fluxo de caixa' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Movimentações recentes' })).toBeVisible()
 
+  const areaChartButton = page.getByRole('button', { name: 'Gráfico de linhas' })
+  const barChartButton = page.getByRole('button', { name: 'Gráfico de barras' })
+  await expect(areaChartButton).toHaveAttribute('aria-pressed', 'true')
+  await expect(barChartButton).toHaveAttribute('aria-pressed', 'false')
+  await barChartButton.click()
+  await expect(barChartButton).toHaveAttribute('aria-pressed', 'true')
+  await expect(areaChartButton).toHaveAttribute('aria-pressed', 'false')
+
   await desktopSidebar.getByRole('button', { name: 'Transações' }).click()
   await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Buscar e filtrar' })).toBeVisible()
