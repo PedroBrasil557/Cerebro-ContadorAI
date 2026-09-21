@@ -12,6 +12,11 @@ describe('receipt parser', () => {
     expect(parseReceiptText('Feijão Preto 8.50').items[0]?.price).toBe(8.5)
   })
 
+  it('parses Brazilian and international thousand separators safely', () => {
+    expect(parseReceiptText('Compra grande 1.234,56').items[0]?.price).toBe(1234.56)
+    expect(parseReceiptText('Compra grande 1,234.56').items[0]?.price).toBe(1234.56)
+  })
+
   it('returns no invented items for an empty receipt', () => {
     expect(parseReceiptText('').items).toEqual([])
   })
@@ -30,6 +35,17 @@ describe('receipt parser', () => {
 
   it('ignores a product without a price', () => {
     expect(parseReceiptText('Sabonete neutro').items).toEqual([])
+  })
+
+  it('ignores summary lines that look like products', () => {
+    const result = parseReceiptText([
+      'Arroz Integral 25,90',
+      'SUBTOTAL 25,90',
+      'TOTAL A PAGAR 25,90',
+      'VALOR TOTAL 25,90',
+    ].join('\n'))
+
+    expect(result.items).toEqual([{ name: 'Arroz Integral', price: 25.9 }])
   })
 
   it('parses a valid receipt without turning totals into products', () => {

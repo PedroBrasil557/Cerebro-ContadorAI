@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { shoppingService } from '@/services/shoppingService'
+import { findExactShoppingItem } from '@/core/finance/shopping'
 
 // --- TIPAGENS ---
 interface ShoppingItem {
@@ -88,7 +89,7 @@ export default function SmartShoppingView() {
   const handleOCRUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       if (!file || !session) return
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size <= 0 || file.size > 5 * 1024 * 1024) {
           toast.error("Envie uma imagem JPG, PNG ou WEBP de até 5 MB.")
           if (fileInputRef.current) fileInputRef.current.value = ''
           return
@@ -101,28 +102,55 @@ export default function SmartShoppingView() {
           const response = await fetch('/api/ocr', { method: 'POST', body: formData })
           const result = await response.json() as {
             items?: Array<{ name: string; price: number }>
+            detectedItems?: number
+            confidence?: number
             requiresManualReview?: boolean
             error?: { message?: string }
           }
           if (!response.ok) throw new Error(result.error?.message || 'Falha ao processar imagem.')
 
-          const extractedItems = result.items ?? []
-          if (extractedItems.length === 0) {
-              toast.warning(result.requiresManualReview
-                ? "Cupom ilegível. Revise e insira os itens manualmente."
-                : "Nenhum produto foi identificado.")
+          if (result.requiresManualReview) {
+              toast.warning(result.detectedItems
+                ? `Leitura insegura (${result.detectedItems} itens detectados). Nenhuma alteração foi aplicada; revise e insira manualmente.`
+                : "Cupom ilegível. Nenhuma alteração foi aplicada; revise e insira manualmente.")
               return
           }
+
+          const extractedItems = result.items ?? []
+          if (extractedItems.length === 0) {
+              toast.warning("Nenhum produto foi identificado. Nenhuma alteração foi aplicada.")
+              return
+          }
+
           const totalCupom = extractedItems.reduce((acc, item) => acc + item.price, 0)
+          const preview = extractedItems
+            .slice(0, 10)
+            .map((item) => `• ${item.name}: ${formatCurrency(item.price)}`)
+            .join('\n')
+          const remainingLabel = extractedItems.length > 10 ? `\n• +${extractedItems.length - 10} item(ns)` : ''
+          const confirmed = window.confirm(
+            `Revise a leitura antes de aplicar:\n\n${preview}${remainingLabel}\n\nTotal detectado: ${formatCurrency(totalCupom)}\n\nConfirmar e aplicar estes dados?`
+          )
+          if (!confirmed) {
+              toast.info("Importação cancelada. Nenhuma alteração foi aplicada.")
+              return
+          }
+
+          let storagePath: string | null = null
           try {
-              const storagePath = await shoppingService.uploadReceiptImage(file, session.id)
-              await shoppingService.saveReceiptRecord(session.id, storagePath, totalCupom)
+              storagePath = await shoppingService.uploadReceiptImage(file, session.id)
+              await shoppingService.saveReceiptRecord(session.id, storagePath, totalCupom, result.confidence ?? 0)
               const dbReceipts = await shoppingService.getReceipts(session.id)
               setReceipts(dbReceipts || [])
-          } catch (e) { console.error("Erro storage:", e) }
+          } catch (e) {
+              if (storagePath) {
+                  try { await shoppingService.removeReceiptImage(session.id, storagePath) } catch { /* limpeza best-effort */ }
+              }
+              throw e
+          }
 
           for (const extItem of extractedItems) {
-              const existingItem = items.find(i => i.name.toLowerCase().includes(extItem.name.toLowerCase().substring(0, 5)))
+              const existingItem = findExactShoppingItem(items, extItem.name)
               if (existingItem) {
                   await shoppingService.updateItem(existingItem.id, { actual_price: extItem.price, is_purchased: true })
               } else {
@@ -135,8 +163,8 @@ export default function SmartShoppingView() {
           const dbItems = await shoppingService.getItems(session.id)
           setItems(dbItems || [])
           toast.success(`OCR Concluído!`)
-      } catch {
-          toast.error("Erro ao processar imagem.")
+      } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Erro ao processar imagem.")
       } finally {
           setIsScanning(false)
           if (fileInputRef.current) fileInputRef.current.value = ''
