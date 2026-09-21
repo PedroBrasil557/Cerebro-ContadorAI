@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import { BarChart3, ChevronRight, Landmark, LineChart as LineChartIcon, Lock, TrendingUp } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ActiveTab, Investment, Transaction } from "@/types_db";
@@ -49,6 +50,7 @@ export default function DashboardView({
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { plan } = useEntitlements();
   const isFreePlan = plan === "free";
+  const reduceMotion = useReducedMotion();
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -163,19 +165,43 @@ export default function DashboardView({
                 <p className="mt-1 text-xs text-[var(--color-text-helper)]">Receitas e despesas em {selectedYear}</p>
               </div>
               <div className="flex rounded-[var(--radius-sm)] bg-[var(--color-action-ghost-hover)] p-1" aria-label="Formato do gráfico">
-                <Button variant={chartType === "area" ? "secondary" : "ghost"} size="icon-sm" aria-label="Gráfico de linhas" onClick={() => setChartType("area")}>
+                <Button
+                  variant={chartType === "area" ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  aria-label="Gráfico de linhas"
+                  aria-pressed={chartType === "area"}
+                  onClick={() => setChartType("area")}
+                >
                   <LineChartIcon className="h-4 w-4" aria-hidden="true" />
                 </Button>
-                <Button variant={chartType === "bar" ? "secondary" : "ghost"} size="icon-sm" aria-label="Gráfico de barras" onClick={() => setChartType("bar")}>
+                <Button
+                  variant={chartType === "bar" ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  aria-label="Gráfico de barras"
+                  aria-pressed={chartType === "bar"}
+                  onClick={() => setChartType("bar")}
+                >
                   <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
             </div>
-            <div className="h-[280px] w-full" aria-label="Fluxo de caixa anual">
+
+            <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--color-text-helper)]" aria-label="Legenda do fluxo de caixa">
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-chart-primary)]" aria-hidden="true" />
+                Receitas
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-chart-secondary)]" aria-hidden="true" />
+                Despesas
+              </span>
+            </div>
+
+            <div className="h-[280px] w-full" role="img" aria-label={`Fluxo de caixa anual de ${selectedYear}: receitas e despesas por mês`}>
               {hasFlowHistory ? (
                 <ResponsiveContainer width="100%" height="100%">
                   {chartType === "area" ? (
-                    <AreaChart data={flowData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
+                    <AreaChart accessibilityLayer data={flowData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
                       <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
                       <XAxis dataKey="label" stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} />
                       <YAxis stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} tickFormatter={formatCompactCurrency} width={72} />
@@ -183,11 +209,33 @@ export default function DashboardView({
                         formatter={(value) => formatCurrency(Number(value ?? 0))}
                         contentStyle={{ background: "var(--color-bg-elevated)", border: "1px solid var(--color-card-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)" }}
                       />
-                      <Area type="monotone" dataKey="receita" stroke="var(--color-chart-primary)" fill="var(--color-chart-primary)" fillOpacity={0.12} strokeWidth={2} />
-                      <Area type="monotone" dataKey="despesa" stroke="var(--color-chart-secondary)" fill="var(--color-chart-secondary)" fillOpacity={0.08} strokeWidth={2} />
+                      <Area
+                        type="monotone"
+                        dataKey="receita"
+                        name="Receitas"
+                        stroke="var(--color-chart-primary)"
+                        fill="var(--color-chart-primary)"
+                        fillOpacity={0.12}
+                        strokeWidth={2}
+                        isAnimationActive={!reduceMotion}
+                        animationDuration={240}
+                        animationEasing="ease-out"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="despesa"
+                        name="Despesas"
+                        stroke="var(--color-chart-secondary)"
+                        fill="var(--color-chart-secondary)"
+                        fillOpacity={0.08}
+                        strokeWidth={2}
+                        isAnimationActive={!reduceMotion}
+                        animationDuration={240}
+                        animationEasing="ease-out"
+                      />
                     </AreaChart>
                   ) : (
-                    <BarChart data={flowData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
+                    <BarChart accessibilityLayer data={flowData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
                       <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
                       <XAxis dataKey="label" stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} />
                       <YAxis stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} tickFormatter={formatCompactCurrency} width={72} />
@@ -195,8 +243,24 @@ export default function DashboardView({
                         formatter={(value) => formatCurrency(Number(value ?? 0))}
                         contentStyle={{ background: "var(--color-bg-elevated)", border: "1px solid var(--color-card-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)" }}
                       />
-                      <Bar dataKey="receita" fill="var(--color-chart-primary)" radius={[5, 5, 0, 0]} />
-                      <Bar dataKey="despesa" fill="var(--color-chart-secondary)" radius={[5, 5, 0, 0]} />
+                      <Bar
+                        dataKey="receita"
+                        name="Receitas"
+                        fill="var(--color-chart-primary)"
+                        radius={[5, 5, 0, 0]}
+                        isAnimationActive={!reduceMotion}
+                        animationDuration={240}
+                        animationEasing="ease-out"
+                      />
+                      <Bar
+                        dataKey="despesa"
+                        name="Despesas"
+                        fill="var(--color-chart-secondary)"
+                        radius={[5, 5, 0, 0]}
+                        isAnimationActive={!reduceMotion}
+                        animationDuration={240}
+                        animationEasing="ease-out"
+                      />
                     </BarChart>
                   )}
                 </ResponsiveContainer>
