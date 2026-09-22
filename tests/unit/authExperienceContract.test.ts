@@ -39,6 +39,13 @@ describe('Auth 2.1 contract', () => {
     expect(response.headers.get('location')).toBe('https://cerebro.example/login?state=confirmed')
   })
 
+  it('accepts the compatible PKCE confirmation return during template transition', async () => {
+    const response = await confirmEmail(new Request('https://cerebro.example/auth/confirm?code=confirmation-code'))
+
+    expect(mocks.exchangeCodeForSession).toHaveBeenCalledWith('confirmation-code')
+    expect(response.headers.get('location')).toBe('https://cerebro.example/login?state=confirmed')
+  })
+
   it('turns missing or invalid confirmation tokens into a recoverable expired-link state', async () => {
     const missing = await confirmEmail(new Request('https://cerebro.example/auth/confirm'))
     expect(missing.headers.get('location')).toBe('https://cerebro.example/login?state=link-expired')
@@ -77,8 +84,9 @@ describe('Auth 2.1 contract', () => {
     expect(login).toContain('Se houver uma conta correspondente')
   })
 
-  it('requires the password recovery auth event instead of accepting a normal signed-in session', () => {
+  it('requires a recovery token or recovery auth event instead of accepting a normal signed-in session', () => {
     const recovery = source('app/nova-senha/page.tsx')
+    expect(recovery).toContain("type: 'recovery'")
     expect(recovery).toContain("event === 'PASSWORD_RECOVERY'")
     expect(recovery).not.toContain("event === 'SIGNED_IN'")
   })
@@ -86,5 +94,23 @@ describe('Auth 2.1 contract', () => {
   it('keeps the confirmation route public at the proxy boundary', () => {
     const proxy = source('proxy.ts')
     expect(proxy).toContain("'/auth/confirm'")
+  })
+
+  it('versions all three transactional templates with the official brand and safe CTA contracts', () => {
+    const confirmation = source('supabase/templates/confirmation.html')
+    const recovery = source('supabase/templates/recovery.html')
+    const passwordChanged = source('supabase/templates/password_changed_notification.html')
+
+    for (const template of [confirmation, recovery, passwordChanged]) {
+      expect(template).toContain('/brand/cerebro-lockup-light.svg')
+      expect(template).not.toContain('tracking')
+    }
+
+    expect(confirmation).toContain('{{ .TokenHash }}')
+    expect(confirmation).toContain('Confirmar meu e-mail')
+    expect(recovery).toContain('{{ .TokenHash }}')
+    expect(recovery).toContain('type=recovery')
+    expect(passwordChanged).toContain('Sua senha foi alterada')
+    expect(passwordChanged).not.toContain('<a href=')
   })
 })
