@@ -1,334 +1,357 @@
-"use client";
+'use client'
 
-import React, { useMemo, useState } from "react";
-import { useReducedMotion } from "framer-motion";
-import { BarChart3, ChevronRight, Landmark, LineChart as LineChartIcon, Lock, TrendingUp } from "lucide-react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { ActiveTab, Investment, Transaction } from "@/types_db";
+import React, { useMemo } from 'react'
+import { useReducedMotion } from 'framer-motion'
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  CircleDollarSign,
+  PiggyBank,
+  Sparkles,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  WalletCards,
+} from 'lucide-react'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import type { ActiveTab, Goal, Investment, Transaction } from '@/types_db'
 import {
   calculateRealizedExpenses,
   calculateRealizedIncome,
   isRealizedTransaction,
-} from "@/core/finance/transactionMath";
-import { calculateInvestmentPortfolioValue } from "@/core/finance/patrimony";
-import { formatCurrency } from "@/lib/utils";
-import UpgradeModal from "@/core/components/UpgradeModal";
-import { useEntitlements } from "@/core/hooks/useEntitlements";
-import { BalanceCard } from "@/core/finance-ui/BalanceCard";
-import { FinancialMetricCard } from "@/core/finance-ui/FinancialMetricCard";
-import { FinancialHealth } from "@/core/finance-ui/FinancialHealth";
-import { SmartAlert } from "@/core/finance-ui/SmartAlert";
-import { TransactionRow } from "@/core/finance-ui/TransactionRow";
-import { Button } from "@/core/ui/button";
-
-type ChartType = "area" | "bar";
+  normalizeTransactionAmount,
+} from '@/core/finance/transactionMath'
+import { calculateInvestmentPortfolioValue } from '@/core/finance/patrimony'
+import { formatCurrency } from '@/lib/utils'
+import { Button } from '@/core/ui/button'
 
 interface DashboardViewProps {
   summary: {
-    balance: number;
-    income: number;
-    expense: number;
-    emergencyTotal: number;
-  };
-  recentTransactions: Transaction[];
-  onNavigate: (tab: ActiveTab) => void;
-  transactions: Transaction[];
-  investments: Investment[];
+    balance: number
+    income: number
+    expense: number
+    emergencyTotal: number
+  }
+  recentTransactions: Transaction[]
+  onNavigate: (tab: ActiveTab) => void
+  transactions: Transaction[]
+  investments: Investment[]
+  goals: Goal[]
+  displayName: string
 }
 
-function formatCompactCurrency(value: number) {
-  if (value === 0) return "R$ 0";
-  if (Math.abs(value) >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)} mi`;
-  if (Math.abs(value) >= 1_000) return `R$ ${(value / 1_000).toFixed(1)} mil`;
-  return `R$ ${Math.round(value)}`;
+function expense(transaction: Transaction) {
+  return transaction.type === 'despesa_fixa' || transaction.type === 'despesa_variavel'
+}
+
+function sameMonth(value: string, reference: Date) {
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`)
+  return !Number.isNaN(date.getTime())
+    && date.getFullYear() === reference.getFullYear()
+    && date.getMonth() === reference.getMonth()
+}
+
+function variation(current: number, previous: number) {
+  if (previous <= 0) return null
+  return ((current - previous) / previous) * 100
+}
+
+function compactCurrency(value: number) {
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)} mi`
+  if (absolute >= 1_000) return `R$ ${(value / 1_000).toFixed(0)} mil`
+  return `R$ ${Math.round(value)}`
+}
+
+function shortCurrency(value: number) {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function greeting(date: Date) {
+  const hour = date.getHours()
+  if (hour < 12) return 'Bom dia'
+  if (hour < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+function Metric({
+  label,
+  value,
+  helper,
+  tone,
+  icon: Icon,
+  last = false,
+}: {
+  label: string
+  value: string
+  helper: string
+  tone: 'success' | 'danger' | 'ai'
+  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  last?: boolean
+}) {
+  const tones = {
+    success: 'bg-[color-mix(in_srgb,var(--color-status-success)_13%,transparent)] text-[var(--color-status-success)]',
+    danger: 'bg-[color-mix(in_srgb,var(--color-status-danger)_12%,transparent)] text-[var(--color-status-danger)]',
+    ai: 'bg-[var(--color-status-ai-surface)] text-[var(--color-status-ai)]',
+  }
+
+  return (
+    <div className={`rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-3 md:min-h-[108px] md:rounded-none md:border-0 md:p-4 xl:px-5 ${last ? '' : 'md:border-r md:border-[var(--color-card-border)]'}`}>
+      <div className="flex items-center gap-2.5">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>
+          <Icon aria-hidden={true} className="h-4 w-4" />
+        </span>
+        <p className="text-[11px] text-[var(--color-text-helper)]">{label}</p>
+      </div>
+      <p className="mt-2 text-[20px] font-semibold leading-6 tracking-[-0.03em] text-[var(--color-text-primary)] md:text-[22px]">{value}</p>
+      <p className={`mt-1 text-[10px] font-medium ${tone === 'danger' ? 'text-[var(--color-status-danger)]' : tone === 'success' ? 'text-[var(--color-status-success)]' : 'text-[var(--color-text-helper)]'}`}>{helper}</p>
+    </div>
+  )
+}
+
+function ProgressGoal({ goal }: { goal: Goal }) {
+  const current = Math.max(0, Number(goal.current_amount || 0))
+  const target = Math.max(0, Number(goal.target_amount || 0))
+  const percent = target > 0 ? Math.min(100, (current / target) * 100) : 0
+  const emergency = (goal as Goal & { goal_type?: string }).goal_type === 'emergency_fund'
+
+  return (
+    <div className="py-2.5 first:pt-0 last:pb-0">
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-xs font-medium text-[var(--color-text-primary)]">{goal.title}</p>
+        <span className={`shrink-0 text-[10px] font-medium ${emergency ? 'text-[var(--color-status-success)]' : 'text-[var(--color-action-primary)]'}`}>{Math.round(percent)}%</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-progress-track)]">
+        <div className={`h-full rounded-full ${emergency ? 'bg-[var(--color-status-success)]' : 'bg-[var(--color-action-primary)]'}`} style={{ width: `${percent}%` }} />
+      </div>
+      <p className="mt-1.5 text-[10px] text-[var(--color-text-helper)]">{shortCurrency(current)} / {shortCurrency(target)}</p>
+    </div>
+  )
 }
 
 export default function DashboardView({
-  summary: initialSummary,
+  summary,
   recentTransactions,
   onNavigate,
-  transactions: initialTransactions = [],
+  transactions = [],
   investments = [],
+  goals = [],
+  displayName,
 }: DashboardViewProps) {
-  const [chartType, setChartType] = useState<ChartType>("area");
-  const [selectedYear] = useState(new Date().getFullYear());
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const { plan } = useEntitlements();
-  const isFreePlan = plan === "free";
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotion()
+  const now = useMemo(() => new Date(), [])
+  const previous = useMemo(() => new Date(now.getFullYear(), now.getMonth() - 1, 1), [now])
+  const firstName = displayName.split(' ')[0] || displayName
 
-  const stats = useMemo(() => {
-    const now = new Date();
-    const monthTransactions = initialTransactions.filter((transaction) => {
-      const date = new Date(transaction.date);
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    });
-    const income = calculateRealizedIncome(monthTransactions);
-    const expense = calculateRealizedExpenses(monthTransactions);
-    const totalInvestments = calculateInvestmentPortfolioValue(investments);
-    const score = expense > 0 ? Math.min(Math.round((income / expense) * 100), 100) : income > 0 ? 100 : 0;
-    const balance = initialSummary.balance;
-    return {
-      income,
-      expense,
-      totalInvestments,
-      score,
-      balance,
-      patrimony: balance + totalInvestments,
-      monthCount: monthTransactions.length,
-      realizedMonthCount: monthTransactions.filter(isRealizedTransaction).length,
-    };
-  }, [initialTransactions, initialSummary.balance, investments]);
+  const data = useMemo(() => {
+    const currentTransactions = transactions.filter((transaction) => sameMonth(transaction.date, now))
+    const previousTransactions = transactions.filter((transaction) => sameMonth(transaction.date, previous))
+    const realizedCurrent = currentTransactions.filter(isRealizedTransaction)
+    const income = calculateRealizedIncome(currentTransactions)
+    const expenseValue = calculateRealizedExpenses(currentTransactions)
+    const previousIncome = calculateRealizedIncome(previousTransactions)
+    const previousExpense = calculateRealizedExpenses(previousTransactions)
+    const investmentsValue = calculateInvestmentPortfolioValue(investments)
 
-  const flowData = useMemo(() => {
-    const months = Array.from({ length: 12 }, (_, index) => ({
-      label: new Date(selectedYear, index, 1).toLocaleDateString("pt-BR", { month: "short" }),
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const flow = Array.from({ length: daysInMonth }, (_, index) => ({
+      day: index + 1,
+      label: `${index + 1}`,
       receita: 0,
       despesa: 0,
-    }));
-    initialTransactions.forEach((transaction) => {
-      if (!isRealizedTransaction(transaction)) return;
-      const date = new Date(transaction.date);
-      if (date.getFullYear() !== selectedYear) return;
-      const amount = Math.abs(Number(transaction.amount || 0));
-      if (transaction.type === "receita") months[date.getMonth()].receita += amount;
-      else if (transaction.type === "despesa_fixa" || transaction.type === "despesa_variavel") {
-        months[date.getMonth()].despesa += amount;
-      }
-    });
-    return months;
-  }, [initialTransactions, selectedYear]);
+    }))
+    for (const transaction of realizedCurrent) {
+      const parsed = new Date(`${transaction.date.slice(0, 10)}T12:00:00`)
+      if (Number.isNaN(parsed.getTime())) continue
+      const index = parsed.getDate() - 1
+      if (transaction.type === 'receita') flow[index].receita += normalizeTransactionAmount(transaction.amount)
+      if (expense(transaction)) flow[index].despesa -= normalizeTransactionAmount(transaction.amount)
+    }
 
-  const hasFlowHistory = flowData.some((month) => month.receita > 0 || month.despesa > 0);
-  const displayedTransactions = recentTransactions.slice(0, 5);
-  const healthState = stats.score >= 100 ? "healthy" : stats.score >= 50 ? "attention" : "critical";
-  const healthDescription =
-    stats.realizedMonthCount === 0
-      ? "Registre ou confirme movimentações realizadas para acompanhar sua cobertura financeira mensal."
-      : stats.score >= 100
-        ? "As receitas realizadas no mês cobrem as despesas realizadas até agora."
-        : "As despesas realizadas estão acima da cobertura atual das receitas realizadas no mês.";
+    const currentCategories = new Map<string, number>()
+    const previousCategories = new Map<string, number>()
+    for (const transaction of transactions) {
+      if (!isRealizedTransaction(transaction) || !expense(transaction)) continue
+      const category = transaction.category?.trim() || 'Outros'
+      const amount = normalizeTransactionAmount(transaction.amount)
+      if (sameMonth(transaction.date, now)) currentCategories.set(category, (currentCategories.get(category) ?? 0) + amount)
+      if (sameMonth(transaction.date, previous)) previousCategories.set(category, (previousCategories.get(category) ?? 0) + amount)
+    }
+
+    const categories = [...currentCategories.entries()]
+      .sort(([, left], [, right]) => right - left)
+      .slice(0, 4)
+      .map(([label, value]) => ({
+        label,
+        value,
+        variation: variation(value, previousCategories.get(label) ?? 0),
+      }))
+
+    const highlightedGoals = [...goals]
+      .sort((left, right) => {
+        const lp = Number(left.target_amount || 0) > 0 ? Number(left.current_amount || 0) / Number(left.target_amount) : 0
+        const rp = Number(right.target_amount || 0) > 0 ? Number(right.current_amount || 0) / Number(right.target_amount) : 0
+        return rp - lp
+      })
+      .slice(0, 3)
+
+    return {
+      income,
+      expense: expenseValue,
+      previousIncome,
+      previousExpense,
+      investments: investmentsValue,
+      realizedCount: realizedCurrent.length,
+      flow,
+      categories,
+      highlightedGoals,
+    }
+  }, [goals, investments, now, previous, transactions])
+
+  const topCategory = data.categories[0]
+  const insight = !topCategory
+    ? {
+        title: 'Seu contexto financeiro fica mais claro a cada movimentação.',
+        description: 'Ainda não há despesas realizadas neste mês para comparar categorias.',
+      }
+    : topCategory.variation == null
+      ? {
+          title: `${topCategory.label} é sua maior categoria de gasto neste mês.`,
+          description: `${shortCurrency(topCategory.value)} em despesas realizadas até agora.`,
+        }
+      : {
+          title: `Seus gastos com ${topCategory.label.toLocaleLowerCase('pt-BR')} ${topCategory.variation <= 0 ? 'caíram' : 'subiram'} ${Math.abs(topCategory.variation).toFixed(0)}% este mês.`,
+          description: `${shortCurrency(topCategory.value)} agora, comparados ao mês anterior.`,
+        }
+
+  const incomeDelta = variation(data.income, data.previousIncome)
+  const expenseDelta = variation(data.expense, data.previousExpense)
+  const hasFlow = data.flow.some((point) => point.receita !== 0 || point.despesa !== 0)
+  const dateLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(now)
+
+  const safeSteps = [
+    { title: 'Revisar orçamento do mês', helper: 'Compare planejado e realizado', tab: 'orçamento' as ActiveTab, icon: CircleDollarSign },
+    ...(data.highlightedGoals[0] ? [{ title: `Acompanhar ${data.highlightedGoals[0].title}`, helper: `Meta: ${shortCurrency(Number(data.highlightedGoals[0].target_amount || 0))}`, tab: 'metas' as ActiveTab, icon: Target }] : []),
+    { title: 'Revisar movimentações', helper: `${data.realizedCount} realizadas neste mês`, tab: 'transações' as ActiveTab, icon: Check },
+  ].slice(0, 3)
+
+  const recent = recentTransactions.slice(0, 5)
+
+  const InsightCard = ({ mobile = false }: { mobile?: boolean }) => (
+    <section className={`rounded-[20px] border border-[var(--color-card-accent-border)] bg-[var(--color-card-accent-fill)] ${mobile ? 'p-4' : 'p-5'}`} aria-labelledby={mobile ? 'overview-insight-mobile' : 'overview-insight-desktop'}>
+      <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-primary)]"><Sparkles aria-hidden="true" className="h-4 w-4 text-[var(--color-action-ai)]" />Insight do Cérebro</div>
+      <h2 id={mobile ? 'overview-insight-mobile' : 'overview-insight-desktop'} className={`${mobile ? 'mt-5 text-[19px] leading-[25px]' : 'mt-6 text-[21px] leading-7'} font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]`}>{insight.title}</h2>
+      <p className="mt-2 text-xs leading-[18px] text-[var(--color-text-secondary)]">{insight.description}</p>
+      <Button variant="secondary" size="icon" aria-label="Ver orçamento relacionado ao insight" className="mt-4 rounded-full bg-[var(--color-bg-surface)]" onClick={() => onNavigate('orçamento')}><ArrowRight className="h-4 w-4" /></Button>
+    </section>
+  )
 
   return (
     <div className="min-h-full bg-[var(--color-bg-canvas)] text-[var(--color-text-primary)]">
-      <div className="mx-auto w-full max-w-[1180px] space-y-6 px-4 py-5 sm:px-6 md:py-7 lg:px-8">
-        <header>
-          <h1 className="text-2xl font-bold tracking-[-0.02em] md:text-[28px]">Visão geral</h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Seu panorama financeiro em um só lugar.</p>
-        </header>
+      <div className="mx-auto w-full max-w-[1148px] space-y-4 px-4 py-[18px] sm:px-6 xl:px-0 xl:py-7">
+        <h1 className="sr-only">Visão geral</h1>
 
-        {!hasFlowHistory ? (
-          <SmartAlert
-            tone="info"
-            title="Seu histórico realizado ainda está em formação"
-            description="Continue registrando e confirmando movimentações para tornar os indicadores e o fluxo de caixa mais completos."
-            actionLabel="Ver transações"
-            onAction={() => onNavigate("transações")}
-          />
-        ) : null}
+        <section className="relative h-[190px] overflow-hidden rounded-[20px] bg-[var(--color-bg-canvas)] md:h-[176px]" aria-label="Resumo do dia">
+          <div aria-hidden="true" className="absolute -right-8 -top-12 h-44 w-40 rounded-[40px] bg-[var(--color-card-accent-fill)] md:right-8 md:h-52 md:w-52" />
+          <div aria-hidden="true" className="absolute right-2 top-[76px] h-16 w-32 rounded-[50%] bg-[var(--color-status-ai-surface)]/70 md:right-28 md:top-[72px] md:w-44" />
+          <div aria-hidden="true" className="absolute bottom-1 right-0 h-20 w-[220px] rounded-tl-[90%] bg-[color-mix(in_srgb,var(--color-card-accent-fill)_86%,white)] md:right-16 md:w-[330px]" />
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)]">
-          <BalanceCard
-            total={stats.patrimony}
-            available={stats.balance}
-            invested={stats.totalInvestments}
-            description="Saldo realizado disponível somado ao valor atual dos investimentos"
-          />
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-            <FinancialMetricCard
-              label="Investimentos"
-              value={formatCurrency(stats.totalInvestments)}
-              helper={stats.totalInvestments === 0 ? "Sem investimentos registrados" : "Valor atual da carteira"}
-              tone="neutral"
-            />
-            <FinancialMetricCard
-              label="Lançamentos neste mês"
-              value={stats.monthCount}
-              helper={stats.monthCount === 1 ? "movimentação registrada" : "movimentações registradas"}
-              tone="neutral"
-            />
+          <p className="relative z-10 pt-3 text-[11px] capitalize text-[var(--color-text-helper)] md:pt-5 md:text-xs">{dateLabel}</p>
+          <p className="relative z-10 mt-5 text-[30px] font-bold leading-[38px] tracking-[-0.04em] md:mt-4 md:text-[42px] md:leading-[50px]">{greeting(now)}, {firstName}.</p>
+          <p className="relative z-10 mt-1 text-[15px] text-[var(--color-text-secondary)] md:text-[20px]">{summary.balance >= 0 ? 'Seu mês continua positivo.' : 'Seu mês pede um pouco mais de atenção.'}</p>
+          <div className="absolute bottom-4 right-2 z-10 w-[158px] text-right md:bottom-10 md:right-14 md:w-[220px]">
+            <p className="text-xs font-semibold leading-[17px] md:text-sm md:leading-5">“Clareza hoje cria<br />mais opções amanhã.”</p>
+            <p className="mt-2 text-[10px] text-[var(--color-text-helper)]">Cérebro</p>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <FinancialMetricCard label="Saldo disponível" value={formatCurrency(stats.balance)} helper="Somente movimentações realizadas" />
-          <FinancialMetricCard label="Receitas realizadas" value={formatCurrency(stats.income)} helper="Neste mês" tone="positive" />
-          <FinancialMetricCard label="Despesas realizadas" value={formatCurrency(stats.expense)} helper="Neste mês" tone="negative" />
+        <section className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-0 md:overflow-hidden md:rounded-[18px] md:border md:border-[var(--color-card-border)] md:bg-[var(--color-card-fill)] md:shadow-[0_4px_12px_rgba(5,6,10,0.08)]" aria-label="Indicadores principais">
+          <Metric label="Saldo disponível" value={shortCurrency(summary.balance)} helper="movimentações realizadas" tone={summary.balance >= 0 ? 'success' : 'danger'} icon={WalletCards} />
+          <Metric label="Receitas" value={shortCurrency(data.income)} helper={incomeDelta == null ? 'sem base anterior' : `${incomeDelta >= 0 ? '↑' : '↓'} ${Math.abs(incomeDelta).toFixed(1)}%`} tone="success" icon={TrendingUp} />
+          <Metric label="Despesas" value={shortCurrency(data.expense)} helper={expenseDelta == null ? 'sem base anterior' : `${expenseDelta <= 0 ? '↓' : '↑'} ${Math.abs(expenseDelta).toFixed(1)}%`} tone={expenseDelta != null && expenseDelta <= 0 ? 'success' : 'danger'} icon={TrendingDown} />
+          <Metric label="Investimentos" value={shortCurrency(data.investments)} helper={data.investments > 0 ? 'valor atual da carteira' : 'sem investimentos'} tone="ai" icon={ArrowUpRight} last />
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
-          <article className="min-w-0 rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-5 md:p-[22px]">
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-base font-semibold">Fluxo de caixa realizado</h2>
-                <p className="mt-1 text-xs text-[var(--color-text-helper)]">Receitas e despesas confirmadas em {selectedYear}</p>
-              </div>
-              <div className="flex rounded-[var(--radius-sm)] bg-[var(--color-action-ghost-hover)] p-1" aria-label="Formato do gráfico">
-                <Button
-                  variant={chartType === "area" ? "secondary" : "ghost"}
-                  size="icon-sm"
-                  aria-label="Gráfico de linhas"
-                  aria-pressed={chartType === "area"}
-                  onClick={() => setChartType("area")}
-                >
-                  <LineChartIcon className="h-4 w-4" aria-hidden="true" />
-                </Button>
-                <Button
-                  variant={chartType === "bar" ? "secondary" : "ghost"}
-                  size="icon-sm"
-                  aria-label="Gráfico de barras"
-                  aria-pressed={chartType === "bar"}
-                  onClick={() => setChartType("bar")}
-                >
-                  <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </div>
-            </div>
+        <div className="xl:hidden"><InsightCard mobile /></div>
 
-            <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--color-text-helper)]" aria-label="Legenda do fluxo de caixa">
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-chart-primary)]" aria-hidden="true" />
-                Receitas
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-chart-secondary)]" aria-hidden="true" />
-                Despesas
-              </span>
-            </div>
-
-            <div className="h-[280px] w-full" role="img" aria-label={`Fluxo de caixa realizado de ${selectedYear}: receitas e despesas por mês`}>
-              {hasFlowHistory ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartType === "area" ? (
-                    <AreaChart accessibilityLayer data={flowData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_322px]">
+          <div className="space-y-4">
+            <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-5" aria-labelledby="cashflow-title">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div><h2 id="cashflow-title" className="text-[18px] font-semibold md:text-xl">Fluxo de caixa</h2><p className="mt-1 text-[11px] text-[var(--color-text-helper)]">Entradas e saídas deste mês</p></div>
+                <div className="flex items-center gap-4 text-[10px] text-[var(--color-text-helper)]"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--color-status-success)]" />Entradas</span><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--color-status-danger)]" />Saídas</span></div>
+              </div>
+              <div className="mt-3 h-[250px] md:h-[300px]" role="img" aria-label="Fluxo de caixa diário realizado deste mês">
+                {hasFlow ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart accessibilityLayer data={data.flow} margin={{ top: 12, right: 6, left: -8, bottom: 0 }} barCategoryGap="26%">
                       <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
-                      <XAxis dataKey="label" stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} />
-                      <YAxis stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} tickFormatter={formatCompactCurrency} width={72} />
-                      <Tooltip
-                        formatter={(value) => formatCurrency(Number(value ?? 0))}
-                        contentStyle={{ background: "var(--color-bg-elevated)", border: "1px solid var(--color-card-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)" }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="receita"
-                        name="Receitas"
-                        stroke="var(--color-chart-primary)"
-                        fill="var(--color-chart-primary)"
-                        fillOpacity={0.12}
-                        strokeWidth={2}
-                        isAnimationActive={!reduceMotion}
-                        animationDuration={240}
-                        animationEasing="ease-out"
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="despesa"
-                        name="Despesas"
-                        stroke="var(--color-chart-secondary)"
-                        fill="var(--color-chart-secondary)"
-                        fillOpacity={0.08}
-                        strokeWidth={2}
-                        isAnimationActive={!reduceMotion}
-                        animationDuration={240}
-                        animationEasing="ease-out"
-                      />
-                    </AreaChart>
-                  ) : (
-                    <BarChart accessibilityLayer data={flowData} margin={{ top: 10, right: 8, left: -12, bottom: 0 }}>
-                      <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
-                      <XAxis dataKey="label" stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} />
-                      <YAxis stroke="var(--color-chart-axis)" tickLine={false} axisLine={false} fontSize={11} tickFormatter={formatCompactCurrency} width={72} />
-                      <Tooltip
-                        formatter={(value) => formatCurrency(Number(value ?? 0))}
-                        contentStyle={{ background: "var(--color-bg-elevated)", border: "1px solid var(--color-card-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)" }}
-                      />
-                      <Bar
-                        dataKey="receita"
-                        name="Receitas"
-                        fill="var(--color-chart-primary)"
-                        radius={[5, 5, 0, 0]}
-                        isAnimationActive={!reduceMotion}
-                        animationDuration={240}
-                        animationEasing="ease-out"
-                      />
-                      <Bar
-                        dataKey="despesa"
-                        name="Despesas"
-                        fill="var(--color-chart-secondary)"
-                        radius={[5, 5, 0, 0]}
-                        isAnimationActive={!reduceMotion}
-                        animationDuration={240}
-                        animationEasing="ease-out"
-                      />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={9} interval={6} stroke="var(--color-chart-axis)" />
+                      <YAxis tickLine={false} axisLine={false} fontSize={9} width={58} tickFormatter={compactCurrency} stroke="var(--color-chart-axis)" />
+                      <ReferenceLine y={0} stroke="var(--color-border-default)" />
+                      <Tooltip formatter={(value) => formatCurrency(Math.abs(Number(value ?? 0)))} contentStyle={{ background: 'var(--color-bg-elevated)', border: '1px solid var(--color-card-border)', borderRadius: 12 }} />
+                      <Bar dataKey="receita" name="Entradas" fill="var(--color-status-success)" radius={[4, 4, 0, 0]} isAnimationActive={!reduceMotion} animationDuration={240} />
+                      <Bar dataKey="despesa" name="Saídas" fill="var(--color-status-danger)" radius={[0, 0, 4, 4]} isAnimationActive={!reduceMotion} animationDuration={240} />
                     </BarChart>
-                  )}
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-ghost-hover)] px-6 text-center text-sm text-[var(--color-text-helper)]">
-                  Ainda não há movimentações realizadas suficientes para visualizar o fluxo anual.
-                </div>
-              )}
-            </div>
-          </article>
-
-          {isFreePlan ? (
-            <article className="flex min-h-[300px] flex-col justify-between rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-5 md:p-[22px]">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-medium"><Lock className="h-4 w-4 text-[var(--color-nav-active-text)]" aria-hidden="true" />Saúde financeira</div>
-                <h3 className="mt-6 text-xl font-semibold">Acompanhe sua cobertura financeira</h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">O indicador detalhado está disponível no plano PRO.</p>
+                  </ResponsiveContainer>
+                ) : <div className="flex h-full items-center justify-center text-center text-sm text-[var(--color-text-helper)]">Registre movimentações realizadas para visualizar o fluxo do mês.</div>}
               </div>
-              <Button variant="secondary" onClick={() => setShowUpgradeModal(true)}>Conhecer PRO</Button>
-            </article>
-          ) : (
-            <FinancialHealth
-              score={stats.score}
-              state={healthState}
-              description={healthDescription}
-              liquidity={stats.balance >= 0 ? "Positiva" : "Negativa"}
-              reserve={initialSummary.emergencyTotal > 0 ? formatCurrency(initialSummary.emergencyTotal) : "Sem reserva"}
-            />
-          )}
-        </section>
+            </section>
 
-        <section className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-5">
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold">Movimentações recentes</h2>
-              <p className="mt-1 text-xs text-[var(--color-text-helper)]">Seus últimos lançamentos registrados</p>
+            <div className="xl:hidden">
+              <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4" aria-labelledby="steps-mobile-title">
+                <div className="mb-3 flex items-center justify-between"><h2 id="steps-mobile-title" className="text-lg font-semibold">Próximos passos</h2></div>
+                <div className="divide-y divide-[var(--color-card-border)]">{safeSteps.map((step) => <button key={step.title} type="button" onClick={() => onNavigate(step.tab)} className="flex w-full items-center gap-3 py-3 text-left"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-action-ghost-hover)] text-[var(--color-action-primary)]"><step.icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{step.title}</span><span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-helper)]">{step.helper}</span></span><ChevronRight className="h-4 w-4 text-[var(--color-text-helper)]" /></button>)}</div>
+              </section>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate("transações")}>Ver todas <ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" /></Button>
+
+            <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-5" aria-labelledby="categories-title">
+              <div className="mb-3 flex items-center justify-between gap-3"><h2 id="categories-title" className="text-lg font-semibold">Categorias em destaque</h2><Button variant="link" size="sm" onClick={() => onNavigate('orçamento')}>Ver todas</Button></div>
+              {data.categories.length ? <div className="grid gap-x-5 md:grid-cols-2">{data.categories.map((category) => <div key={category.label} className="flex items-center gap-3 border-b border-[var(--color-card-border)] py-3 last:border-0"><span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[var(--color-action-ghost-hover)] text-[10px] font-semibold">{category.label.charAt(0).toUpperCase()}</span><span className="min-w-0 flex-1 truncate text-xs font-medium">{category.label}</span><span className="text-xs font-medium tabular-nums">{shortCurrency(category.value)}</span><span className={`w-12 text-right text-[10px] ${category.variation == null ? 'text-[var(--color-text-helper)]' : category.variation <= 0 ? 'text-[var(--color-status-success)]' : 'text-[var(--color-status-warning)]'}`}>{category.variation == null ? '—' : `${category.variation <= 0 ? '↓' : '↑'} ${Math.abs(category.variation).toFixed(0)}%`}</span></div>)}</div> : <p className="py-6 text-center text-sm text-[var(--color-text-helper)]">Nenhuma despesa realizada neste mês.</p>}
+            </section>
+
+            <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-5" aria-labelledby="overview-goals-title">
+              <div className="mb-3 flex items-center justify-between"><h2 id="overview-goals-title" className="text-lg font-semibold">Metas</h2><Button variant="link" size="sm" onClick={() => onNavigate('metas')}>Ver todas</Button></div>
+              {data.highlightedGoals.length ? <div className="divide-y divide-[var(--color-card-border)]">{data.highlightedGoals.map((goal) => <ProgressGoal key={goal.id} goal={goal} />)}</div> : <div className="py-6 text-center"><p className="text-sm text-[var(--color-text-helper)]">Nenhuma meta criada ainda.</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => onNavigate('metas')}>Criar meta</Button></div>}
+            </section>
+
+            <div className="xl:hidden">
+              <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4" aria-labelledby="recent-mobile-title">
+                <div className="mb-3 flex items-center justify-between"><h2 id="recent-mobile-title" className="text-lg font-semibold">Transações recentes</h2><Button variant="link" size="sm" onClick={() => onNavigate('transações')}>Ver todas</Button></div>
+                <div className="divide-y divide-[var(--color-card-border)]">{recent.map((transaction) => <div key={transaction.id} className="flex items-center gap-3 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-action-ghost-hover)] text-[10px] font-semibold">{transaction.description.charAt(0).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{transaction.description}</span><span className="text-[10px] text-[var(--color-text-helper)]">{transaction.category}</span></span><span className={`text-xs font-semibold tabular-nums ${transaction.type === 'receita' ? 'text-[var(--color-status-success)]' : 'text-[var(--color-text-primary)]'}`}>{transaction.type === 'receita' ? '+' : expense(transaction) ? '−' : ''} {shortCurrency(normalizeTransactionAmount(transaction.amount))}</span></div>)}</div>
+              </section>
+            </div>
           </div>
-          {displayedTransactions.length ? (
-            <div className="space-y-2">
-              {displayedTransactions.map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} />)}
-            </div>
-          ) : (
-            <div className="rounded-[var(--radius-md)] bg-[var(--color-action-ghost-hover)] px-4 py-8 text-center text-sm text-[var(--color-text-helper)]">Nenhuma movimentação recente.</div>
-          )}
-        </section>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <article className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-status-info-surface)] text-[var(--color-status-info)]"><TrendingUp className="h-5 w-5" aria-hidden="true" /></span>
-              <div><h2 className="font-semibold">Investimentos</h2><p className="text-xs text-[var(--color-text-helper)]">Valor atual da carteira registrada</p></div>
-            </div>
-            <p className="mt-5 text-2xl font-semibold">{formatCurrency(stats.totalInvestments)}</p>
-          </article>
-          <article className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-ghost-hover)] text-[var(--color-text-secondary)]"><Landmark className="h-5 w-5" aria-hidden="true" /></span>
-              <div><h2 className="font-semibold">Central de Dívidas</h2><p className="text-xs text-[var(--color-text-helper)]">Acompanhe compromissos e organização de dívidas</p></div>
-            </div>
-            <Button className="mt-5" variant="secondary" onClick={() => (isFreePlan ? setShowUpgradeModal(true) : onNavigate("central de dividas"))}>
-              {isFreePlan ? <><Lock className="mr-2 h-4 w-4" aria-hidden="true" />Recurso PRO</> : "Abrir Central de Dívidas"}
-            </Button>
-          </article>
-        </section>
+          <aside className="hidden space-y-4 xl:block" aria-label="Contexto financeiro">
+            <InsightCard />
+            <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4" aria-labelledby="steps-title">
+              <h2 id="steps-title" className="text-lg font-semibold">Próximos passos</h2>
+              <div className="mt-3 divide-y divide-[var(--color-card-border)]">{safeSteps.map((step) => <button key={step.title} type="button" onClick={() => onNavigate(step.tab)} className="flex w-full items-center gap-3 py-3 text-left"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-action-ghost-hover)] text-[var(--color-action-primary)]"><step.icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{step.title}</span><span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-helper)]">{step.helper}</span></span><ChevronRight className="h-4 w-4 text-[var(--color-text-helper)]" /></button>)}</div>
+            </section>
+            <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4" aria-labelledby="recent-title">
+              <div className="mb-3 flex items-center justify-between"><h2 id="recent-title" className="text-lg font-semibold">Transações recentes</h2><Button variant="link" size="sm" onClick={() => onNavigate('transações')}>Ver todas</Button></div>
+              <div className="divide-y divide-[var(--color-card-border)]">{recent.length ? recent.map((transaction) => <div key={transaction.id} className="flex items-center gap-3 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-action-ghost-hover)] text-[10px] font-semibold">{transaction.description.charAt(0).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{transaction.description}</span><span className="text-[10px] text-[var(--color-text-helper)]">{transaction.category}</span></span><span className={`text-[11px] font-semibold tabular-nums ${transaction.type === 'receita' ? 'text-[var(--color-status-success)]' : 'text-[var(--color-text-primary)]'}`}>{transaction.type === 'receita' ? '+' : expense(transaction) ? '−' : ''} {shortCurrency(normalizeTransactionAmount(transaction.amount))}</span></div>) : <p className="py-4 text-center text-xs text-[var(--color-text-helper)]">Nenhuma movimentação recente.</p>}</div>
+            </section>
+          </aside>
+        </div>
       </div>
-
-      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </div>
-  );
+  )
 }
