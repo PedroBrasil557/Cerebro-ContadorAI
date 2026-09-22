@@ -10,9 +10,6 @@ import type { ProductAccess } from '@/lib/billing/plans'
 import { motionTransition, pageMotionVariants } from '@/core/motion/presets'
 import { OverviewNorthStarSections } from '@/modules/personal/components/OverviewNorthStarSections'
 
-// ==========================================
-// 📦 CAMADA 2: MÓDULOS PESSOAIS
-// ==========================================
 const moduleLoading = () => <div role="status" aria-live="polite" className="p-8 text-sm text-gray-400">Carregando módulo…</div>
 const DashboardView = dynamic(() => import('@/modules/personal/views/DashboardView'), { loading: moduleLoading })
 const TransactionsView = dynamic(() => import('@/modules/personal/views/TransactionsView'), { loading: moduleLoading })
@@ -24,9 +21,6 @@ const DebtCenterView = dynamic(() => import('@/modules/personal/views/DebtCenter
 const ProfileView = dynamic(() => import('@/modules/personal/views/ProfileView'), { loading: moduleLoading })
 const SmartShoppingView = dynamic(() => import('@/modules/personal/views/SmartShoppingView'), { loading: moduleLoading })
 
-// ==========================================
-// 💼 CAMADA 3: MÓDULOS PROFISSIONAIS (B2B)
-// ==========================================
 const CaixaView = dynamic(() => import('@/modules/professional/views/CaixaView'), { loading: moduleLoading })
 const FinancialCommandCenter = dynamic(() => import('@/modules/professional/components/FinancialCommandCenter'), { loading: moduleLoading })
 const FounderDashboard = dynamic(() => import('@/modules/admin/views/FounderDashboard'), { loading: moduleLoading })
@@ -34,23 +28,17 @@ const FounderDashboard = dynamic(() => import('@/modules/admin/views/FounderDash
 interface ViewContainerProps {
   activeTab: ActiveTab
   handleRedirect: (tab: ActiveTab) => void
-
-  // Resumo Financeiro
   summary: {
     balance: number
     income: number
     expense: number
     emergencyTotal: number
   }
-
-  // Dados
   goals: Goal[]
   transactions: Transaction[]
   investments: Investment[]
   access: ProductAccess
   accountMode: 'personal' | 'professional'
-
-  // Handlers
   onAddGoal: (goal: NewGoal) => Promise<void>
   onAdjustGoal: (id: string, delta: number) => Promise<void>
   onUpdateGoal: (id: string, updates: Pick<Goal, 'title' | 'target_amount' | 'deadline'>) => Promise<void>
@@ -75,7 +63,6 @@ export default function ViewContainer({
         transition={motionTransition.standard}
         className="w-full h-full relative p-4 md:p-8"
       >
-
         {accountMode === 'personal' && access.canAccessPersonal && (
           <>
             {currentTab === 'dashboard' && (
@@ -95,24 +82,17 @@ export default function ViewContainer({
               </>
             )}
 
-            {(currentTab === 'compras inteligentes' || currentTab === 'compras') && (
-              <SmartShoppingView />
-            )}
-
-            {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && (
-              <TransactionsView />
-            )}
+            {(currentTab === 'compras inteligentes' || currentTab === 'compras') && <SmartShoppingView />}
+            {(currentTab === 'transações' || currentTab === 'transactions' || currentTab === 'transacoes') && <TransactionsView />}
 
             {currentTab === 'orçamento' && (
-              <BudgetView
-                transactions={transactions}
-                handleRedirect={handleRedirect}
-              />
+              <BudgetView transactions={transactions} handleRedirect={handleRedirect} />
             )}
 
             {currentTab === 'metas' && (
               <GoalsView
                 goals={goals}
+                transactions={transactions}
                 onAddGoal={onAddGoal}
                 onAdjustGoal={onAdjustGoal}
                 onUpdateGoal={onUpdateGoal}
@@ -121,43 +101,21 @@ export default function ViewContainer({
               />
             )}
 
-            {currentTab === 'investimentos' && (
-              <InvestmentsView
-                goals={goals}
-                onAddGoal={onAddGoal}
-              />
-            )}
-
-            {(currentTab === 'minha carteira' || currentTab === 'carteira') && (
-              <WalletView />
-            )}
-
-            {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
-              <DebtCenterView />
-            )}
+            {currentTab === 'investimentos' && <InvestmentsView goals={goals} onAddGoal={onAddGoal} />}
+            {(currentTab === 'minha carteira' || currentTab === 'carteira') && <WalletView />}
+            {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && <DebtCenterView />}
           </>
         )}
 
         {accountMode === 'professional' && access.canAccessProfessional && (
           <>
-            {(currentTab === 'visão do negócio' || currentTab === 'dashboard') && (
-              <FinancialCommandCenter />
-            )}
-
-            {(currentTab === 'caixa empresarial' || currentTab === 'caixa') && (
-              <CaixaView />
-            )}
+            {(currentTab === 'visão do negócio' || currentTab === 'dashboard') && <FinancialCommandCenter />}
+            {(currentTab === 'caixa empresarial' || currentTab === 'caixa') && <CaixaView />}
           </>
         )}
 
-        {(currentTab === 'meu perfil' || currentTab === 'perfil') && (
-          <ProfileView />
-        )}
-
-        {currentTab === 'admin' && access.canAccessAdmin && (
-          <FounderDashboard />
-        )}
-
+        {(currentTab === 'meu perfil' || currentTab === 'perfil') && <ProfileView />}
+        {currentTab === 'admin' && access.canAccessAdmin && <FounderDashboard />}
       </motion.div>
     </AnimatePresence>
   )

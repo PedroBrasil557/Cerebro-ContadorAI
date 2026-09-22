@@ -110,14 +110,15 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await expect(page.getByRole('button', { name: /Definir orçamento|Ajustar limites/ })).toBeVisible()
 
   await desktopSidebar.getByRole('button', { name: 'Metas' }).click()
-  await expect(page.getByRole('heading', { name: 'Metas', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Criar meta' })).toBeVisible()
-  await expect(page.getByText('Suas metas')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Transforme planos em progresso visível.' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Nova meta' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Suas metas' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Criar meta' }).click()
+  await page.getByRole('button', { name: 'Nova meta' }).click()
   const goalDialog = page.getByRole('dialog', { name: 'Criar meta' })
   await expect(goalDialog).toBeVisible()
   await expect(goalDialog.getByLabel('Nome da meta')).toBeVisible()
+  await expect(goalDialog.getByLabel('Tipo da meta')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(goalDialog).toHaveCount(0)
 
