@@ -11,12 +11,15 @@ import {
   updateTransaction,
 } from '@/core/action/transactions'
 import {
-  calculateRealizedBalance,
-  calculateRealizedExpenses,
-  calculateRealizedIncome,
-} from '@/core/finance/transactionMath'
+  buildTransactionPeriodContext,
+  matchesTransactionSearch,
+  matchesTransactionType,
+  type TransactionTypeFilter,
+} from '@/core/finance/transactionInsights'
+import { isRealizedTransaction } from '@/core/finance/transactionMath'
 import UpgradeModal from '@/core/components/UpgradeModal'
 import FixedExpensesList from '@/modules/personal/components/FixedExpensesList'
+import TransactionContextRail from '@/modules/personal/components/TransactionContextRail'
 import TransactionDetailModal from '@/modules/personal/components/TransactionDetailModal'
 import { financeService } from '@/services/financeService'
 import type { CreditCard as CreditCardRecord } from '@/types_db'
@@ -187,13 +190,20 @@ function groupLabel(dateValue: string) {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
 }
 
+function typeLabel(filter: TransactionTypeFilter) {
+  if (filter === 'receita') return 'Receitas'
+  if (filter === 'despesa') return 'Despesas'
+  if (filter === 'transferencia') return 'Transferências'
+  return 'Todos os tipos'
+}
+
 export default function TransactionsView() {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const [filterType, setFilterType] = useState<'all' | 'receita' | 'despesa'>('all')
+  const [filterType, setFilterType] = useState<TransactionTypeFilter>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'pago' | 'pendente'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -222,29 +232,25 @@ export default function TransactionsView() {
     return safeTransactions.filter(transaction => transaction.date.startsWith(currentMonthStr))
   }, [transactions, currentMonthStr])
 
+  const periodContext = useMemo(
+    () => buildTransactionPeriodContext(transactions, currentDate),
+    [transactions, currentDate],
+  )
+
   const filteredData = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLocaleLowerCase('pt-BR')
     return monthTransactions.filter(transaction => {
-      const matchesType = filterType === 'all' ? true : filterType === 'receita' ? transaction.type === 'receita' : transaction.type !== 'receita'
       const matchesStatus = filterStatus === 'all' ? true : filterStatus === 'pago' ? transaction.is_paid : !transaction.is_paid
-      const matchesSearch =
-        normalizedSearch === '' ||
-        transaction.description.toLocaleLowerCase('pt-BR').includes(normalizedSearch) ||
-        transaction.category.toLocaleLowerCase('pt-BR').includes(normalizedSearch)
-      return matchesType && matchesStatus && matchesSearch
+      return matchesTransactionType(transaction, filterType)
+        && matchesStatus
+        && matchesTransactionSearch(transaction, searchTerm)
     })
   }, [monthTransactions, filterType, filterStatus, searchTerm])
 
   useEffect(() => setPage(1), [currentMonthStr, filterType, filterStatus, searchTerm])
 
-  const totals = useMemo(
-    () => ({
-      income: calculateRealizedIncome(monthTransactions),
-      expense: calculateRealizedExpenses(monthTransactions),
-      balance: calculateRealizedBalance(monthTransactions),
-    }),
-    [monthTransactions],
-  )
+  const realizedCount = monthTransactions.filter(isRealizedTransaction).length
+  const pendingCount = monthTransactions.length - realizedCount
+  const transferCount = monthTransactions.filter(transaction => transaction.type === 'transferencia').length
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -274,7 +280,7 @@ export default function TransactionsView() {
     doc.roundedRect(140, 10, 55, 25, 3, 3, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(14)
-    doc.text(formatCurrency(totals.balance), 145, 28)
+    doc.text(formatCurrency(periodContext.current.balance), 145, 28)
     const rows = filteredData.map(transaction => [
       new Date(transaction.date).toLocaleDateString('pt-BR'),
       transaction.description.toUpperCase(),
@@ -321,7 +327,7 @@ export default function TransactionsView() {
     )
   }
 
-  const typeLabel = filterType === 'all' ? 'Todos os tipos' : filterType === 'receita' ? 'Receitas' : 'Despesas'
+  const selectedTypeLabel = typeLabel(filterType)
   const statusLabel = filterStatus === 'all' ? 'Todos os status' : filterStatus === 'pago' ? 'Pagos' : 'Pendentes'
   const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -339,8 +345,9 @@ export default function TransactionsView() {
       <div className="mx-auto w-full max-w-[1180px] space-y-6 px-4 py-5 sm:px-6 md:py-7 lg:px-8">
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-[-0.02em] md:text-[28px]">Transações</h1>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Acompanhe entradas, saídas e transferências em um só lugar.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-helper)]">Transações</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-[-0.02em] md:text-[28px]">Entenda cada movimento sem perder o contexto.</h1>
+            <p className="mt-1 text-sm capitalize text-[var(--color-text-secondary)]">{currentMonthLabel} · entradas, saídas e transferências em um só lugar.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-11 items-center rounded-[var(--radius-md)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)]">
@@ -357,9 +364,24 @@ export default function TransactionsView() {
         </header>
 
         <section aria-label="Resumo financeiro realizado" className="grid gap-4 md:grid-cols-3">
-          <FinancialMetricCard label="Saldo realizado" value={formatCurrency(totals.balance)} helper="Somente movimentações confirmadas" tone={totals.balance < 0 ? 'negative' : 'neutral'} />
-          <FinancialMetricCard label="Entradas realizadas" value={formatCurrency(totals.income)} helper={currentMonthLabel} tone="positive" />
-          <FinancialMetricCard label="Saídas realizadas" value={formatCurrency(Math.abs(totals.expense))} helper={currentMonthLabel} tone="negative" />
+          <FinancialMetricCard
+            label="Saldo realizado"
+            value={formatCurrency(periodContext.current.balance)}
+            helper={`Mês anterior: ${formatCurrency(periodContext.previous.balance)}`}
+            tone={periodContext.current.balance < 0 ? 'negative' : 'neutral'}
+          />
+          <FinancialMetricCard
+            label="Entradas realizadas"
+            value={formatCurrency(periodContext.current.income)}
+            helper={`Mês anterior: ${formatCurrency(periodContext.previous.income)}`}
+            tone="positive"
+          />
+          <FinancialMetricCard
+            label="Saídas realizadas"
+            value={formatCurrency(periodContext.current.expense)}
+            helper={`Mês anterior: ${formatCurrency(periodContext.previous.expense)}`}
+            tone="negative"
+          />
         </section>
 
         <FixedExpensesList transactions={transactions} currentDate={currentDate} />
@@ -373,17 +395,25 @@ export default function TransactionsView() {
                 id="transaction-search"
                 type="search"
                 aria-label="Buscar transações"
-                placeholder="Buscar por descrição ou categoria"
+                placeholder="Buscar por nome, categoria, forma ou valor"
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
                 className="pl-9"
               />
             </div>
             <CustomSelect
-              value={typeLabel}
-              options={['Todos os tipos', 'Receitas', 'Despesas']}
+              value={selectedTypeLabel}
+              options={['Todos os tipos', 'Receitas', 'Despesas', 'Transferências']}
               aria-label="Filtrar por tipo"
-              onChange={value => setFilterType(value === 'Receitas' ? 'receita' : value === 'Despesas' ? 'despesa' : 'all')}
+              onChange={value => setFilterType(
+                value === 'Receitas'
+                  ? 'receita'
+                  : value === 'Despesas'
+                    ? 'despesa'
+                    : value === 'Transferências'
+                      ? 'transferencia'
+                      : 'all',
+              )}
             />
             {isFreePlan ? (
               <Button variant="secondary" onClick={() => setShowUpgradeModal(true)} className="justify-between"><span>Todos os status (PRO)</span><Lock className="h-4 w-4 text-[var(--color-nav-active-text)]" /></Button>
@@ -398,50 +428,62 @@ export default function TransactionsView() {
           </div>
         </section>
 
-        <section aria-labelledby="transactions-list-title" className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-[18px]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-card-border)] pb-4">
-            <div>
-              <h2 id="transactions-list-title" className="text-base font-semibold">{filteredData.length} {filteredData.length === 1 ? 'transação' : 'transações'}</h2>
-              <p className="mt-1 text-xs text-[var(--color-text-helper)]">Movimentações de {currentMonthLabel}</p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-[var(--color-text-helper)]"><Filter className="h-4 w-4" aria-hidden="true" />Página {safePage} de {totalPages}</div>
-          </div>
-
-          {pageData.length === 0 ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center px-5 text-center">
-              <h3 className="text-sm font-semibold">{monthTransactions.length === 0 ? 'Sem transações neste mês' : 'Nenhuma transação encontrada'}</h3>
-              <p className="mt-1 max-w-sm text-sm text-[var(--color-text-helper)]">{monthTransactions.length === 0 ? 'Adicione uma nova transação para começar a acompanhar seu fluxo.' : 'Tente ajustar os filtros.'}</p>
-              {monthTransactions.length === 0 ? <Button variant="secondary" className="mt-5" onClick={() => setIsCreateModalOpen(true)}>Nova transação</Button> : null}
-            </div>
-          ) : (
-            <div className="py-2">
-              {groups.map(group => (
-                <div key={group.label} className="py-2">
-                  <h3 className="mb-2 text-xs font-medium text-[var(--color-text-helper)]">{group.label}</h3>
-                  <div className="space-y-2">
-                    {group.items.map(transaction => (
-                      <TransactionRow
-                        key={transaction.id}
-                        transaction={transaction}
-                        onClick={() => handleTransactionClick(transaction)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--color-card-border)] pt-4">
-              <span className="text-xs text-[var(--color-text-helper)]">Página {safePage} de {totalPages}</span>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" disabled={safePage <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}>Anterior</Button>
-                <Button variant="secondary" size="sm" disabled={safePage >= totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}>Próxima</Button>
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section aria-labelledby="transactions-list-title" className="rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4 md:p-[18px]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-card-border)] pb-4">
+              <div>
+                <h2 id="transactions-list-title" className="text-base font-semibold">{filteredData.length} {filteredData.length === 1 ? 'transação' : 'transações'}</h2>
+                <p className="mt-1 text-xs capitalize text-[var(--color-text-helper)]">Movimentações de {currentMonthLabel}</p>
               </div>
+              <div className="flex items-center gap-2 text-xs text-[var(--color-text-helper)]"><Filter className="h-4 w-4" aria-hidden="true" />Página {safePage} de {totalPages}</div>
             </div>
-          ) : null}
-        </section>
+
+            {pageData.length === 0 ? (
+              <div className="flex min-h-[220px] flex-col items-center justify-center px-5 text-center">
+                <h3 className="text-sm font-semibold">{monthTransactions.length === 0 ? 'Sem transações neste mês' : 'Nenhuma transação encontrada'}</h3>
+                <p className="mt-1 max-w-sm text-sm text-[var(--color-text-helper)]">{monthTransactions.length === 0 ? 'Adicione uma nova transação para começar a acompanhar seu fluxo.' : 'Tente ajustar os filtros.'}</p>
+                {monthTransactions.length === 0 ? <Button variant="secondary" className="mt-5" onClick={() => setIsCreateModalOpen(true)}>Nova transação</Button> : null}
+              </div>
+            ) : (
+              <div className="py-2">
+                {groups.map(group => (
+                  <div key={group.label} className="py-2">
+                    <h3 className="mb-2 text-xs font-medium text-[var(--color-text-helper)]">{group.label}</h3>
+                    <div className="space-y-2">
+                      {group.items.map(transaction => (
+                        <TransactionRow
+                          key={transaction.id}
+                          transaction={transaction}
+                          onClick={() => handleTransactionClick(transaction)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {totalPages > 1 ? (
+              <div className="flex items-center justify-between gap-3 border-t border-[var(--color-card-border)] pt-4">
+                <span className="text-xs text-[var(--color-text-helper)]">Página {safePage} de {totalPages}</span>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" disabled={safePage <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}>Anterior</Button>
+                  <Button variant="secondary" size="sm" disabled={safePage >= totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}>Próxima</Button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <TransactionContextRail
+            context={periodContext}
+            currentMonthLabel={currentMonthLabel}
+            realizedCount={realizedCount}
+            pendingCount={pendingCount}
+            transferCount={transferCount}
+            isFreePlan={isFreePlan}
+            onExportPDF={generatePDF}
+          />
+        </div>
       </div>
 
       <NewTransactionModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={handleSuccessAction} />
