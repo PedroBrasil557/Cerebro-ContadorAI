@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import type { ActiveTab, AccountMode } from '@/types_db'
 import type { Entitlements, PlanCode, ProductAccess } from '@/lib/billing/plans'
 import UpgradeModal from '@/core/components/UpgradeModal'
+import { CerebroLogo } from '@/core/brand/CerebroLogo'
 import { Button } from '@/core/ui/button'
 import { IconButton } from '@/core/ui/icon-button'
 import {
@@ -210,14 +211,11 @@ export default function Navigation({
         aria-label="Navegação principal"
         className="hidden h-screen w-[280px] shrink-0 flex-col border-r border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-5 py-5 xl:flex"
       >
-        <div className="flex h-11 items-center gap-3 px-1">
-          <span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-primary)] text-white">
-            <Sparkles aria-hidden="true" className="h-[18px] w-[18px]" />
+        <div className="flex h-11 items-center justify-between gap-3 px-1">
+          <CerebroLogo variant="lockup" height={32} priority />
+          <span className="rounded-full bg-[var(--color-card-accent-fill)] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--color-nav-active-text)]">
+            {accountLabel}
           </span>
-          <div className="min-w-0">
-            <p className="text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[var(--color-text-primary)]">Cérebro</p>
-            <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-helper)]">{accountLabel}</p>
-          </div>
         </div>
 
         <div className="my-5">
@@ -293,9 +291,7 @@ export default function Navigation({
           aria-label="Navegação principal"
           className="hidden h-screen w-20 shrink-0 flex-col items-center border-r border-[var(--color-border-default)] bg-[var(--color-bg-surface)] py-4 md:flex xl:hidden"
         >
-          <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-action-primary)] text-white">
-            <Sparkles aria-hidden="true" className="h-5 w-5" />
-          </span>
+          <CerebroLogo variant="mark" height={36} className="mb-5" priority />
           <nav className="flex flex-1 flex-col items-center gap-1" aria-label={`${accountLabel} — módulos`}>
             {primaryItems.map((item) => (
               <Tooltip key={item.id}>

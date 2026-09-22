@@ -2,7 +2,8 @@
 
 import React, { useEffect, useId, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BrainCircuit, CheckCircle2, Cpu, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, Cpu, ShieldCheck } from 'lucide-react'
+import { CerebroLogo } from '@/core/brand/CerebroLogo'
 
 interface AppLoadingScreenProps {
   isLoading: boolean // Estado real de carregamento do pai
@@ -101,28 +102,17 @@ export default function AppLoadingScreen({ isLoading }: AppLoadingScreenProps) {
               transition={{ duration: 0.8 }}
               className="mb-10 flex flex-col items-center"
             >
-              <div className="relative w-20 h-20 flex items-center justify-center mb-6">
-                {/* Glow pulsante atrás do ícone */}
+              <div className="relative mb-6 flex h-20 items-center justify-center px-4">
                 <motion.div 
-                   animate={{ opacity: [0.5, 0.8, 0.5], scale: [1, 1.1, 1] }}
-                   transition={{ duration: 2, repeat: Infinity }}
-                   className="absolute inset-0 bg-blue-500/30 blur-2xl rounded-full" 
+                  animate={{ opacity: [0.45, 0.75, 0.45], scale: [1, 1.08, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute inset-0 rounded-full bg-indigo-500/20 blur-3xl" 
                 />
-                {/* Anel giratório tecnológico */}
-                <motion.div 
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border border-blue-500/20 border-t-blue-400 border-r-transparent"
-                />
-                {/* Ícone Central */}
-                <div className="relative z-10 bg-gradient-to-br from-gray-900 to-black p-4 rounded-2xl border border-white/10 shadow-2xl">
-                  <BrainCircuit className="h-8 w-8 text-blue-400" />
+                <div className="relative z-10">
+                  <CerebroLogo variant="lockup" theme="dark" height={52} priority />
                 </div>
               </div>
               
-              <h1 className="text-2xl font-bold text-white tracking-tight text-center">
-                CÉREBRO<span className="text-blue-500">.AI</span>
-              </h1>
               <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
