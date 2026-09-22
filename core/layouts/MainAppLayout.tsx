@@ -153,6 +153,8 @@ export default function MainAppLayout({ user }: { user: User }) {
     }
   }, [transactions])
 
+  const displayName = userProfile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário'
+
   return (
     <div className="relative flex h-dvh overflow-hidden bg-[var(--color-bg-canvas)] font-sans text-[var(--color-text-primary)]">
       <AppLoadingScreen isLoading={isLoading || billing.loading} />
@@ -165,6 +167,7 @@ export default function MainAppLayout({ user }: { user: User }) {
         plan={billing.plan}
         access={billing.access}
         entitlements={billing.entitlements}
+        profile={userProfile}
         refreshEntitlements={billing.refresh}
         isSwitchingProduct={isSwitchingProduct}
         onSwitchProduct={handleProductSwitch}
@@ -178,6 +181,7 @@ export default function MainAppLayout({ user }: { user: User }) {
           activeTab={activeTab}
           accountMode={accountMode}
           access={billing.access}
+          entitlements={billing.entitlements}
           isSwitchingProduct={isSwitchingProduct}
           onSwitchProduct={handleProductSwitch}
           onMarkAsRead={handleMarkNotificationAsRead}
@@ -195,6 +199,7 @@ export default function MainAppLayout({ user }: { user: User }) {
             investments={investments}
             access={billing.access}
             accountMode={accountMode}
+            displayName={displayName}
             onAddGoal={(goal) =>
               goalsService.createGoal(goal).then((createdGoal) =>
                 setGoals((current) => [...current, createdGoal]),
