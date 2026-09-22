@@ -42,7 +42,7 @@ async function closeAssistant(page: import('@playwright/test').Page) {
   await expect(assistant).toHaveCount(0)
 }
 
-test('renders the responsive Personal shell and unifies Cerebro entrypoints', async ({ page }) => {
+test('renders the Personal North Star shell without losing access to advanced modules', async ({ page }) => {
   test.skip(!hasE2EUser, 'Configure E2E_USER_EMAIL and E2E_USER_PASSWORD.')
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -51,11 +51,14 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   const desktopSidebar = page.locator('aside[aria-label="Navegação principal"]:visible')
   await expect(desktopSidebar).toHaveCount(1)
   await expect(desktopSidebar).toHaveCSS('width', '236px')
+  await expect(desktopSidebar.getByRole('button', { name: 'Visão geral' })).toBeVisible()
   await expect(desktopSidebar.getByRole('button', { name: 'Transações' })).toBeVisible()
   await expect(desktopSidebar.getByRole('button', { name: 'Orçamento' })).toBeVisible()
   await expect(desktopSidebar.getByRole('button', { name: 'Metas' })).toBeVisible()
+  await expect(desktopSidebar.getByRole('button', { name: 'Smart Shopping' })).toBeVisible()
+  await expect(desktopSidebar.getByRole('button', { name: 'Carteira' })).toBeVisible()
   await expect(desktopSidebar.getByRole('button', { name: 'Cérebro', exact: true })).toBeVisible()
-  await expect(desktopSidebar.getByRole('button', { name: /Patrimônio/ })).toBeVisible()
+  await expect(desktopSidebar.getByRole('button', { name: /Patrimônio/ })).toHaveCount(0)
 
   const commandEntry = page.getByRole('button', { name: 'Perguntar ao Cérebro' })
   await expect(commandEntry).toBeVisible()
@@ -72,17 +75,11 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await closeAssistant(page)
 
   await desktopSidebar.getByRole('button', { name: 'Visão geral' }).click()
-  await expect(page.getByRole('heading', { name: 'Visão geral', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Visão geral', exact: true })).toHaveCount(1)
   await expect(page.getByRole('heading', { name: 'Fluxo de caixa' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Movimentações recentes' })).toBeVisible()
-
-  const areaChartButton = page.getByRole('button', { name: 'Gráfico de linhas' })
-  const barChartButton = page.getByRole('button', { name: 'Gráfico de barras' })
-  await expect(areaChartButton).toHaveAttribute('aria-pressed', 'true')
-  await expect(barChartButton).toHaveAttribute('aria-pressed', 'false')
-  await barChartButton.click()
-  await expect(barChartButton).toHaveAttribute('aria-pressed', 'true')
-  await expect(areaChartButton).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByText('Insight do Cérebro').first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Categorias em destaque' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Metas', exact: true })).toBeVisible()
 
   await desktopSidebar.getByRole('button', { name: 'Transações' }).click()
   await expect(page.getByRole('heading', { name: 'Entenda cada movimento sem perder o contexto.' })).toBeVisible()
@@ -93,7 +90,6 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   const transactionsContext = page.getByLabel('Contexto das transações')
   await expect(transactionsContext).toBeVisible()
   await expect(transactionsContext.getByText('Insight do Cérebro')).toBeVisible()
-  await expect(transactionsContext.getByRole('heading', { name: 'Resumo do período' })).toBeVisible()
   await expect(page.getByText('Exportar CSV')).toHaveCount(0)
   await expect(page.getByText(/comprovantes ou observações/i)).toHaveCount(0)
 
@@ -122,7 +118,11 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await page.keyboard.press('Escape')
   await expect(goalDialog).toHaveCount(0)
 
-  await desktopSidebar.getByRole('button', { name: /Patrimônio/ }).click()
+  await desktopSidebar.getByRole('button', { name: 'Abrir perfil e mais recursos' }).click()
+  const accountResources = page.getByRole('dialog', { name: 'Conta e recursos' })
+  await expect(accountResources).toBeVisible()
+  await expect(accountResources.getByRole('button', { name: /Patrimônio/ })).toBeVisible()
+  await accountResources.getByRole('button', { name: /Patrimônio/ }).click()
   await expect(page.getByRole('heading', { name: 'Cérebro.IA PRO' })).toBeVisible()
   await page.getByRole('button', { name: 'Continuar com limitações' }).click()
 
@@ -136,7 +136,7 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await expect(tabletMoreButton).toBeFocused()
   await page.keyboard.press('Enter')
 
-  const tabletMore = page.getByRole('dialog', { name: 'Mais recursos' })
+  const tabletMore = page.getByRole('dialog', { name: 'Conta e recursos' })
   await expect(tabletMore).toBeVisible()
   await expect(tabletMore.getByRole('button', { name: 'Perfil' })).toBeVisible()
   await expect(tabletMore.getByRole('button', { name: /Patrimônio/ })).toBeVisible()
@@ -152,6 +152,11 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await expect(mobileNav.getByRole('button', { name: 'Transações' })).toBeVisible()
   await expect(mobileNav.getByRole('button', { name: 'Orçamento' })).toBeVisible()
   await expect(mobileNav.getByRole('button', { name: 'Metas' })).toBeVisible()
+  await expect(mobileNav.getByRole('button', { name: 'Cérebro', exact: true })).toBeVisible()
+
+  await mobileNav.getByRole('button', { name: 'Cérebro', exact: true }).click()
+  await expectAssistantOpen(page)
+  await closeAssistant(page)
 
   const mobileAsk = page.getByRole('button', { name: 'Perguntar ao Cérebro' })
   await expect(mobileAsk).toBeVisible()
@@ -159,20 +164,13 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await expectAssistantOpen(page)
   await closeAssistant(page)
 
-  const mobileMoreButton = mobileNav.getByRole('button', { name: 'Mais' })
-  await expect(mobileMoreButton).toBeVisible()
-  await mobileMoreButton.focus()
-  await expect(mobileMoreButton).toBeFocused()
-  await page.keyboard.press('Enter')
-
-  const mobileMore = page.getByRole('dialog', { name: 'Mais recursos' })
-  await expect(mobileMore).toBeVisible()
-  await expect(mobileMore.getByRole('button', { name: 'Cérebro', exact: true })).toBeVisible()
-  await mobileMore.getByRole('button', { name: /Patrimônio/ }).click()
-  await expect(page.getByRole('heading', { name: 'Cérebro.IA PRO' })).toBeVisible()
+  await page.getByRole('button', { name: 'Abrir menu do perfil' }).click()
+  const profileMenu = page.getByRole('menu')
+  await expect(profileMenu.getByText('Mais recursos')).toBeVisible()
+  await expect(profileMenu.getByRole('menuitem', { name: /Patrimônio/ })).toBeVisible()
 })
 
-test('honors an elevated Personal preference and switches to Professional through the shell', async ({ page }) => {
+test('switches between Personal and Professional without reintroducing Personal-only shell chrome', async ({ page }) => {
   test.skip(!hasE2EUser, 'Configure E2E_USER_EMAIL and E2E_USER_PASSWORD.')
 
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -199,20 +197,24 @@ test('honors an elevated Personal preference and switches to Professional throug
 
   await login(page)
 
-  const desktopSidebar = page.locator('aside[aria-label="Navegação principal"]:visible')
-  const productSwitcher = page.getByRole('button', { name: 'Trocar de Cérebro Personal' })
+  const personalSidebar = page.locator('aside[aria-label="Navegação principal"]:visible')
+  await expect(personalSidebar).toHaveCSS('width', '236px')
+  await expect(personalSidebar.getByRole('button', { name: 'Cérebro', exact: true })).toBeVisible()
+  await expect(personalSidebar.getByRole('button', { name: 'Administração' })).toHaveCount(0)
 
-  await expect(productSwitcher).toBeVisible()
-  await expect(desktopSidebar).toHaveCSS('width', '236px')
-  await expect(desktopSidebar.getByRole('button', { name: 'Administração' })).toBeVisible()
-  await expect(desktopSidebar.getByRole('button', { name: /Patrimônio/ })).toBeVisible()
-  await expect(desktopSidebar.getByRole('button', { name: 'Cérebro', exact: true })).toBeVisible()
+  await personalSidebar.getByRole('button', { name: 'Abrir perfil e mais recursos' }).click()
+  const accountResources = page.getByRole('dialog', { name: 'Conta e recursos' })
+  await expect(accountResources.getByRole('button', { name: 'Administração' })).toBeVisible()
+  const personalSwitcher = accountResources.getByRole('button', { name: 'Trocar de Cérebro Personal' })
+  await expect(personalSwitcher).toBeVisible()
+  await personalSwitcher.click()
 
-  await productSwitcher.click()
   await expect.poll(() => requestedMode).toBe('professional')
   await expect(page.getByRole('button', { name: 'Trocar de Cérebro Professional' })).toBeVisible()
-  await expect(desktopSidebar).toHaveCSS('width', '280px')
-  await expect(desktopSidebar.getByRole('button', { name: 'Financeiro' })).toBeVisible()
-  await expect(desktopSidebar.getByRole('button', { name: 'Administração' })).toBeVisible()
-  await expect(desktopSidebar.getByRole('button', { name: 'Cérebro', exact: true })).toHaveCount(0)
+
+  const professionalSidebar = page.locator('aside[aria-label="Navegação principal"]:visible')
+  await expect(professionalSidebar).toHaveCSS('width', '280px')
+  await expect(professionalSidebar.getByRole('button', { name: 'Financeiro' })).toBeVisible()
+  await expect(professionalSidebar.getByRole('button', { name: 'Administração' })).toBeVisible()
+  await expect(professionalSidebar.getByRole('button', { name: 'Cérebro', exact: true })).toHaveCount(0)
 })
