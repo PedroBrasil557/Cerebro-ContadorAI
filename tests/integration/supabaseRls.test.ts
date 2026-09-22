@@ -51,6 +51,11 @@ async function requirePlan(instance: SupabaseClient, user: User, expectedPlan: '
   }
 }
 
+function rpcRows<T extends { id: string }>(data: T | T[] | null) {
+  if (!data) return []
+  return Array.isArray(data) ? data : [data]
+}
+
 describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
   let free: SupabaseClient
   let pro: SupabaseClient
@@ -560,7 +565,13 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
       for (let index = 0; index < 4; index += 1) {
         const extraCard = await elevated.from('credit_cards').insert({ user_id: user.id, name: `${systemRole}-card-${index}`, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 })
         expect(extraCard.error).toBeNull()
-        const extraGoal = await elevated.from('goals').insert({ user_id: user.id, title: `${systemRole}-goal-${index}`, target_amount: 10, current_amount: 0, deadline: '2099-01-01' })
+        const extraGoal = await elevated.rpc('create_personal_goal', {
+          p_title: `${systemRole}-goal-${index}`,
+          p_target_amount: 10,
+          p_deadline: '2099-01-01',
+          p_color: '#3b82f6',
+          p_goal_type: 'standard',
+        })
         expect(extraGoal.error).toBeNull()
       }
       const professionalWrite = await elevated.from('business_customers').insert({ workspace_id: workspace.id, name: systemRole }).select('id').single()
@@ -639,23 +650,41 @@ describe.skipIf(!hasTestEnvironment)('Supabase RLS release matrix', () => {
     expect(capabilities?.some((capability) => capability.capability === 'finance' && capability.enabled)).toBe(true)
   })
 
-  it.each([
-    ['credit_cards', () => ({ user_id: freeUser.id, name: '', brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 })],
-    ['goals', () => ({ user_id: freeUser.id, title: '', target_amount: 10, current_amount: 0, deadline: '2099-01-01' })],
-  ])('keeps concurrent FREE inserts at three rows for %s', async (table, payload) => {
+  it('keeps concurrent FREE inserts at three rows for credit_cards', async () => {
     const marker = `limit-${crypto.randomUUID()}`
-    const markerColumn = table === 'credit_cards' ? 'name' : 'title'
-    const { count: existingCount, error: countError } = await free.from(table).select('*', { count: 'exact', head: true })
+    const { count: existingCount, error: countError } = await free.from('credit_cards').select('*', { count: 'exact', head: true })
     expect(countError).toBeNull()
 
-    const attempts = await Promise.all(Array.from({ length: 6 }, () => free.from(table).insert({ ...payload(), [markerColumn]: marker }).select('id')))
+    const attempts = await Promise.all(Array.from({ length: 6 }, () => free.from('credit_cards').insert({ user_id: freeUser.id, name: marker, brand: 'other', limit_amount: 10, due_day: 10, closing_day: 3 }).select('id')))
     const successful = attempts.flatMap(({ data }) => data ?? []).length
     expect(successful).toBe(Math.max(0, 3 - (existingCount ?? 0)))
 
-    const { count: finalCount, error: finalCountError } = await free.from(table).select('*', { count: 'exact', head: true })
+    const { count: finalCount, error: finalCountError } = await free.from('credit_cards').select('*', { count: 'exact', head: true })
     expect(finalCountError).toBeNull()
     expect(finalCount).toBeLessThanOrEqual(3)
-    await free.from(table).delete().eq(markerColumn, marker).eq('user_id', freeUser.id)
+    await free.from('credit_cards').delete().eq('name', marker).eq('user_id', freeUser.id)
+  })
+
+  it('keeps concurrent FREE goal creation at three rows through the contract RPC', async () => {
+    const marker = `limit-goal-${crypto.randomUUID()}`
+    const { count: existingCount, error: countError } = await free.from('goals').select('*', { count: 'exact', head: true })
+    expect(countError).toBeNull()
+
+    const attempts = await Promise.all(Array.from({ length: 6 }, (_, index) => free.rpc('create_personal_goal', {
+      p_title: `${marker}-${index}`,
+      p_target_amount: 10,
+      p_deadline: '2099-01-01',
+      p_color: '#3b82f6',
+      p_goal_type: 'standard',
+    })))
+    const createdRows = attempts.flatMap(({ data }) => rpcRows<{ id: string }>(data as { id: string } | { id: string }[] | null))
+    expect(createdRows).toHaveLength(Math.max(0, 3 - (existingCount ?? 0)))
+
+    const { count: finalCount, error: finalCountError } = await free.from('goals').select('*', { count: 'exact', head: true })
+    expect(finalCountError).toBeNull()
+    expect(finalCount).toBeLessThanOrEqual(3)
+
+    await Promise.all(createdRows.map((row) => free.rpc('delete_personal_goal', { p_goal_id: row.id })))
   })
 
   it('stores exactly one appointment for concurrent retries with one idempotency key', async () => {
