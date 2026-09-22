@@ -78,12 +78,8 @@ export default function MainAppLayout({ user }: { user: User }) {
           setAccountMode(resolvedMode)
           setActiveTab((current) => {
             if (current === 'admin' || current === 'meu perfil') return current
-            if (resolvedMode === 'professional' && !PROFESSIONAL_TABS.has(current)) {
-              return 'visão do negócio'
-            }
-            if (resolvedMode === 'personal' && PROFESSIONAL_TABS.has(current)) {
-              return 'dashboard'
-            }
+            if (resolvedMode === 'professional' && !PROFESSIONAL_TABS.has(current)) return 'visão do negócio'
+            if (resolvedMode === 'personal' && PROFESSIONAL_TABS.has(current)) return 'dashboard'
             return current
           })
         }
@@ -140,11 +136,9 @@ export default function MainAppLayout({ user }: { user: User }) {
 
   const handleMarkNotificationAsRead = (id: string) => {
     void financeService.markNotificationAsRead(id).then(() => {
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === id ? { ...notification, read: true } : notification,
-        ),
-      )
+      setNotifications((current) => current.map((notification) =>
+        notification.id === id ? { ...notification, read: true } : notification,
+      ))
     })
   }
 
@@ -202,7 +196,7 @@ export default function MainAppLayout({ user }: { user: User }) {
             access={billing.access}
             accountMode={accountMode}
             onAddGoal={(goal) =>
-              financeService.createGoal(goal).then((createdGoal) =>
+              goalsService.createGoal(goal).then((createdGoal) =>
                 setGoals((current) => [...current, createdGoal]),
               )
             }
@@ -225,9 +219,7 @@ export default function MainAppLayout({ user }: { user: User }) {
           <div className="h-24 md:h-8" aria-hidden="true" />
         </div>
 
-        {accountMode === 'personal' && billing.access.canAccessPersonal ? (
-          <AIAssistant user={user} />
-        ) : null}
+        {accountMode === 'personal' && billing.access.canAccessPersonal ? <AIAssistant user={user} /> : null}
       </main>
     </div>
   )
