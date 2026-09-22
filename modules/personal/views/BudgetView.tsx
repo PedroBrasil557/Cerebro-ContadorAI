@@ -6,7 +6,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Loader2,
-  PiggyBank,
   SlidersHorizontal,
   Sparkles,
   TrendingDown,
