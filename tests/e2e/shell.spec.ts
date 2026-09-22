@@ -105,9 +105,9 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await expect(createDialog).toHaveCount(0)
 
   await desktopSidebar.getByRole('button', { name: 'Orçamento' }).click()
-  await expect(page.getByRole('heading', { name: 'Orçamento', exact: true })).toBeVisible()
-  await expect(page.getByText('Limites personalizados ainda não estão disponíveis')).toBeVisible()
-  await expect(page.getByText('Gasto neste mês')).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Orçamento de/i })).toBeVisible()
+  await expect(page.getByText('Planeje limites e acompanhe o ritmo antes que o mês decida por você.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Definir orçamento|Ajustar limites/ })).toBeVisible()
 
   await desktopSidebar.getByRole('button', { name: 'Metas' }).click()
   await expect(page.getByRole('heading', { name: 'Metas', exact: true })).toBeVisible()
