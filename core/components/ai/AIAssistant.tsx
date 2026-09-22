@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
+import {
   X, Send, Zap, BrainCircuit, Loader2, LayoutDashboard, Terminal
 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
+import { CEREBRO_ASSISTANT_OPEN_EVENT } from '@/lib/assistant/openCerebroAssistant'
 
 interface Message {
   id: string
@@ -26,14 +27,27 @@ export default function AIAssistant({ user }: AIAssistantProps) {
     { id: '1', role: 'assistant', content: `Olá, ${user?.user_metadata?.full_name || 'tudo bem'}? Posso ajudar a entender e organizar suas finanças pessoais.` }
   ])
   const [isTyping, setIsTyping] = useState(false)
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  const handleOpenChat = () => setIsOpen(!isOpen)
+  useEffect(() => {
+    const openAssistant = () => setIsOpen(true)
+    window.addEventListener(CEREBRO_ASSISTANT_OPEN_EVENT, openAssistant)
+    return () => window.removeEventListener(CEREBRO_ASSISTANT_OPEN_EVENT, openAssistant)
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 120)
+    return () => window.clearTimeout(timer)
+  }, [isOpen])
+
+  const handleOpenChat = () => setIsOpen((current) => !current)
 
   const handleSend = async (customText?: string) => {
     const textToSend = customText || input
@@ -43,153 +57,157 @@ export default function AIAssistant({ user }: AIAssistantProps) {
       .filter((message) => message.id !== '1')
       .slice(-MAX_CHAT_HISTORY)
       .map(({ role, content }) => ({ role, content }))
-    
+
     setInput('')
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: textToSend }
     setMessages(prev => [...prev, userMsg])
     setIsTyping(true)
 
     try {
-        const response = await fetch('/api/ai/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: textToSend, history })
-        })
-        
-        const data = await response.json() as {
-          response?: string
-          error?: { message?: string }
-        }
-        if (!response.ok) throw new Error(data.error?.message || 'Falha ao consultar a IA.')
-        if (!data.response?.trim()) throw new Error('A IA não retornou uma resposta válida.')
-        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: data.response! }])
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: textToSend, history })
+      })
+
+      const data = await response.json() as {
+        response?: string
+        error?: { message?: string }
+      }
+      if (!response.ok) throw new Error(data.error?.message || 'Falha ao consultar a IA.')
+      if (!data.response?.trim()) throw new Error('A IA não retornou uma resposta válida.')
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: data.response! }])
     } catch (error: unknown) {
-        const message = error instanceof Error && error.message
-          ? error.message
-          : 'Não consegui responder agora. Tente novamente em instantes.'
-        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: message }])
-    } finally { setIsTyping(false) }
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Não consegui responder agora. Tente novamente em instantes.'
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: message }])
+    } finally {
+      setIsTyping(false)
+    }
   }
 
   return (
     <>
-      {/* BOTÃO FLUTUANTE DE ELITE */}
       <motion.button
+        type="button"
+        aria-label={isOpen ? 'Fechar Cérebro' : 'Abrir Cérebro'}
+        aria-expanded={isOpen}
         whileHover={{ scale: 1.1, rotate: 5 }}
         whileTap={{ scale: 0.9 }}
         onClick={handleOpenChat}
         className={`fixed bottom-24 right-4 z-50 h-16 w-16 rounded-[1.25rem] shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-center justify-center transition-all duration-500 group border md:bottom-8 md:right-8 ${
-            isOpen ? 'bg-rose-500 border-rose-400' : 'bg-[#09090b] border-white/10'
+          isOpen ? 'bg-rose-500 border-rose-400' : 'bg-[#09090b] border-white/10'
         }`}
       >
         {isOpen ? <X className="text-white" /> : (
-            <div className="relative">
-                <BrainCircuit className="text-indigo-400 group-hover:text-indigo-300 transition-colors" size={28} />
-            </div>
+          <div className="relative">
+            <BrainCircuit className="text-indigo-400 group-hover:text-indigo-300 transition-colors" size={28} />
+          </div>
         )}
       </motion.button>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            role="dialog"
+            aria-modal="false"
+            aria-label="Cérebro financeiro"
+            data-testid="cerebro-assistant"
             initial={{ opacity: 0, y: 40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
             className="fixed bottom-40 right-4 z-50 flex h-[calc(100dvh-12rem)] max-h-[650px] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#09090b]/90 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-3xl md:bottom-28 md:right-8 md:h-[75vh] md:max-h-[750px] md:w-[480px]"
           >
-            {/* HEADER TERMINAL STYLE */}
             <div className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20 text-indigo-400">
-                        <Zap size={20} className="animate-pulse" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white italic">Cérebro.IA</h3>
-                            <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/30 font-black">CORE V2</span>
-                        </div>
-                        <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1.5 uppercase mt-0.5">
-                           <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" /> Auditoria Ativa
-                        </p>
-                    </div>
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20 text-indigo-400">
+                  <Zap size={20} className="animate-pulse" />
                 </div>
-                <button onClick={() => setIsOpen(false)} className="p-2.5 hover:bg-white/5 rounded-xl text-gray-500 transition-colors">
-                    <X size={20} />
-                </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white italic">Cérebro.IA</h3>
+                    <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/30 font-black">CORE V2</span>
+                  </div>
+                  <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1.5 uppercase mt-0.5">
+                    <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" /> Auditoria Ativa
+                  </p>
+                </div>
+              </div>
+              <button type="button" aria-label="Fechar Cérebro" onClick={() => setIsOpen(false)} className="p-2.5 hover:bg-white/5 rounded-xl text-gray-500 transition-colors">
+                <X size={20} />
+              </button>
             </div>
 
-            {/* MESSAGE FEED */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                
-                {/* ORIENTAÇÃO DE SEGURANÇA FIXA */}
-                <div className="bg-indigo-600/5 border border-indigo-500/10 p-5 rounded-[1.5rem] flex gap-4 items-center group hover:bg-indigo-600/10 transition-colors">
-                    <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0 border border-indigo-500/20">
-                        <LayoutDashboard size={20} />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">Diretriz de Realidade</p>
-                        <p className="text-xs text-gray-400 leading-tight">Sincronização ativa. Para valores exatos de caixa, consulte o <span className="text-indigo-400 font-bold">Dashboard Principal</span>.</p>
-                    </div>
+              <div className="bg-indigo-600/5 border border-indigo-500/10 p-5 rounded-[1.5rem] flex gap-4 items-center group hover:bg-indigo-600/10 transition-colors">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0 border border-indigo-500/20">
+                  <LayoutDashboard size={20} />
                 </div>
+                <div>
+                  <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">Diretriz de Realidade</p>
+                  <p className="text-xs text-gray-400 leading-tight">Sincronização ativa. Para valores exatos de caixa, consulte o <span className="text-indigo-400 font-bold">Dashboard Principal</span>.</p>
+                </div>
+              </div>
 
-                {messages.map((msg) => (
-                    <motion.div
-                        key={msg.id}
-                        initial={{ opacity: 0, x: msg.role === 'user' ? 10 : -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                        <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm leading-relaxed shadow-xl ${
-                            msg.role === 'user' 
-                                ? 'bg-indigo-600 text-white rounded-tr-none shadow-indigo-900/20' 
-                                : 'bg-white/[0.03] border border-white/10 text-gray-200 rounded-tl-none'
-                        }`}>
-                            <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
-                        </div>
-                    </motion.div>
-                ))}
-                
-                {isTyping && (
-                    <div className="flex justify-start">
-                        <div className="bg-white/5 border border-white/10 p-5 rounded-[1.5rem] rounded-tl-none flex gap-1.5 items-center">
-                            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
-                            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
-                            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* QUICK ACTIONS BAR */}
-            <div className="px-6 py-3 flex gap-2 overflow-x-auto scrollbar-hide border-t border-white/5 bg-black/20">
-                <button onClick={() => handleSend("Onde posso cortar gastos?")} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Sugerir Cortes</button>
-                <button onClick={() => handleSend("Analise minhas metas")} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Metas Ativas</button>
-                <button onClick={() => handleSend("Resumo de gastos do mês")} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Auditoria Mensal</button>
-            </div>
-
-            {/* INPUT AREA HARDWARE STYLE */}
-            <div className="p-6 bg-black/60 backdrop-blur-md">
-                <form 
-                    onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                    className="flex gap-3 items-center bg-white/[0.03] border border-white/10 rounded-2xl px-4 py-2 focus-within:border-indigo-500/50 transition-all shadow-inner"
+              {messages.map((msg) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, x: msg.role === 'user' ? 10 : -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                    <Terminal size={16} className="text-gray-600" />
-                    <input 
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Pergunte sobre suas finanças..."
-                        className="flex-1 bg-transparent text-white placeholder:text-gray-600 outline-none text-sm h-12 font-medium"
-                    />
-                    <button 
-                        type="submit" 
-                        disabled={!input.trim() || isTyping}
-                        className="h-10 w-10 bg-white text-black rounded-xl flex items-center justify-center disabled:opacity-30 hover:bg-indigo-500 hover:text-white transition-all shadow-lg active:scale-95"
-                    >
-                        {isTyping ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                    </button>
-                </form>
-                <p className="text-[8px] text-gray-600 text-center mt-4 uppercase font-black tracking-[0.3em] opacity-40">Intelligence Protocol v2.4.0</p>
+                  <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm leading-relaxed shadow-xl ${
+                    msg.role === 'user'
+                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-indigo-900/20'
+                      : 'bg-white/[0.03] border border-white/10 text-gray-200 rounded-tl-none'
+                  }`}>
+                    <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
+                  </div>
+                </motion.div>
+              ))}
+
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-white/5 border border-white/10 p-5 rounded-[1.5rem] rounded-tl-none flex gap-1.5 items-center">
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="px-6 py-3 flex gap-2 overflow-x-auto scrollbar-hide border-t border-white/5 bg-black/20">
+              <button type="button" onClick={() => handleSend('Onde posso cortar gastos?')} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Sugerir Cortes</button>
+              <button type="button" onClick={() => handleSend('Analise minhas metas')} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Metas Ativas</button>
+              <button type="button" onClick={() => handleSend('Resumo de gastos do mês')} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Auditoria Mensal</button>
+            </div>
+
+            <div className="p-6 bg-black/60 backdrop-blur-md">
+              <form
+                onSubmit={(e) => { e.preventDefault(); void handleSend() }}
+                className="flex gap-3 items-center bg-white/[0.03] border border-white/10 rounded-2xl px-4 py-2 focus-within:border-indigo-500/50 transition-all shadow-inner"
+              >
+                <Terminal size={16} className="text-gray-600" />
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Pergunte sobre suas finanças..."
+                  className="flex-1 bg-transparent text-white placeholder:text-gray-600 outline-none text-sm h-12 font-medium"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isTyping}
+                  aria-label="Enviar pergunta"
+                  className="h-10 w-10 bg-white text-black rounded-xl flex items-center justify-center disabled:opacity-30 hover:bg-indigo-500 hover:text-white transition-all shadow-lg active:scale-95"
+                >
+                  {isTyping ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                </button>
+              </form>
+              <p className="text-[8px] text-gray-600 text-center mt-4 uppercase font-black tracking-[0.3em] opacity-40">Intelligence Protocol v2.4.0</p>
             </div>
           </motion.div>
         )}
