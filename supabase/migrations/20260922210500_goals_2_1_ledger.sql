@@ -1,5 +1,13 @@
 -- Personal North Star 2.1 — Goals ledger, explicit goal semantics and atomic mutation boundary.
 
+update public.goals
+set current_amount = 0
+where current_amount is null;
+
+alter table public.goals
+  alter column current_amount set default 0,
+  alter column current_amount set not null;
+
 alter table public.goals
   add column if not exists goal_type text not null default 'standard';
 
@@ -90,7 +98,6 @@ create or replace function public.create_personal_goal(
   p_target_amount numeric,
   p_deadline date,
   p_color text default '#3b82f6',
-  p_icon text default null,
   p_goal_type text default 'standard'
 )
 returns public.goals
@@ -125,7 +132,6 @@ begin
     current_amount,
     deadline,
     color,
-    icon,
     goal_type
   )
   values (
@@ -135,7 +141,6 @@ begin
     0,
     p_deadline,
     coalesce(nullif(trim(p_color), ''), '#3b82f6'),
-    nullif(trim(p_icon), ''),
     p_goal_type
   )
   returning * into created_goal;
@@ -295,12 +300,12 @@ begin
 end;
 $$;
 
-revoke all on function public.create_personal_goal(text, numeric, date, text, text, text) from public, anon;
+revoke all on function public.create_personal_goal(text, numeric, date, text, text) from public, anon;
 revoke all on function public.update_personal_goal(uuid, text, numeric, date, text) from public, anon;
 revoke all on function public.adjust_personal_goal(uuid, numeric, timestamptz) from public, anon;
 revoke all on function public.delete_personal_goal(uuid) from public, anon;
 
-grant execute on function public.create_personal_goal(text, numeric, date, text, text, text) to authenticated, service_role;
+grant execute on function public.create_personal_goal(text, numeric, date, text, text) to authenticated, service_role;
 grant execute on function public.update_personal_goal(uuid, text, numeric, date, text) to authenticated, service_role;
 grant execute on function public.adjust_personal_goal(uuid, numeric, timestamptz) to authenticated, service_role;
 grant execute on function public.delete_personal_goal(uuid) to authenticated, service_role;
