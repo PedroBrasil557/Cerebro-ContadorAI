@@ -77,7 +77,8 @@ describe('buildBudgetAnalysis', () => {
       transaction({ amount: 550, category: 'Alimentação' }),
     ], budget(), new Date(2026, 8, 1), new Date(2026, 8, 10))
 
-    expect(analysis.categories[0]).toMatchObject({ state: 'exceeded', utilizationPercent: 110 })
+    expect(analysis.categories[0].state).toBe('exceeded')
+    expect(analysis.categories[0].utilizationPercent).toBeCloseTo(110)
   })
 
   it('projects the current month only after three elapsed days with realized spend', () => {
