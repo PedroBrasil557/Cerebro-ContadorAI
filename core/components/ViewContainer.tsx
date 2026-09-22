@@ -8,6 +8,7 @@ import {
 import dynamic from 'next/dynamic'
 import type { ProductAccess } from '@/lib/billing/plans'
 import { motionTransition, pageMotionVariants } from '@/core/motion/presets'
+import { OverviewNorthStarSections } from '@/modules/personal/components/OverviewNorthStarSections'
 
 // ==========================================
 // 📦 CAMADA 2: MÓDULOS PESSOAIS
@@ -61,7 +62,6 @@ export default function ViewContainer({
   onAddGoal, onAdjustGoal, onUpdateGoal, onDeleteGoal,
   investments = [], access, accountMode
 }: ViewContainerProps) {
-  // Normaliza o nome da aba para evitar erros de renderização
   const currentTab = (activeTab || '').toLowerCase().trim()
 
   return (
@@ -76,19 +76,23 @@ export default function ViewContainer({
         className="w-full h-full relative p-4 md:p-8"
       >
 
-        {/* ========================================== */}
-        {/* 🟢 RENDERIZAÇÃO MODO PESSOAL (CPF)          */}
-        {/* ========================================== */}
         {accountMode === 'personal' && access.canAccessPersonal && (
           <>
             {currentTab === 'dashboard' && (
-              <DashboardView
-                summary={summary}
-                recentTransactions={transactions.slice(0, 5)}
-                onNavigate={handleRedirect}
-                transactions={transactions}
-                investments={investments}
-              />
+              <>
+                <DashboardView
+                  summary={summary}
+                  recentTransactions={transactions.slice(0, 5)}
+                  onNavigate={handleRedirect}
+                  transactions={transactions}
+                  investments={investments}
+                />
+                <OverviewNorthStarSections
+                  transactions={transactions}
+                  goals={goals}
+                  onNavigate={handleRedirect}
+                />
+              </>
             )}
 
             {(currentTab === 'compras inteligentes' || currentTab === 'compras') && (
@@ -134,9 +138,6 @@ export default function ViewContainer({
           </>
         )}
 
-        {/* ========================================== */}
-        {/* 🏢 RENDERIZAÇÃO MODO PROFISSIONAL (CNPJ)     */}
-        {/* ========================================== */}
         {accountMode === 'professional' && access.canAccessProfessional && (
           <>
             {(currentTab === 'visão do negócio' || currentTab === 'dashboard') && (
@@ -149,9 +150,6 @@ export default function ViewContainer({
           </>
         )}
 
-        {/* ========================================== */}
-        {/* ⚙️ CAMADA 1: MÓDULOS GLOBAIS (Ambos modos) */}
-        {/* ========================================== */}
         {(currentTab === 'meu perfil' || currentTab === 'perfil') && (
           <ProfileView />
         )}
