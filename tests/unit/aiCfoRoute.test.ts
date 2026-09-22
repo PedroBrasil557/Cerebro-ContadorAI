@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
@@ -67,6 +67,8 @@ function transactionsQuery() {
 
 describe('CFO AI route integrity', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-21T15:00:00.000Z'))
     vi.clearAllMocks()
     mocks.requireUser.mockResolvedValue({ id: 'user-1' })
     mocks.getUserEntitlements.mockResolvedValue({
@@ -94,6 +96,10 @@ describe('CFO AI route integrity', () => {
       throw new Error(`Unexpected table: ${table}`)
     })
     mocks.groqCreate.mockResolvedValue({ choices: [{ message: { content: 'Análise profissional segura.' } }] })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('grounds professional analysis in workspace-scoped realized monthly facts', async () => {
