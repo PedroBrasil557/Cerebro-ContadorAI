@@ -63,7 +63,6 @@ function calculateMonthlyPace(movements: GoalMovement[], today: Date) {
   const currentMonth = startOfMonth(today)
   const buckets = [-2, -1, 0].map((offset) => addMonths(currentMonth, offset))
   const bucketKeys = buckets.map(monthKey)
-
   const netByMonth = new Map(bucketKeys.map((key) => [key, 0]))
   const hasMovement = new Set<string>()
 
@@ -110,9 +109,7 @@ function calculateWeeklyConsistency(movements: GoalMovement[], today: Date) {
 }
 
 function calculateEmergencyCoverage(goal: Goal, transactions: Transaction[], today: Date) {
-  if (goalType(goal) !== 'emergency_fund') {
-    return { months: null, average: null }
-  }
+  if (goalType(goal) !== 'emergency_fund') return { months: null, average: null }
 
   const currentMonth = startOfMonth(today)
   const monthlyTotals: number[] = []
@@ -141,8 +138,8 @@ function calculateNextContribution(goal: Goal, today: Date, remaining: number) {
   if (remaining <= 0) return null
   const deadline = dateFrom(goal.deadline)
   if (!deadline || deadline <= today) return null
-  const dayMs = 86_400_000
-  const months = Math.max(1, Math.ceil((deadline.getTime() - today.getTime()) / (30.4375 * dayMs)))
+  const calendarMonths = (deadline.getFullYear() - today.getFullYear()) * 12 + deadline.getMonth() - today.getMonth()
+  const months = Math.max(1, calendarMonths)
   return Number((remaining / months).toFixed(2))
 }
 
