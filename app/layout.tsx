@@ -14,8 +14,7 @@ export const metadata: Metadata = {
   title: `${BRAND.name} | ${BRAND.tagline}`,
   description: "A inteligência financeira definitiva com IA cognitiva integrada.",
   icons: {
-    // TODO(brand): replace the temporary emoji with the final Cérebro mark.
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>",
+    icon: BRAND.assets.appIcon.light,
   }
 };
 
