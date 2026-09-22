@@ -77,7 +77,9 @@ test('renders the Personal North Star shell without losing access to advanced mo
   await desktopSidebar.getByRole('button', { name: 'Visão geral' }).click()
   await expect(page.getByRole('heading', { name: 'Visão geral', exact: true })).toHaveCount(1)
   await expect(page.getByRole('heading', { name: 'Fluxo de caixa' })).toBeVisible()
-  await expect(page.getByText('Insight do Cérebro').first()).toBeVisible()
+  const desktopContext = page.getByLabel('Contexto financeiro')
+  await expect(desktopContext).toBeVisible()
+  await expect(desktopContext.getByText('Insight do Cérebro')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Categorias em destaque' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Metas', exact: true })).toBeVisible()
 
