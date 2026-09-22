@@ -95,7 +95,7 @@ test('renders the Personal North Star shell without losing access to advanced mo
   await expect(page.getByText('Exportar CSV')).toHaveCount(0)
   await expect(page.getByText(/comprovantes ou observações/i)).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Nova transação' }).click()
+  await page.getByRole('button', { name: 'Nova transação', exact: true }).first().click()
   const createDialog = page.getByRole('dialog', { name: 'Nova transação' })
   await expect(createDialog).toBeVisible()
   await expect(createDialog.getByLabel('Categoria')).toBeVisible()
