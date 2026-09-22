@@ -77,7 +77,7 @@ test('renders the Personal North Star shell without losing access to advanced mo
   await desktopSidebar.getByRole('button', { name: 'Visão geral' }).click()
   await expect(page.getByRole('heading', { name: 'Visão geral', exact: true })).toHaveCount(1)
   await expect(page.getByRole('heading', { name: 'Fluxo de caixa' })).toBeVisible()
-  const desktopContext = page.getByLabel('Contexto financeiro')
+  const desktopContext = page.getByRole('complementary', { name: 'Contexto financeiro' })
   await expect(desktopContext).toBeVisible()
   await expect(desktopContext.getByText('Insight do Cérebro')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Categorias em destaque' })).toBeVisible()
@@ -95,7 +95,7 @@ test('renders the Personal North Star shell without losing access to advanced mo
   await expect(page.getByText('Exportar CSV')).toHaveCount(0)
   await expect(page.getByText(/comprovantes ou observações/i)).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Adicionar transação' }).click()
+  await page.getByRole('button', { name: 'Nova transação' }).click()
   const createDialog = page.getByRole('dialog', { name: 'Nova transação' })
   await expect(createDialog).toBeVisible()
   await expect(createDialog.getByLabel('Categoria')).toBeVisible()
@@ -212,9 +212,8 @@ test('switches between Personal and Professional without reintroducing Personal-
   await personalSwitcher.click()
 
   await expect.poll(() => requestedMode).toBe('professional')
-  await expect(page.getByRole('button', { name: 'Trocar de Cérebro Professional' })).toBeVisible()
-
   const professionalSidebar = page.locator('aside[aria-label="Navegação principal"]:visible')
+  await expect(professionalSidebar.getByRole('button', { name: 'Trocar de Cérebro Professional' })).toBeVisible()
   await expect(professionalSidebar).toHaveCSS('width', '280px')
   await expect(professionalSidebar.getByRole('button', { name: 'Financeiro' })).toBeVisible()
   await expect(professionalSidebar.getByRole('button', { name: 'Administração' })).toBeVisible()
