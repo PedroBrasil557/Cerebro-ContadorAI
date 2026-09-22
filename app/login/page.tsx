@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Check, Loader2, Mail, ShieldCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { AuthExperienceShell } from '@/core/auth/AuthExperienceShell'
 import { Button } from '@/core/ui/button'
 import { Field } from '@/core/ui/field'
@@ -142,6 +141,7 @@ export default function AuthPage() {
 
     if (state === 'confirmed') setView('confirmed')
     if (state === 'link-expired') setView('link-expired')
+    if (state === 'forgot') setView('forgot')
 
     if (authErrorParam === 'oauth') {
       setView('login')
