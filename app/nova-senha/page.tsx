@@ -24,6 +24,7 @@ export default function NewPasswordPage() {
   useEffect(() => {
     let mounted = true
     let recoveryConfirmed = false
+    const tokenHash = new URLSearchParams(window.location.search).get('token_hash')
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
@@ -32,6 +33,27 @@ export default function NewPasswordPage() {
         setRecoveryState('valid')
       }
     })
+
+    async function verifyRecoveryToken() {
+      if (!tokenHash) return
+
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'recovery',
+      })
+
+      if (!mounted) return
+      if (error) {
+        setRecoveryState('expired')
+        return
+      }
+
+      recoveryConfirmed = true
+      setRecoveryState('valid')
+      window.history.replaceState({}, '', '/nova-senha')
+    }
+
+    void verifyRecoveryToken()
 
     const timeout = window.setTimeout(() => {
       if (mounted && !recoveryConfirmed) setRecoveryState('expired')
