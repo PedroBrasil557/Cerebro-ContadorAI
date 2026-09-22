@@ -17,6 +17,8 @@ interface AIAssistantProps {
   user: User
 }
 
+const MAX_CHAT_HISTORY = 8
+
 export default function AIAssistant({ user }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
@@ -35,7 +37,12 @@ export default function AIAssistant({ user }: AIAssistantProps) {
 
   const handleSend = async (customText?: string) => {
     const textToSend = customText || input
-    if (!textToSend.trim()) return
+    if (!textToSend.trim() || isTyping) return
+
+    const history = messages
+      .filter((message) => message.id !== '1')
+      .slice(-MAX_CHAT_HISTORY)
+      .map(({ role, content }) => ({ role, content }))
     
     setInput('')
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: textToSend }
@@ -46,14 +53,21 @@ export default function AIAssistant({ user }: AIAssistantProps) {
         const response = await fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: textToSend })
+            body: JSON.stringify({ message: textToSend, history })
         })
         
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error || 'Falha ao consultar a IA.')
-        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: data.response }])
-    } catch {
-        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: 'Não consegui responder agora. Tente novamente em instantes.' }])
+        const data = await response.json() as {
+          response?: string
+          error?: { message?: string }
+        }
+        if (!response.ok) throw new Error(data.error?.message || 'Falha ao consultar a IA.')
+        if (!data.response?.trim()) throw new Error('A IA não retornou uma resposta válida.')
+        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: data.response! }])
+    } catch (error: unknown) {
+        const message = error instanceof Error && error.message
+          ? error.message
+          : 'Não consegui responder agora. Tente novamente em instantes.'
+        setMessages(prev => [...prev, { id: (Date.now()+1).toString(), role: 'assistant', content: message }])
     } finally { setIsTyping(false) }
   }
 
