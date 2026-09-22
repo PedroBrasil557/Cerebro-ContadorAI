@@ -11,8 +11,8 @@ if (process.env.RELEASE_E2E_REQUIRED === 'true' && !hasE2EUser) {
 export async function login(page: Page) {
   await page.goto('/login')
   await page.getByPlaceholder('seu@email.com').fill(e2eEmail!)
-  await page.getByPlaceholder('••••••••').fill(e2ePassword!)
-  await page.getByRole('button', { name: 'Desbloquear Cofre' }).click()
+  await page.getByPlaceholder('Sua senha').fill(e2ePassword!)
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
   await expect(page).toHaveURL(/\/app\/?$/, { timeout: 20_000 })
   await page.getByTestId('app-loading-screen').waitFor({ state: 'detached', timeout: 20_000 })
 }
