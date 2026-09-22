@@ -85,10 +85,17 @@ test('renders the responsive Personal shell and unifies Cerebro entrypoints', as
   await expect(areaChartButton).toHaveAttribute('aria-pressed', 'false')
 
   await desktopSidebar.getByRole('button', { name: 'Transações' }).click()
-  await expect(page.getByRole('heading', { name: 'Transações', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Entenda cada movimento sem perder o contexto.' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Buscar e filtrar' })).toBeVisible()
-  await expect(page.getByRole('searchbox', { name: 'Buscar transações' })).toBeVisible()
+  await expect(page.getByRole('searchbox', { name: 'Buscar transações' })).toHaveAttribute('placeholder', 'Buscar por nome, categoria, forma ou valor')
   await expect(page.getByLabel('Filtrar por tipo')).toBeVisible()
+
+  const transactionsContext = page.getByLabel('Contexto das transações')
+  await expect(transactionsContext).toBeVisible()
+  await expect(transactionsContext.getByText('Insight do Cérebro')).toBeVisible()
+  await expect(transactionsContext.getByRole('heading', { name: 'Resumo do período' })).toBeVisible()
+  await expect(page.getByText('Exportar CSV')).toHaveCount(0)
+  await expect(page.getByText(/comprovantes ou observações/i)).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Adicionar transação' }).click()
   const createDialog = page.getByRole('dialog', { name: 'Nova transação' })
