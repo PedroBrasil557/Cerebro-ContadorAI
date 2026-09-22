@@ -8,7 +8,6 @@ import {
   Check,
   ChevronRight,
   CircleDollarSign,
-  PiggyBank,
   Sparkles,
   Target,
   TrendingDown,
@@ -49,6 +48,11 @@ interface DashboardViewProps {
   investments: Investment[]
   goals: Goal[]
   displayName: string
+}
+
+type OverviewInsight = {
+  title: string
+  description: string
 }
 
 function expense(transaction: Transaction) {
@@ -145,6 +149,44 @@ function ProgressGoal({ goal }: { goal: Goal }) {
   )
 }
 
+function OverviewInsightCard({
+  insight,
+  onNavigate,
+  mobile = false,
+}: {
+  insight: OverviewInsight
+  onNavigate: (tab: ActiveTab) => void
+  mobile?: boolean
+}) {
+  return (
+    <section
+      className={`rounded-[20px] border border-[var(--color-card-accent-border)] bg-[var(--color-card-accent-fill)] ${mobile ? 'p-4' : 'p-5'}`}
+      aria-labelledby={mobile ? 'overview-insight-mobile' : 'overview-insight-desktop'}
+    >
+      <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-primary)]">
+        <Sparkles aria-hidden="true" className="h-4 w-4 text-[var(--color-action-ai)]" />
+        Insight do Cérebro
+      </div>
+      <h2
+        id={mobile ? 'overview-insight-mobile' : 'overview-insight-desktop'}
+        className={`${mobile ? 'mt-5 text-[19px] leading-[25px]' : 'mt-6 text-[21px] leading-7'} font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]`}
+      >
+        {insight.title}
+      </h2>
+      <p className="mt-2 text-xs leading-[18px] text-[var(--color-text-secondary)]">{insight.description}</p>
+      <Button
+        variant="secondary"
+        size="icon"
+        aria-label="Ver orçamento relacionado ao insight"
+        className="mt-4 rounded-full bg-[var(--color-bg-surface)]"
+        onClick={() => onNavigate('orçamento')}
+      >
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+    </section>
+  )
+}
+
 export default function DashboardView({
   summary,
   recentTransactions,
@@ -225,7 +267,7 @@ export default function DashboardView({
   }, [goals, investments, now, previous, transactions])
 
   const topCategory = data.categories[0]
-  const insight = !topCategory
+  const insight: OverviewInsight = !topCategory
     ? {
         title: 'Seu contexto financeiro fica mais claro a cada movimentação.',
         description: 'Ainda não há despesas realizadas neste mês para comparar categorias.',
@@ -253,15 +295,6 @@ export default function DashboardView({
 
   const recent = recentTransactions.slice(0, 5)
 
-  const InsightCard = ({ mobile = false }: { mobile?: boolean }) => (
-    <section className={`rounded-[20px] border border-[var(--color-card-accent-border)] bg-[var(--color-card-accent-fill)] ${mobile ? 'p-4' : 'p-5'}`} aria-labelledby={mobile ? 'overview-insight-mobile' : 'overview-insight-desktop'}>
-      <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-primary)]"><Sparkles aria-hidden="true" className="h-4 w-4 text-[var(--color-action-ai)]" />Insight do Cérebro</div>
-      <h2 id={mobile ? 'overview-insight-mobile' : 'overview-insight-desktop'} className={`${mobile ? 'mt-5 text-[19px] leading-[25px]' : 'mt-6 text-[21px] leading-7'} font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]`}>{insight.title}</h2>
-      <p className="mt-2 text-xs leading-[18px] text-[var(--color-text-secondary)]">{insight.description}</p>
-      <Button variant="secondary" size="icon" aria-label="Ver orçamento relacionado ao insight" className="mt-4 rounded-full bg-[var(--color-bg-surface)]" onClick={() => onNavigate('orçamento')}><ArrowRight className="h-4 w-4" /></Button>
-    </section>
-  )
-
   return (
     <div className="min-h-full bg-[var(--color-bg-canvas)] text-[var(--color-text-primary)]">
       <div className="mx-auto w-full max-w-[1148px] space-y-4 px-4 py-[18px] sm:px-6 xl:px-0 xl:py-7">
@@ -288,7 +321,7 @@ export default function DashboardView({
           <Metric label="Investimentos" value={shortCurrency(data.investments)} helper={data.investments > 0 ? 'valor atual da carteira' : 'sem investimentos'} tone="ai" icon={ArrowUpRight} last />
         </section>
 
-        <div className="xl:hidden"><InsightCard mobile /></div>
+        <div className="xl:hidden"><OverviewInsightCard insight={insight} onNavigate={onNavigate} mobile /></div>
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_322px]">
           <div className="space-y-4">
@@ -340,7 +373,7 @@ export default function DashboardView({
           </div>
 
           <aside className="hidden space-y-4 xl:block" aria-label="Contexto financeiro">
-            <InsightCard />
+            <OverviewInsightCard insight={insight} onNavigate={onNavigate} />
             <section className="rounded-[18px] border border-[var(--color-card-border)] bg-[var(--color-card-fill)] p-4" aria-labelledby="steps-title">
               <h2 id="steps-title" className="text-lg font-semibold">Próximos passos</h2>
               <div className="mt-3 divide-y divide-[var(--color-card-border)]">{safeSteps.map((step) => <button key={step.title} type="button" onClick={() => onNavigate(step.tab)} className="flex w-full items-center gap-3 py-3 text-left"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-action-ghost-hover)] text-[var(--color-action-primary)]"><step.icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{step.title}</span><span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-helper)]">{step.helper}</span></span><ChevronRight className="h-4 w-4 text-[var(--color-text-helper)]" /></button>)}</div>
