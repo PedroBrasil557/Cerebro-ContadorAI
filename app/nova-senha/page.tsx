@@ -1,118 +1,211 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { Check, Clock3, Loader2, LockKeyhole } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { BrainCircuit, Loader2, LockKeyhole } from 'lucide-react'
 import { toast } from 'sonner'
+import { AuthExperienceShell } from '@/core/auth/AuthExperienceShell'
+import { Button } from '@/core/ui/button'
+import { Field } from '@/core/ui/field'
+import { Input } from '@/core/ui/input'
 import { createClient } from '@/lib/supabase/client'
+
+type RecoveryState = 'checking' | 'valid' | 'expired'
 
 export default function NewPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
-  const [checkingSession, setCheckingSession] = useState(true)
-  const [hasSession, setHasSession] = useState(false)
+  const [recoveryState, setRecoveryState] = useState<RecoveryState>('checking')
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     let mounted = true
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return
-      setHasSession(Boolean(data.session))
-      setCheckingSession(false)
-    })
+    let recoveryConfirmed = false
+    const tokenHash = new URLSearchParams(window.location.search).get('token_hash')
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-        setHasSession(Boolean(session))
-        setCheckingSession(false)
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        recoveryConfirmed = true
+        setRecoveryState('valid')
       }
     })
 
+    async function verifyRecoveryToken() {
+      if (!tokenHash) return
+
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'recovery',
+      })
+
+      if (!mounted) return
+      if (error) {
+        setRecoveryState('expired')
+        return
+      }
+
+      recoveryConfirmed = true
+      setRecoveryState('valid')
+      window.history.replaceState({}, '', '/nova-senha')
+    }
+
+    void verifyRecoveryToken()
+
+    const timeout = window.setTimeout(() => {
+      if (mounted && !recoveryConfirmed) setRecoveryState('expired')
+    }, 2500)
+
     return () => {
       mounted = false
+      window.clearTimeout(timeout)
       listener.subscription.unsubscribe()
     }
   }, [supabase])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setFormError(null)
 
+    if (recoveryState !== 'valid') {
+      setFormError('Este link não possui mais uma sessão de recuperação válida.')
+      return
+    }
     if (password.length < 8) {
-      toast.error('A senha deve ter pelo menos 8 caracteres.')
+      setFormError('A senha deve ter pelo menos 8 caracteres.')
       return
     }
-
     if (password !== confirmation) {
-      toast.error('As senhas não são iguais.')
-      return
-    }
-
-    if (!hasSession) {
-      toast.error('O link expirou ou não contém uma sessão válida.')
+      setFormError('As senhas não são iguais.')
       return
     }
 
     setLoading(true)
     const { error } = await supabase.auth.updateUser({ password })
-    setLoading(false)
 
     if (error) {
-      toast.error('Não foi possível atualizar a senha. Solicite um novo link.')
+      setLoading(false)
+      setFormError('Não foi possível atualizar a senha. Solicite um novo link de recuperação.')
       return
     }
 
-    toast.success('Senha atualizada com sucesso.')
     await supabase.auth.signOut()
+    toast.success('Senha atualizada. Entre novamente com a nova senha.')
     router.replace('/login')
   }
 
-  return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050505] p-4 text-white">
-      <div className="absolute -left-32 -top-32 h-[520px] w-[520px] rounded-full bg-indigo-600/10 blur-[130px]" />
-      <section className="relative z-10 w-full max-w-[420px] rounded-3xl border border-white/10 bg-[#09090b]/90 p-8 shadow-2xl backdrop-blur-2xl">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-3">
-            <BrainCircuit className="h-8 w-8 text-indigo-400" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tight">Definir nova senha</h1>
-          <p className="mt-2 text-sm text-gray-400">Crie uma senha segura para recuperar seu acesso.</p>
+  if (recoveryState === 'checking') {
+    return (
+      <AuthExperienceShell
+        eyebrow="Nova senha"
+        title="Validando seu link"
+        description="Estamos confirmando a sessão de recuperação antes de liberar a alteração."
+        heroEyebrow="Nova credencial"
+        heroTitle="Uma senha nova. O mesmo contexto protegido."
+        heroDescription="Você troca a credencial sem perder o que já organizou. Segurança deve preservar continuidade."
+        mobileHeroTitle="Uma senha nova."
+        heroMode="password"
+        heroFooter="Proteção sem ruído. Controle sem fricção."
+      >
+        <div className="flex items-center gap-3 rounded-[14px] border border-[var(--neutral-200)] bg-[var(--neutral-50)] p-4 text-sm text-[var(--neutral-600)]">
+          <Loader2 className="h-5 w-5 animate-spin text-[var(--brand-500)]" aria-hidden="true" />
+          Validando link de recuperação…
         </div>
+      </AuthExperienceShell>
+    )
+  }
 
-        {checkingSession ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-400">
-            <Loader2 className="h-4 w-4 animate-spin" /> Validando link…
+  if (recoveryState === 'expired') {
+    return (
+      <AuthExperienceShell
+        eyebrow="Link expirado"
+        title="Este link não está mais disponível"
+        description="Links de recuperação têm prazo para proteger sua conta. Solicite outro para continuar."
+        heroEyebrow="Prazo de segurança"
+        heroTitle="Links seguros têm prazo."
+        heroDescription="Isso reduz o risco de reutilização indevida. Solicitar outro link leva só alguns segundos."
+        mobileHeroTitle="Links seguros têm prazo."
+        heroMode="expired"
+        heroFooter="Proteção sem ruído. Controle sem fricção."
+      >
+        <div className="space-y-6">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--color-status-warning-surface)] text-[var(--color-status-warning)]">
+            <Clock3 className="h-7 w-7" aria-hidden="true" />
           </div>
-        ) : !hasSession ? (
-          <div className="space-y-5 text-center">
-            <p className="text-sm text-amber-300">Este link expirou ou já foi utilizado.</p>
-            <button onClick={() => router.replace('/login')} className="text-sm font-bold text-indigo-400 hover:text-indigo-300">
-              Solicitar um novo link
-            </button>
+          <div className="rounded-[14px] border border-[var(--neutral-200)] bg-[var(--neutral-50)] p-4 text-xs leading-5 text-[var(--neutral-600)]">
+            <strong className="block text-[var(--neutral-700)]">Nada foi alterado na sua conta.</strong>
+            <span className="mt-1 block">Um novo link substitui o anterior e mantém o processo protegido.</span>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <label className="block space-y-2 text-xs font-bold uppercase tracking-wider text-gray-400">
-              Nova senha
-              <span className="relative mt-2 block">
-                <LockKeyhole className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                <input type="password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#13131a] py-3 pl-11 pr-4 text-sm text-white outline-none focus:border-indigo-500/60" />
-              </span>
-            </label>
-            <label className="block space-y-2 text-xs font-bold uppercase tracking-wider text-gray-400">
-              Confirmar senha
-              <input type="password" minLength={8} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#13131a] px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/60" />
-            </label>
-            <button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 py-3.5 text-xs font-black uppercase tracking-widest disabled:opacity-60">
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Atualizar senha
-            </button>
-          </form>
-        )}
-      </section>
-    </main>
+          <Button className="w-full" onClick={() => router.replace('/login?state=forgot')}>Solicitar novo link</Button>
+          <button type="button" className="text-sm font-semibold text-[var(--brand-500)]" onClick={() => router.replace('/login')}>Voltar para entrar</button>
+        </div>
+      </AuthExperienceShell>
+    )
+  }
+
+  return (
+    <AuthExperienceShell
+      eyebrow="Nova senha"
+      title="Crie uma nova senha"
+      description="Escolha uma senha nova para voltar ao seu espaço com segurança."
+      heroEyebrow="Nova credencial"
+      heroTitle="Uma senha nova. O mesmo contexto protegido."
+      heroDescription="Você troca a credencial sem perder o que já organizou. Segurança deve preservar continuidade."
+      mobileHeroTitle="Uma senha nova."
+      heroMode="password"
+      heroFooter="Proteção sem ruído. Controle sem fricção."
+    >
+      <div className="space-y-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--brand-100)] text-[var(--brand-700)]">
+          <LockKeyhole className="h-7 w-7" aria-hidden="true" />
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Nova senha" htmlFor="new-password">
+            <Input
+              id="new-password"
+              type="password"
+              minLength={8}
+              required
+              autoComplete="new-password"
+              placeholder="Sua senha"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </Field>
+          <Field label="Confirmar nova senha" htmlFor="confirm-password">
+            <Input
+              id="confirm-password"
+              type="password"
+              minLength={8}
+              required
+              autoComplete="new-password"
+              placeholder="Sua senha"
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+            />
+          </Field>
+
+          <div className="rounded-[16px] border border-[var(--neutral-200)] bg-[var(--neutral-50)] p-4">
+            <p className="text-xs font-semibold text-[var(--neutral-700)]">Sua senha deve ter:</p>
+            <div className="mt-3 space-y-2 text-[11px] text-[var(--neutral-600)]">
+              <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[var(--brand-700)]" aria-hidden="true" /> 8 ou mais caracteres</p>
+              <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[var(--brand-700)]" aria-hidden="true" /> Uma combinação difícil de adivinhar</p>
+              <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[var(--brand-700)]" aria-hidden="true" /> Ser diferente da senha anterior</p>
+            </div>
+          </div>
+
+          {formError ? <p role="alert" className="text-xs leading-5 text-[var(--color-text-error)]">{formError}</p> : null}
+
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Salvar nova senha
+          </Button>
+        </form>
+        <button type="button" className="text-sm font-semibold text-[var(--brand-500)]" onClick={() => router.replace('/login')}>Voltar para entrar</button>
+      </div>
+    </AuthExperienceShell>
   )
 }

@@ -28,10 +28,12 @@ describe('proxy auth resilience', () => {
     })
   })
 
-  it('serves the public login route without a remote Supabase session lookup', async () => {
-    const response = await proxy(new NextRequest('https://cerebro.example/login'))
+  it('serves public auth routes without a remote Supabase session lookup', async () => {
+    for (const path of ['/login', '/auth/callback', '/auth/confirm', '/nova-senha']) {
+      const response = await proxy(new NextRequest(`https://cerebro.example${path}`))
+      expect(response.status).toBe(200)
+    }
 
-    expect(response.status).toBe(200)
     expect(mocks.createServerClient).not.toHaveBeenCalled()
     expect(mocks.getUser).not.toHaveBeenCalled()
   })
