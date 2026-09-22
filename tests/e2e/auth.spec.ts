@@ -22,7 +22,7 @@ test('exposes registration and password recovery flows', async ({ page }) => {
 test('shows recoverable OAuth callback errors without technical provider details', async ({ page }) => {
   await page.goto('/login?auth_error=oauth')
   await expect(page.getByRole('heading', { name: 'Entre no Cérebro' })).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('Não foi possível concluir o acesso com Google')
+  await expect(page.getByText('Não foi possível concluir o acesso com Google. Você pode tentar novamente.')).toBeVisible()
 })
 
 test('logs in and logs out with the configured test account', async ({ page }) => {
