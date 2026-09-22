@@ -28,6 +28,7 @@ test('shows recoverable OAuth callback errors without technical provider details
 test('logs in and logs out with the configured test account', async ({ page }) => {
   test.skip(!hasE2EUser, 'Configure E2E_USER_EMAIL and E2E_USER_PASSWORD.')
   await login(page)
-  await page.getByRole('button', { name: 'Sair do Cérebro' }).click()
+  await page.getByRole('button', { name: 'Abrir menu do perfil' }).click()
+  await page.getByRole('menuitem', { name: 'Sair do Cérebro' }).click()
   await expect(page).toHaveURL(/\/login$/)
 })

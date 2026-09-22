@@ -2,13 +2,10 @@
 
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Transaction, Goal, NewGoal, Investment, ActiveTab
-} from '@/types_db'
+import { Transaction, Goal, NewGoal, Investment, ActiveTab } from '@/types_db'
 import dynamic from 'next/dynamic'
 import type { ProductAccess } from '@/lib/billing/plans'
 import { motionTransition, pageMotionVariants } from '@/core/motion/presets'
-import { OverviewNorthStarSections } from '@/modules/personal/components/OverviewNorthStarSections'
 
 const moduleLoading = () => <div role="status" aria-live="polite" className="p-8 text-sm text-gray-400">Carregando módulo…</div>
 const DashboardView = dynamic(() => import('@/modules/personal/views/DashboardView'), { loading: moduleLoading })
@@ -39,6 +36,7 @@ interface ViewContainerProps {
   investments: Investment[]
   access: ProductAccess
   accountMode: 'personal' | 'professional'
+  displayName: string
   onAddGoal: (goal: NewGoal) => Promise<void>
   onAdjustGoal: (id: string, delta: number) => Promise<void>
   onUpdateGoal: (id: string, updates: Pick<Goal, 'title' | 'target_amount' | 'deadline'>) => Promise<void>
@@ -46,9 +44,19 @@ interface ViewContainerProps {
 }
 
 export default function ViewContainer({
-  activeTab, handleRedirect, summary, transactions = [], goals = [],
-  onAddGoal, onAdjustGoal, onUpdateGoal, onDeleteGoal,
-  investments = [], access, accountMode
+  activeTab,
+  handleRedirect,
+  summary,
+  transactions = [],
+  goals = [],
+  onAddGoal,
+  onAdjustGoal,
+  onUpdateGoal,
+  onDeleteGoal,
+  investments = [],
+  access,
+  accountMode,
+  displayName,
 }: ViewContainerProps) {
   const currentTab = (activeTab || '').toLowerCase().trim()
 
@@ -61,25 +69,20 @@ export default function ViewContainer({
         exit="exit"
         variants={pageMotionVariants}
         transition={motionTransition.standard}
-        className="w-full h-full relative p-4 md:p-8"
+        className={accountMode === 'personal' ? 'relative min-h-full w-full' : 'relative h-full w-full p-4 md:p-8'}
       >
         {accountMode === 'personal' && access.canAccessPersonal && (
           <>
             {currentTab === 'dashboard' && (
-              <>
-                <DashboardView
-                  summary={summary}
-                  recentTransactions={transactions.slice(0, 5)}
-                  onNavigate={handleRedirect}
-                  transactions={transactions}
-                  investments={investments}
-                />
-                <OverviewNorthStarSections
-                  transactions={transactions}
-                  goals={goals}
-                  onNavigate={handleRedirect}
-                />
-              </>
+              <DashboardView
+                summary={summary}
+                recentTransactions={transactions.slice(0, 5)}
+                onNavigate={handleRedirect}
+                transactions={transactions}
+                investments={investments}
+                goals={goals}
+                displayName={displayName}
+              />
             )}
 
             {(currentTab === 'compras inteligentes' || currentTab === 'compras') && <SmartShoppingView />}
