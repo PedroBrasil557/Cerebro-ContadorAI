@@ -110,7 +110,7 @@ export function AppTopBar({
             type="button"
             onClick={openCerebroAssistant}
             aria-label="Perguntar ao Cérebro"
-            className="group absolute left-1/2 hidden h-[52px] w-[min(638px,calc(100%-220px))] -translate-x-1/2 items-center gap-3 rounded-[26px] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 text-left shadow-[0_4px_12px_rgba(5,6,10,0.10)] transition-colors hover:border-[var(--color-card-accent-border)] md:flex"
+            className="group absolute left-1/2 hidden h-[52px] w-[min(638px,calc(100%_-_220px))] -translate-x-1/2 items-center gap-3 rounded-[26px] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 text-left shadow-[0_4px_12px_rgba(5,6,10,0.10)] transition-colors hover:border-[var(--color-card-accent-border)] md:flex"
           >
             <Sparkles aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-[var(--color-action-ai)]" />
             <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-secondary)]">Pergunte algo sobre seu dinheiro...</span>
