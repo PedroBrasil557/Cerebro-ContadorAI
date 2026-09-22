@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  CalendarDays,
   Check,
   ChevronRight,
   Flag,
@@ -13,7 +12,6 @@ import {
   Sparkles,
   Target,
   Trash2,
-  TrendingUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ActiveTab, Goal, NewGoal, Transaction } from '@/types_db'
