@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import type { User } from '@supabase/supabase-js'
 import {
@@ -9,7 +9,9 @@ import {
   CheckCircle2,
   Info,
   LogOut,
+  Search,
   Settings,
+  Sparkles,
 } from 'lucide-react'
 import type { ActiveTab, AccountMode, NotificationItem, UserProfile } from '@/types_db'
 import { Badge } from '@/core/ui/badge'
@@ -25,6 +27,7 @@ import {
 import { ProductSwitcher } from '@/core/navigation/ProductSwitcher'
 import type { ProductAccess } from '@/lib/billing/plans'
 import { getNavigationItems } from '@/core/navigation/config'
+import { openCerebroAssistant } from '@/lib/assistant/openCerebroAssistant'
 
 interface AppTopBarProps {
   user: User
@@ -83,15 +86,26 @@ export function AppTopBar({
   const firstName = profile?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'Usuário'
   const modeLabel = accountMode === 'personal' ? 'Personal' : 'Professional'
 
+  useEffect(() => {
+    if (accountMode !== 'personal') return
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'k' || (!event.metaKey && !event.ctrlKey)) return
+      event.preventDefault()
+      openCerebroAssistant()
+    }
+    window.addEventListener('keydown', handleShortcut)
+    return () => window.removeEventListener('keydown', handleShortcut)
+  }, [accountMode])
+
   return (
     <header
       className={[
-        'sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 px-4',
+        'sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 px-4',
         'border-b border-[var(--color-border-default)] bg-[var(--color-bg-surface)]/95 backdrop-blur-xl',
-        'md:h-[72px] md:px-6 xl:h-20 xl:px-8',
+        'md:h-[72px] md:px-6 xl:h-20 xl:px-7',
       ].join(' ')}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 shrink-0 md:w-[170px] xl:w-[190px]">
         <div className="flex items-center gap-3">
           <div className="min-w-0">
             <p className="truncate text-[15px] font-semibold leading-5 text-[var(--color-text-primary)] md:text-base">
@@ -117,7 +131,38 @@ export function AppTopBar({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
+      {accountMode === 'personal' ? (
+        <button
+          type="button"
+          onClick={openCerebroAssistant}
+          aria-label="Perguntar ao Cérebro"
+          className="group hidden min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-card-border)] bg-[var(--color-bg-canvas)] px-4 text-left transition-colors hover:border-[var(--color-action-ai)]/40 hover:bg-[var(--color-action-ghost-hover)] md:flex md:h-11 xl:h-[52px] xl:max-w-[638px]"
+        >
+          <Sparkles aria-hidden="true" className="h-4 w-4 shrink-0 text-[var(--color-action-ai)]" />
+          <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-helper)]">
+            Pergunte algo sobre seu dinheiro...
+          </span>
+          <kbd className="hidden shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2 py-1 text-[10px] font-medium text-[var(--color-text-helper)] lg:inline-flex">
+            Ctrl/⌘ K
+          </kbd>
+        </button>
+      ) : (
+        <div className="min-w-0 flex-1" />
+      )}
+
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 md:gap-2">
+        {accountMode === 'personal' ? (
+          <button
+            type="button"
+            onClick={openCerebroAssistant}
+            aria-label="Perguntar ao Cérebro"
+            className="inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 text-xs font-semibold text-[var(--color-nav-active-text)] hover:bg-[var(--color-nav-active-fill)] md:hidden"
+          >
+            <Search aria-hidden="true" className="h-4 w-4" />
+            Perguntar
+          </button>
+        ) : null}
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton label="Abrir notificações" variant="ghost" size="md" className="relative">

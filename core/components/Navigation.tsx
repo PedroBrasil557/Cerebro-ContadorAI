@@ -34,6 +34,7 @@ import {
   type AppNavigationItem,
 } from '@/core/navigation/config'
 import { cn } from '@/lib/utils'
+import { openCerebroAssistant } from '@/lib/assistant/openCerebroAssistant'
 
 interface NavigationProps {
   activeTab: ActiveTab
@@ -190,6 +191,11 @@ export default function Navigation({
     setMoreOpen(false)
   }
 
+  const openAssistant = () => {
+    setMoreOpen(false)
+    openCerebroAssistant()
+  }
+
   const handleRefreshSession = async () => {
     setIsRefreshing(true)
     try {
@@ -206,10 +212,13 @@ export default function Navigation({
 
   return (
     <>
-      {/* Desktop — Figma Sidebar / 280px */}
+      {/* Desktop — Personal North Star 236px; Professional stays on its established shell. */}
       <aside
         aria-label="Navegação principal"
-        className="hidden h-screen w-[280px] shrink-0 flex-col border-r border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-5 py-5 xl:flex"
+        className={cn(
+          'hidden h-screen shrink-0 flex-col border-r border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-5 xl:flex',
+          accountMode === 'personal' ? 'w-[236px]' : 'w-[280px] px-5',
+        )}
       >
         <div className="flex h-11 items-center justify-between gap-3 px-1">
           <CerebroLogo variant="lockup" height={32} priority />
@@ -261,7 +270,20 @@ export default function Navigation({
           ) : null}
         </nav>
 
-        <div className="mt-4 space-y-2 border-t border-[var(--color-border-default)] pt-4">
+        {accountMode === 'personal' ? (
+          <div className="mt-4 border-t border-[var(--color-border-default)] pt-4">
+            <button
+              type="button"
+              onClick={openAssistant}
+              className="flex h-11 w-full items-center gap-3 rounded-[var(--radius-md)] px-3 text-sm font-semibold text-[var(--color-nav-active-text)] transition-colors hover:bg-[var(--color-nav-active-fill)]"
+            >
+              <Sparkles aria-hidden="true" className="h-5 w-5" />
+              Cérebro
+            </button>
+          </div>
+        ) : null}
+
+        <div className="mt-3 space-y-2 border-t border-[var(--color-border-default)] pt-4">
           {plan === 'free' ? (
             <Button variant="ai" className="w-full justify-start gap-2" onClick={() => setShowUpgradeModal(true)}>
               <Sparkles aria-hidden="true" className="h-4 w-4" />
@@ -285,7 +307,7 @@ export default function Navigation({
         </div>
       </aside>
 
-      {/* Tablet — Figma Navigation Rail / 80px */}
+      {/* Tablet — Navigation Rail / 80px */}
       <TooltipProvider delayDuration={200}>
         <aside
           aria-label="Navegação principal"
@@ -310,6 +332,18 @@ export default function Navigation({
               </Tooltip>
             ))}
           </nav>
+
+          {accountMode === 'personal' ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <IconButton label="Cérebro" variant="ghost" size="lg" onClick={openAssistant}>
+                  <Sparkles aria-hidden="true" className="h-5 w-5" />
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent side="right">Cérebro</TooltipContent>
+            </Tooltip>
+          ) : null}
+
           <Tooltip>
             <TooltipTrigger asChild>
               <IconButton
@@ -326,7 +360,7 @@ export default function Navigation({
         </aside>
       </TooltipProvider>
 
-      {/* Mobile — Figma Bottom Navigation / 72px */}
+      {/* Mobile — Bottom Navigation / 72px. Cérebro entrypoint lives in AppTopBar as “Perguntar”. */}
       <nav
         aria-label="Navegação principal"
         className="fixed inset-x-0 bottom-0 z-40 flex h-[72px] border-t border-[var(--color-border-default)] bg-[var(--color-bg-surface)] md:hidden"
@@ -395,6 +429,16 @@ export default function Navigation({
             />
 
             <div className="space-y-1">
+              {accountMode === 'personal' ? (
+                <button
+                  type="button"
+                  onClick={openAssistant}
+                  className="flex h-10 w-full items-center gap-3 rounded-[var(--radius-md)] px-3 text-sm font-semibold text-[var(--color-nav-active-text)] hover:bg-[var(--color-nav-active-fill)]"
+                >
+                  <Sparkles aria-hidden="true" className="h-5 w-5" />
+                  Cérebro
+                </button>
+              ) : null}
               {moreItems.map((item) => (
                 <NavigationItem
                   key={item.id}
