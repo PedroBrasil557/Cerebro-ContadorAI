@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import { Check, Clock3, LockKeyhole, Mail } from 'lucide-react'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -26,9 +26,48 @@ type AuthExperienceShellProps = {
   contentClassName?: string
 }
 
+const AUTH_LIGHT_SEMANTICS = {
+  '--color-bg-canvas': 'var(--neutral-50)',
+  '--color-bg-surface': 'var(--neutral-0)',
+  '--color-card-fill': 'var(--neutral-0)',
+  '--color-card-border': 'var(--neutral-200)',
+  '--color-card-accent-fill': 'var(--brand-100)',
+  '--color-card-accent-border': 'var(--brand-300)',
+  '--color-text-primary': 'var(--neutral-900)',
+  '--color-text-secondary': 'var(--neutral-500)',
+  '--color-text-helper': 'var(--neutral-500)',
+  '--color-text-placeholder': 'var(--neutral-600)',
+  '--color-text-disabled': 'var(--neutral-500)',
+  '--color-text-on-action': 'var(--neutral-0)',
+  '--color-action-primary': 'var(--brand-500)',
+  '--color-action-primary-hover': 'var(--brand-600)',
+  '--color-action-primary-pressed': 'var(--brand-700)',
+  '--color-action-secondary-fill': 'var(--neutral-0)',
+  '--color-action-secondary-border': 'var(--neutral-200)',
+  '--color-action-secondary-hover': 'var(--neutral-100)',
+  '--color-action-secondary-pressed': 'var(--neutral-200)',
+  '--color-action-disabled-fill': 'var(--neutral-200)',
+  '--color-field-fill': 'var(--neutral-0)',
+  '--color-field-fill-disabled': 'var(--neutral-100)',
+  '--color-field-border': 'var(--neutral-300)',
+  '--color-field-border-hover': 'var(--neutral-400)',
+  '--color-field-border-focus': 'var(--brand-500)',
+  '--color-focus-ring': 'var(--brand-500)',
+  '--color-status-success': 'var(--success-700)',
+  '--color-status-success-surface': 'var(--success-100)',
+  '--color-status-warning': 'var(--warning-700)',
+  '--color-status-warning-surface': 'var(--warning-100)',
+  '--color-status-danger': 'var(--danger-700)',
+  '--color-status-danger-surface': 'var(--danger-100)',
+  '--color-status-ai': 'var(--ai-600)',
+  '--color-status-ai-surface': 'var(--ai-100)',
+  '--color-progress-track': 'var(--neutral-200)',
+  '--color-progress-active': 'var(--brand-500)',
+} as CSSProperties
+
 function ProductStage() {
   return (
-    <div className="relative h-[470px] w-full max-w-[800px] overflow-hidden rounded-[28px] border border-[var(--neutral-800,#1e293b)] bg-[var(--neutral-950)]">
+    <div className="relative h-[470px] w-full max-w-[800px] overflow-hidden rounded-[28px] border border-[var(--neutral-700)] bg-[var(--neutral-950)]">
       <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(var(--neutral-700)_1px,transparent_1px),linear-gradient(90deg,var(--neutral-700)_1px,transparent_1px)] [background-size:92px_92px]" />
       <div className="absolute left-[5%] top-[16%] w-[440px] origin-top-left rotate-2 scale-[0.78]">
         <BalanceCard
@@ -143,7 +182,7 @@ function MobileHero({ title, mode }: { title: string; mode: AuthHeroMode }) {
   return (
     <div className="relative h-[190px] overflow-hidden bg-[var(--neutral-950)] px-6 pt-5 lg:hidden">
       <div className="absolute -right-16 -top-20 h-[210px] w-[210px] rounded-full bg-[var(--brand-500)]" />
-      <div className="absolute -bottom-24 -left-20 h-[190px] w-[190px] rounded-full bg-[var(--neutral-800)]" />
+      <div className="absolute -bottom-24 -left-20 h-[190px] w-[190px] rounded-full bg-[var(--neutral-900)]" />
       <CerebroLogo variant="lockup" theme="dark" height={33} className="relative z-10" priority />
       <h2 className="relative z-10 mt-5 max-w-[245px] text-[24px] font-bold leading-[1.15] tracking-[-0.5px] text-white">
         {title}
@@ -179,7 +218,7 @@ export function AuthExperienceShell({
   const reduceMotion = useReducedMotion()
 
   return (
-    <main className="min-h-screen bg-[var(--neutral-0)] text-[var(--neutral-900)]">
+    <main className="min-h-screen bg-[var(--neutral-0)] text-[var(--neutral-900)]" style={AUTH_LIGHT_SEMANTICS}>
       <MobileHero title={mobileHeroTitle} mode={heroMode} />
       <div className="mx-auto min-h-[calc(100vh-190px)] max-w-[1440px] lg:grid lg:min-h-screen lg:grid-cols-[520px_minmax(0,1fr)]">
         <section className="relative flex min-h-[calc(100vh-190px)] flex-col bg-white px-6 pb-6 pt-6 sm:px-10 lg:min-h-screen lg:px-14 lg:pb-12 lg:pt-[46px]">
@@ -205,10 +244,10 @@ export function AuthExperienceShell({
         </section>
 
         <aside className="relative hidden min-h-screen overflow-hidden bg-[var(--neutral-950)] px-16 py-14 text-white lg:flex lg:flex-col">
-          <div className="absolute -right-44 -top-40 h-[430px] w-[430px] rounded-full bg-[var(--neutral-800)]" />
-          <div className="absolute -bottom-52 -left-44 h-[420px] w-[420px] rounded-full bg-[var(--neutral-800)]" />
+          <div className="absolute -right-44 -top-40 h-[430px] w-[430px] rounded-full bg-[var(--neutral-900)]" />
+          <div className="absolute -bottom-52 -left-44 h-[420px] w-[420px] rounded-full bg-[var(--neutral-900)]" />
           <div className="absolute right-[8%] top-[38%] h-[420px] w-[420px] rounded-full bg-[var(--brand-500)] opacity-95" />
-          <div className="absolute left-[43%] top-[42%] h-[360px] w-[360px] rounded-full bg-[var(--color-status-ai)]/20 blur-[120px]" />
+          <div className="absolute left-[43%] top-[42%] h-[360px] w-[360px] rounded-full bg-[var(--ai-600)]/20 blur-[120px]" />
 
           <div className="relative z-10">
             <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--brand-300)]">{heroEyebrow}</p>
