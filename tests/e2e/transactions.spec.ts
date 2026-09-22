@@ -12,7 +12,7 @@ test('creates, displays, edits and deletes a transaction', async ({ page }) => {
   await transactionsNav.click()
   await expect(page.getByRole('heading', { name: 'Entenda cada movimento sem perder o contexto.' })).toBeVisible({ timeout: 15_000 })
 
-  await page.getByRole('button', { name: 'Nova transação', exact: true }).click()
+  await page.getByRole('button', { name: 'Nova transação', exact: true }).first().click()
   const createDialog = page.getByRole('dialog', { name: 'Nova transação' })
   await expect(createDialog).toBeVisible()
   await createDialog.getByRole('button', { name: 'Receita', exact: true }).click()
