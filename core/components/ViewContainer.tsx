@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import type { ProductAccess } from '@/lib/billing/plans'
 import { motionTransition, pageMotionVariants } from '@/core/motion/presets'
 
-const moduleLoading = () => <div role="status" aria-live="polite" className="p-8 text-sm text-gray-400">Carregando módulo…</div>
+const moduleLoading = () => <div role="status" aria-live="polite" className="p-8 text-sm text-[var(--color-text-helper)]">Carregando módulo…</div>
 const DashboardView = dynamic(() => import('@/modules/personal/views/DashboardView'), { loading: moduleLoading })
 const TransactionsView = dynamic(() => import('@/modules/personal/views/TransactionsView'), { loading: moduleLoading })
 const BudgetView = dynamic(() => import('@/modules/personal/views/BudgetView'), { loading: moduleLoading })
@@ -104,9 +104,17 @@ export default function ViewContainer({
               />
             )}
 
-            {currentTab === 'investimentos' && <InvestmentsView goals={goals} onAddGoal={onAddGoal} />}
+            {currentTab === 'investimentos' && (
+              <div className="personal-advanced-theme min-h-full" data-testid="personal-advanced-theme-surface">
+                <InvestmentsView goals={goals} onAddGoal={onAddGoal} />
+              </div>
+            )}
             {(currentTab === 'minha carteira' || currentTab === 'carteira') && <WalletView />}
-            {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && <DebtCenterView />}
+            {(currentTab === 'central de dividas' || currentTab === 'central_dividas' || currentTab === 'dividas') && (
+              <div className="personal-advanced-theme min-h-full" data-testid="personal-advanced-theme-surface">
+                <DebtCenterView />
+              </div>
+            )}
           </>
         )}
 
