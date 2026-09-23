@@ -61,8 +61,11 @@ export function CerebroThemeProvider({ children }: { children: ReactNode }) {
         : persistedTheme() ?? browserTheme()
 
     applyTheme(initialTheme)
-    setPreference(initialTheme)
-    setMounted(true)
+    const frame = window.requestAnimationFrame(() => {
+      setPreference(initialTheme)
+      setMounted(true)
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [])
 
   useEffect(() => {
