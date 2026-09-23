@@ -4,7 +4,7 @@ import { ValidationError } from '@/lib/api/errors'
 import { requireUser } from '@/lib/auth/requireUser'
 import { publicEnv } from '@/lib/env/public'
 import { getStripePriceIds } from '@/lib/env/server'
-import { getStripe } from '@/lib/stripe'
+import { assertStripeReadyForCheckout, getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { productForPlan } from '@/lib/billing/plans'
 
@@ -13,6 +13,15 @@ export const dynamic = 'force-dynamic'
 const checkoutSchema = z.object({
   plan: z.enum(['pro', 'premium']),
 }).strict()
+
+function isStripeResourceMissing(error: unknown) {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'resource_missing'
+  )
+}
 
 async function getOrCreateCustomer(userId: string, email: string) {
   const supabase = createAdminClient()
@@ -23,9 +32,17 @@ async function getOrCreateCustomer(userId: string, email: string) {
     .maybeSingle<{ stripe_customer_id: string | null }>()
 
   if (error) throw error
-  if (data?.stripe_customer_id) return data.stripe_customer_id
 
   const stripe = getStripe()
+  if (data?.stripe_customer_id) {
+    try {
+      const storedCustomer = await stripe.customers.retrieve(data.stripe_customer_id)
+      if (!storedCustomer.deleted) return storedCustomer.id
+    } catch (customerError) {
+      if (!isStripeResourceMissing(customerError)) throw customerError
+    }
+  }
+
   const existing = await stripe.customers.search({
     query: `metadata['userId']:'${userId}'`,
     limit: 1,
@@ -46,6 +63,8 @@ export async function POST(request: Request) {
     if (!user.email) throw new ValidationError('Sua conta não possui um e-mail válido.')
 
     const { plan } = checkoutSchema.parse(await request.json())
+    assertStripeReadyForCheckout()
+
     const product = productForPlan(plan)
     const stripePrices = getStripePriceIds()
     const priceId = plan === 'pro'
