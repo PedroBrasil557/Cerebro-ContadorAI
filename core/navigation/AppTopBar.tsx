@@ -214,11 +214,9 @@ export function AppTopBar({
           </div>
           <div className="ml-auto flex items-center gap-2">
             <ProductSwitcher accountMode={accountMode} canSwitch={access.canSwitchProducts} isSwitching={isSwitchingProduct} onSwitch={onSwitchProduct} variant="compact" />
-            <ThemeToggle className="hidden sm:inline-flex" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild><button type="button" aria-label="Abrir menu do perfil" className="rounded-full">{avatar}</button></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
-                {mobileThemeMenuItem}
                 <DropdownMenuItem onSelect={() => onNavigate('meu perfil')}><Settings className="mr-2 h-4 w-4" />Configurações</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onSelect={onLogout}><LogOut className="mr-2 h-4 w-4" />Sair do Cérebro</DropdownMenuItem>
