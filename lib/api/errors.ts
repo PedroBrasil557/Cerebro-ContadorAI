@@ -4,6 +4,7 @@ export type ApiErrorCode =
   | 'VALIDATION_ERROR'
   | 'RATE_LIMITED'
   | 'NOT_FOUND'
+  | 'SERVICE_UNAVAILABLE'
   | 'INTERNAL_ERROR'
 
 export class ApiError extends Error {
@@ -44,5 +45,11 @@ export class RateLimitError extends ApiError {
 export class NotFoundError extends ApiError {
   constructor(message = 'Recurso não encontrado.') {
     super('NOT_FOUND', 404, message)
+  }
+}
+
+export class ServiceUnavailableError extends ApiError {
+  constructor(message = 'Serviço temporariamente indisponível.') {
+    super('SERVICE_UNAVAILABLE', 503, message)
   }
 }
