@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "./personal-advanced-theme.css";
 import { BRAND } from '@/lib/branding'
 import { CerebroMotionProvider } from '@/core/motion/CerebroMotionProvider'
 import { CerebroThemeProvider } from '@/core/theme/CerebroThemeProvider'

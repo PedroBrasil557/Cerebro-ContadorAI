@@ -1,0 +1,196 @@
+/*
+ * Theme bridge for the legacy advanced Personal surfaces.
+ *
+ * Patrimônio and Central de Dívidas predate the semantic Design System and
+ * still carry old dark-only utility classes. Keep this bridge scoped to the
+ * wrapper applied by ViewContainer so those modules follow the active theme
+ * without leaking overrides into Auth, Professional or newer Personal views.
+ * New/rewritten UI should consume semantic tokens directly instead of adding
+ * entries here.
+ */
+.personal-advanced-theme {
+  min-height: 100%;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+}
+
+/* Canvas and card surfaces */
+.personal-advanced-theme [class~="bg-[#050505]"] {
+  background-color: var(--color-bg-canvas);
+}
+
+.personal-advanced-theme [class~="bg-[#050505]/40"] {
+  background-color: var(--color-bg-canvas);
+}
+
+.personal-advanced-theme [class~="bg-[#09090b]"],
+.personal-advanced-theme [class~="bg-[#09090b]/40"],
+.personal-advanced-theme [class~="bg-[#09090b]/80"],
+.personal-advanced-theme [class~="bg-[#0a0a0c]"],
+.personal-advanced-theme [class~="bg-[#0a0a0c]/40"],
+.personal-advanced-theme [class~="bg-[#111]"],
+.personal-advanced-theme [class~="bg-[#121214]"] {
+  background-color: var(--color-card-fill);
+}
+
+.personal-advanced-theme [class~="bg-[#0f0f0f]"] {
+  background-color: var(--color-bg-elevated);
+}
+
+.personal-advanced-theme [class~="bg-white/5"],
+.personal-advanced-theme [class~="bg-white/[0.01]"],
+.personal-advanced-theme [class~="bg-white/[0.02]"],
+.personal-advanced-theme [class~="bg-black/20"],
+.personal-advanced-theme [class~="bg-black/40"] {
+  background-color: var(--color-action-ghost-hover);
+}
+
+.personal-advanced-theme [class~="to-[#09090b]"] {
+  --tw-gradient-to: var(--color-card-fill) var(--tw-gradient-to-position);
+}
+
+.personal-advanced-theme [class~="from-indigo-900/20"] {
+  --tw-gradient-from: color-mix(in srgb, var(--color-status-ai) 14%, transparent) var(--tw-gradient-from-position);
+}
+
+.personal-advanced-theme [class~="from-rose-900/10"] {
+  --tw-gradient-from: color-mix(in srgb, var(--color-status-danger) 10%, transparent) var(--tw-gradient-from-position);
+}
+
+/* Legacy white borders become semantic borders. */
+.personal-advanced-theme [class~="border-white/5"],
+.personal-advanced-theme [class~="border-white/[0.05]"],
+.personal-advanced-theme [class~="border-white/10"] {
+  border-color: var(--color-border-default);
+}
+
+.personal-advanced-theme [class~="hover:border-white/10"]:hover {
+  border-color: var(--color-field-border-hover);
+}
+
+/* Neutral typography */
+.personal-advanced-theme [class~="text-white"] {
+  color: var(--color-text-primary);
+}
+
+.personal-advanced-theme [class~="text-gray-300"],
+.personal-advanced-theme [class~="text-gray-400"] {
+  color: var(--color-text-secondary);
+}
+
+.personal-advanced-theme [class~="text-gray-500"],
+.personal-advanced-theme [class~="text-gray-600"] {
+  color: var(--color-text-helper);
+}
+
+.personal-advanced-theme [class~="hover:text-white"]:hover,
+.personal-advanced-theme [class~="hover:text-gray-300"]:hover {
+  color: var(--color-text-primary);
+}
+
+/* Status/accent text keeps sufficient contrast in both themes. */
+.personal-advanced-theme [class~="text-indigo-300"],
+.personal-advanced-theme [class~="text-indigo-400"],
+.personal-advanced-theme [class~="text-violet-400"] {
+  color: var(--color-status-ai);
+}
+
+.personal-advanced-theme [class~="text-blue-300"],
+.personal-advanced-theme [class~="text-blue-400"],
+.personal-advanced-theme [class~="text-blue-500"] {
+  color: var(--color-status-info);
+}
+
+.personal-advanced-theme [class~="text-emerald-400"],
+.personal-advanced-theme [class~="text-emerald-500"] {
+  color: var(--color-status-success);
+}
+
+.personal-advanced-theme [class~="text-rose-400"],
+.personal-advanced-theme [class~="text-rose-500"] {
+  color: var(--color-status-danger);
+}
+
+.personal-advanced-theme [class~="text-amber-400"] {
+  color: var(--color-status-warning);
+}
+
+/* Form fields */
+.personal-advanced-theme input,
+.personal-advanced-theme select,
+.personal-advanced-theme textarea {
+  background-color: var(--color-field-fill);
+  border-color: var(--color-field-border);
+  color: var(--color-text-primary);
+  caret-color: var(--color-text-primary);
+  color-scheme: inherit;
+}
+
+.personal-advanced-theme input::placeholder,
+.personal-advanced-theme textarea::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.personal-advanced-theme input:focus,
+.personal-advanced-theme select:focus,
+.personal-advanced-theme textarea:focus {
+  border-color: var(--color-field-border-focus);
+}
+
+/* White legacy CTA buttons become the shared primary action. */
+.personal-advanced-theme button[class~="bg-white"][class~="text-black"] {
+  background-color: var(--color-action-primary);
+  color: var(--color-text-on-action);
+}
+
+.personal-advanced-theme button[class~="bg-white"][class~="text-black"]:hover {
+  background-color: var(--color-action-primary-hover);
+}
+
+.personal-advanced-theme button[class~="text-white"] {
+  color: var(--color-text-on-action);
+}
+
+.personal-advanced-theme button[class~="bg-white"] [class~="text-black"] {
+  color: var(--color-text-on-action);
+}
+
+.personal-advanced-theme [class~="hover:bg-white/5"]:hover,
+.personal-advanced-theme [class~="hover:bg-white/10"]:hover {
+  background-color: var(--color-action-ghost-hover);
+}
+
+/* Elevation */
+.personal-advanced-theme [class~="shadow-2xl"] {
+  box-shadow: var(--shadow-elevated);
+}
+
+.personal-advanced-theme [class~="shadow-xl"],
+.personal-advanced-theme [class~="shadow-lg"] {
+  box-shadow: var(--shadow-surface);
+}
+
+/* Recharts: replace inline dark-only presentation with semantic chart tokens. */
+.personal-advanced-theme .recharts-cartesian-grid line {
+  stroke: var(--color-chart-grid);
+}
+
+.personal-advanced-theme .recharts-cartesian-axis-tick text {
+  fill: var(--color-chart-axis);
+}
+
+.personal-advanced-theme .recharts-default-tooltip {
+  background-color: var(--color-tooltip-fill) !important;
+  border-color: var(--color-border-default) !important;
+  color: var(--color-tooltip-text) !important;
+  box-shadow: var(--shadow-elevated) !important;
+}
+
+.personal-advanced-theme .recharts-default-tooltip .recharts-tooltip-label,
+.personal-advanced-theme .recharts-default-tooltip .recharts-tooltip-item {
+  color: var(--color-tooltip-text) !important;
+}
+
+.personal-advanced-theme .recharts-legend-item-text {
+  color: var(--color-text-secondary) !important;
+}
