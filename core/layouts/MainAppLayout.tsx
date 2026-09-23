@@ -30,6 +30,7 @@ import type {
   UserProfile,
 } from '@/types_db'
 import { useEntitlements } from '@/core/hooks/useEntitlements'
+import { useCerebroTheme } from '@/core/theme/CerebroThemeProvider'
 
 const PROFESSIONAL_TABS = new Set<ActiveTab>(['visão do negócio', 'caixa empresarial'])
 
@@ -37,6 +38,7 @@ export default function MainAppLayout({ user }: { user: User }) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const billing = useEntitlements()
+  const { setThemeOverride } = useCerebroTheme()
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard')
   const [accountMode, setAccountMode] = useState<AccountMode>('personal')
@@ -48,6 +50,11 @@ export default function MainAppLayout({ user }: { user: User }) {
   const [goals, setGoals] = useState<Goal[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
+
+  useEffect(() => {
+    setThemeOverride(accountMode === 'professional' ? 'dark' : null)
+    return () => setThemeOverride(null)
+  }, [accountMode, setThemeOverride])
 
   useEffect(() => {
     async function loadData() {
