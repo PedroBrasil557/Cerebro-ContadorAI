@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { Toaster } from 'sonner'
 import { isCerebroTheme, THEME_STORAGE_KEY, type CerebroTheme } from '@/core/theme/theme'
 
@@ -8,26 +8,30 @@ interface CerebroThemeContextValue {
   theme: CerebroTheme
   setTheme: (theme: CerebroTheme) => void
   toggleTheme: () => void
-  mounted: boolean
 }
 
+const THEME_CHANGE_EVENT = 'cerebro:theme-change'
 const CerebroThemeContext = createContext<CerebroThemeContextValue | null>(null)
+
+function readTheme(): CerebroTheme {
+  const current = document.documentElement.dataset.theme
+  return isCerebroTheme(current) ? current : 'light'
+}
+
+function subscribeTheme(onStoreChange: () => void) {
+  window.addEventListener(THEME_CHANGE_EVENT, onStoreChange)
+  return () => window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange)
+}
 
 function applyTheme(theme: CerebroTheme) {
   const root = document.documentElement
   root.dataset.theme = theme
   root.style.colorScheme = theme
+  window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
 }
 
 export function CerebroThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<CerebroTheme>('light')
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    const current = document.documentElement.dataset.theme
-    if (isCerebroTheme(current)) setThemeState(current)
-    setMounted(true)
-  }, [])
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => 'light')
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -35,9 +39,7 @@ export function CerebroThemeProvider({ children }: { children: React.ReactNode }
     const handleSystemThemeChange = (event: MediaQueryListEvent) => {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
       if (isCerebroTheme(stored)) return
-      const nextTheme: CerebroTheme = event.matches ? 'dark' : 'light'
-      applyTheme(nextTheme)
-      setThemeState(nextTheme)
+      applyTheme(event.matches ? 'dark' : 'light')
     }
 
     media.addEventListener('change', handleSystemThemeChange)
@@ -47,14 +49,13 @@ export function CerebroThemeProvider({ children }: { children: React.ReactNode }
   const setTheme = useCallback((nextTheme: CerebroTheme) => {
     window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
     applyTheme(nextTheme)
-    setThemeState(nextTheme)
   }, [])
 
   const toggleTheme = useCallback(() => {
     setTheme(theme === 'dark' ? 'light' : 'dark')
   }, [setTheme, theme])
 
-  const value = useMemo(() => ({ theme, setTheme, toggleTheme, mounted }), [mounted, setTheme, theme, toggleTheme])
+  const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [setTheme, theme, toggleTheme])
 
   return (
     <CerebroThemeContext.Provider value={value}>
