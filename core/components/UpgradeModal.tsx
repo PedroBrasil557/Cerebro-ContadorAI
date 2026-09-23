@@ -39,8 +39,8 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
       } else {
         throw new Error('Falha ao gerar link de pagamento')
       }
-    } catch {
-      toast.error('Erro ao iniciar portal de pagamento. Tente novamente.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao iniciar portal de pagamento. Tente novamente.')
       setIsRedirecting(false)
     }
   }
