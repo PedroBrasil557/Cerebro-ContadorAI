@@ -93,16 +93,18 @@ export default function AIAssistant({ user }: AIAssistantProps) {
         type="button"
         aria-label={isOpen ? 'Fechar Cérebro' : 'Abrir Cérebro'}
         aria-expanded={isOpen}
-        whileHover={{ scale: 1.1, rotate: 5 }}
-        whileTap={{ scale: 0.9 }}
+        whileHover={{ scale: 1.08, rotate: 4 }}
+        whileTap={{ scale: 0.94 }}
         onClick={handleOpenChat}
-        className={`fixed bottom-24 right-4 z-50 h-16 w-16 rounded-[1.25rem] shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-center justify-center transition-all duration-500 group border md:bottom-8 md:right-8 ${
-          isOpen ? 'bg-rose-500 border-rose-400' : 'bg-[#09090b] border-white/10'
+        className={`group fixed bottom-24 right-4 z-50 flex h-16 w-16 items-center justify-center rounded-[1.25rem] border shadow-[var(--shadow-floating)] transition-all duration-500 md:bottom-8 md:right-8 ${
+          isOpen
+            ? 'border-[var(--color-status-danger)] bg-[var(--color-status-danger)] text-white'
+            : 'border-[var(--color-card-accent-border)] bg-[var(--color-bg-surface)] text-[var(--color-action-ai)]'
         }`}
       >
         {isOpen ? <X className="text-white" /> : (
           <div className="relative">
-            <BrainCircuit className="text-indigo-400 group-hover:text-indigo-300 transition-colors" size={28} />
+            <BrainCircuit className="transition-colors group-hover:text-[var(--color-action-primary)]" size={28} />
           </div>
         )}
       </motion.button>
@@ -117,36 +119,36 @@ export default function AIAssistant({ user }: AIAssistantProps) {
             initial={{ opacity: 0, y: 40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
-            className="fixed bottom-40 right-4 z-50 flex h-[calc(100dvh-12rem)] max-h-[650px] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#09090b]/90 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-3xl md:bottom-28 md:right-8 md:h-[75vh] md:max-h-[750px] md:w-[480px]"
+            className="fixed bottom-40 right-4 z-50 flex h-[calc(100dvh-12rem)] max-h-[650px] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[2.5rem] border border-[var(--color-card-border)] bg-[var(--color-bg-surface)]/95 text-[var(--color-text-primary)] shadow-[var(--shadow-floating)] backdrop-blur-3xl md:bottom-28 md:right-8 md:h-[75vh] md:max-h-[750px] md:w-[480px]"
           >
-            <div className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-[var(--color-card-border)] bg-[var(--color-bg-elevated)]/75 p-6">
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20 text-indigo-400">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--color-card-accent-border)] bg-[var(--color-card-accent-fill)] text-[var(--color-action-ai)]">
                   <Zap size={20} className="animate-pulse" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white italic">Cérebro.IA</h3>
-                    <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/30 font-black">CORE V2</span>
+                    <h3 className="text-sm font-black uppercase italic tracking-[0.2em] text-[var(--color-text-primary)]">Cérebro.IA</h3>
+                    <span className="rounded border border-[var(--color-card-accent-border)] bg-[var(--color-card-accent-fill)] px-2 py-0.5 text-[8px] font-black text-[var(--color-status-ai)]">CORE V2</span>
                   </div>
-                  <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1.5 uppercase mt-0.5">
-                    <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" /> Auditoria Ativa
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase text-[var(--color-status-success)]">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--color-status-success)]" /> Auditoria Ativa
                   </p>
                 </div>
               </div>
-              <button type="button" aria-label="Fechar Cérebro" onClick={() => setIsOpen(false)} className="p-2.5 hover:bg-white/5 rounded-xl text-gray-500 transition-colors">
+              <button type="button" aria-label="Fechar Cérebro" onClick={() => setIsOpen(false)} className="rounded-xl p-2.5 text-[var(--color-text-helper)] transition-colors hover:bg-[var(--color-action-ghost-hover)] hover:text-[var(--color-text-primary)]">
                 <X size={20} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              <div className="bg-indigo-600/5 border border-indigo-500/10 p-5 rounded-[1.5rem] flex gap-4 items-center group hover:bg-indigo-600/10 transition-colors">
-                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0 border border-indigo-500/20">
+            <div className="custom-scrollbar flex-1 space-y-6 overflow-y-auto p-6">
+              <div className="flex items-center gap-4 rounded-[1.5rem] border border-[var(--color-card-accent-border)] bg-[var(--color-card-accent-fill)] p-5 transition-colors">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-card-accent-border)] bg-[var(--color-bg-surface)] text-[var(--color-action-ai)]">
                   <LayoutDashboard size={20} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">Diretriz de Realidade</p>
-                  <p className="text-xs text-gray-400 leading-tight">Sincronização ativa. Para valores exatos de caixa, consulte o <span className="text-indigo-400 font-bold">Dashboard Principal</span>.</p>
+                  <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-[var(--color-status-ai)]">Diretriz de Realidade</p>
+                  <p className="text-xs leading-tight text-[var(--color-text-secondary)]">Sincronização ativa. Para valores exatos de caixa, consulte o <span className="font-bold text-[var(--color-action-ai)]">Dashboard Principal</span>.</p>
                 </div>
               </div>
 
@@ -157,10 +159,10 @@ export default function AIAssistant({ user }: AIAssistantProps) {
                   animate={{ opacity: 1, x: 0 }}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`max-w-[85%] p-4 rounded-[1.5rem] text-sm leading-relaxed shadow-xl ${
+                  <div className={`max-w-[85%] rounded-[1.5rem] p-4 text-sm leading-relaxed shadow-[var(--shadow-card)] ${
                     msg.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-indigo-900/20'
-                      : 'bg-white/[0.03] border border-white/10 text-gray-200 rounded-tl-none'
+                      ? 'rounded-tr-none bg-[var(--color-action-primary)] text-[var(--color-text-on-action)]'
+                      : 'rounded-tl-none border border-[var(--color-card-border)] bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)]'
                   }`}>
                     <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
                   </div>
@@ -169,45 +171,56 @@ export default function AIAssistant({ user }: AIAssistantProps) {
 
               {isTyping && (
                 <div className="flex justify-start">
-                  <div className="bg-white/5 border border-white/10 p-5 rounded-[1.5rem] rounded-tl-none flex gap-1.5 items-center">
-                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
-                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
-                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                  <div className="flex items-center gap-1.5 rounded-[1.5rem] rounded-tl-none border border-[var(--color-card-border)] bg-[var(--color-bg-elevated)] p-5">
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="h-1.5 w-1.5 rounded-full bg-[var(--color-action-ai)]" />
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="h-1.5 w-1.5 rounded-full bg-[var(--color-action-ai)]" />
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="h-1.5 w-1.5 rounded-full bg-[var(--color-action-ai)]" />
                   </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="px-6 py-3 flex gap-2 overflow-x-auto scrollbar-hide border-t border-white/5 bg-black/20">
-              <button type="button" onClick={() => handleSend('Onde posso cortar gastos?')} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Sugerir Cortes</button>
-              <button type="button" onClick={() => handleSend('Analise minhas metas')} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Metas Ativas</button>
-              <button type="button" onClick={() => handleSend('Resumo de gastos do mês')} className="shrink-0 px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[9px] font-black uppercase text-gray-400 hover:text-white hover:bg-indigo-600/20 transition-all">Auditoria Mensal</button>
+            <div className="scrollbar-hide flex gap-2 overflow-x-auto border-t border-[var(--color-card-border)] bg-[var(--color-bg-elevated)]/60 px-6 py-3">
+              {[
+                ['Onde posso cortar gastos?', 'Sugerir Cortes'],
+                ['Analise minhas metas', 'Metas Ativas'],
+                ['Resumo de gastos do mês', 'Auditoria Mensal'],
+              ].map(([prompt, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => handleSend(prompt)}
+                  className="shrink-0 rounded-xl border border-[var(--color-card-border)] bg-[var(--color-bg-surface)] px-4 py-2 text-[9px] font-black uppercase text-[var(--color-text-secondary)] transition-all hover:border-[var(--color-card-accent-border)] hover:bg-[var(--color-card-accent-fill)] hover:text-[var(--color-text-primary)]"
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="p-6 bg-black/60 backdrop-blur-md">
+            <div className="bg-[var(--color-bg-surface)] p-6">
               <form
                 onSubmit={(e) => { e.preventDefault(); void handleSend() }}
-                className="flex gap-3 items-center bg-white/[0.03] border border-white/10 rounded-2xl px-4 py-2 focus-within:border-indigo-500/50 transition-all shadow-inner"
+                className="flex items-center gap-3 rounded-2xl border border-[var(--color-field-border)] bg-[var(--color-field-fill)] px-4 py-2 shadow-inner transition-all focus-within:border-[var(--color-field-border-focus)]"
               >
-                <Terminal size={16} className="text-gray-600" />
+                <Terminal size={16} className="text-[var(--color-text-helper)]" />
                 <input
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Pergunte sobre suas finanças..."
-                  className="flex-1 bg-transparent text-white placeholder:text-gray-600 outline-none text-sm h-12 font-medium"
+                  className="h-12 flex-1 bg-transparent text-sm font-medium text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-placeholder)]"
                 />
                 <button
                   type="submit"
                   disabled={!input.trim() || isTyping}
                   aria-label="Enviar pergunta"
-                  className="h-10 w-10 bg-white text-black rounded-xl flex items-center justify-center disabled:opacity-30 hover:bg-indigo-500 hover:text-white transition-all shadow-lg active:scale-95"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-action-primary)] text-[var(--color-text-on-action)] shadow-[var(--shadow-card)] transition-all hover:bg-[var(--color-action-primary-hover)] active:scale-95 disabled:opacity-30"
                 >
                   {isTyping ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 </button>
               </form>
-              <p className="text-[8px] text-gray-600 text-center mt-4 uppercase font-black tracking-[0.3em] opacity-40">Intelligence Protocol v2.4.0</p>
+              <p className="mt-4 text-center text-[8px] font-black uppercase tracking-[0.3em] text-[var(--color-text-disabled)]">Intelligence Protocol v2.4.0</p>
             </div>
           </motion.div>
         )}
