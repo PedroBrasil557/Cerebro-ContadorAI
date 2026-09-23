@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * Cérebro Design System 1.0
  * Source of truth: audited Figma variables.
@@ -159,6 +161,102 @@
 
   --color-tooltip-fill: #0f172a;
   --color-tooltip-text: #ffffff;
+
+  --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-card-strong: 0 18px 45px rgba(15, 23, 42, 0.12);
+  --shadow-floating: 0 24px 70px rgba(15, 23, 42, 0.18);
+  --color-overlay: rgba(2, 6, 23, 0.52);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Core / Semantic — Dark */
+  --color-bg-canvas: #020617;
+  --color-bg-surface: #0f172a;
+  --color-bg-elevated: #111c31;
+  --color-border-default: #334155;
+
+  --color-card-fill: #0f172a;
+  --color-card-border: #334155;
+  --color-card-accent-fill: #172036;
+  --color-card-accent-border: #5b21b6;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e2e8f0;
+  --color-text-helper: #94a3b8;
+  --color-text-placeholder: #94a3b8;
+  --color-text-disabled: #64748b;
+  --color-text-on-action: #ffffff;
+  --color-text-error: #ef4444;
+  --color-text-success: #10b981;
+
+  --color-action-primary: #7c3aed;
+  --color-action-primary-hover: #a78bfa;
+  --color-action-primary-pressed: #6d28d9;
+  --color-action-secondary-fill: #0f172a;
+  --color-action-secondary-border: #334155;
+  --color-action-secondary-hover: #1e293b;
+  --color-action-secondary-pressed: #334155;
+  --color-action-ghost-hover: #1e293b;
+  --color-action-ghost-pressed: #334155;
+  --color-action-destructive: #dc2626;
+  --color-action-destructive-hover: #ef4444;
+  --color-action-destructive-pressed: #b91c1c;
+  --color-action-ai: #818cf8;
+  --color-action-ai-hover: #a5b4fc;
+  --color-action-ai-pressed: #6366f1;
+  --color-action-disabled-fill: #334155;
+
+  --color-field-fill: #0f172a;
+  --color-field-fill-disabled: #1e293b;
+  --color-field-border: #334155;
+  --color-field-border-hover: #64748b;
+  --color-field-border-focus: #a78bfa;
+  --color-field-border-error: #ef4444;
+  --color-field-border-success: #10b981;
+
+  --color-focus-ring: #c4b5fd;
+
+  --color-nav-active-fill: #334155;
+  --color-nav-active-text: #c4b5fd;
+
+  --color-status-success: #6ee7b7;
+  --color-status-success-surface: #14362f;
+  --color-status-warning: #fcd34d;
+  --color-status-warning-surface: #3d3219;
+  --color-status-danger: #fca5a5;
+  --color-status-danger-surface: #43242a;
+  --color-status-info: #93c5fd;
+  --color-status-info-surface: #1d3150;
+  --color-status-ai: #c4b5fd;
+  --color-status-ai-surface: #292449;
+  --color-status-neutral: #e2e8f0;
+  --color-status-neutral-surface: #334155;
+
+  --color-chart-primary: #a78bfa;
+  --color-chart-secondary: #818cf8;
+  --color-chart-positive: #34d399;
+  --color-chart-negative: #f87171;
+  --color-chart-warning: #fbbf24;
+  --color-chart-grid: #334155;
+  --color-chart-axis: #94a3b8;
+
+  --color-progress-active: #a78bfa;
+  --color-progress-completed: #34d399;
+  --color-progress-at-risk: #fbbf24;
+  --color-progress-track: #334155;
+
+  --color-skeleton-base: #334155;
+  --color-skeleton-highlight: #475569;
+
+  --color-tooltip-fill: #1e293b;
+  --color-tooltip-text: #ffffff;
+
+  --shadow-card: 0 10px 26px rgba(0, 0, 0, 0.24);
+  --shadow-card-strong: 0 20px 50px rgba(0, 0, 0, 0.34);
+  --shadow-floating: 0 28px 80px rgba(0, 0, 0, 0.48);
+  --color-overlay: rgba(2, 6, 23, 0.72);
 }
 
 @theme inline {
@@ -180,98 +278,17 @@
   --color-info: var(--color-status-info);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-
-    /* Core / Semantic — Dark */
-    --color-bg-canvas: #020617;
-    --color-bg-surface: #0f172a;
-    --color-bg-elevated: #334155;
-    --color-border-default: #334155;
-
-    --color-card-fill: #0f172a;
-    --color-card-border: #334155;
-    --color-card-accent-fill: #0f172a;
-    --color-card-accent-border: #5b21b6;
-
-    --color-text-primary: #ffffff;
-    --color-text-secondary: #e2e8f0;
-    --color-text-helper: #94a3b8;
-    --color-text-placeholder: #94a3b8;
-    --color-text-disabled: #64748b;
-    --color-text-on-action: #ffffff;
-    --color-text-error: #ef4444;
-    --color-text-success: #10b981;
-
-    --color-action-primary: #7c3aed;
-    --color-action-primary-hover: #c4b5fd;
-    --color-action-primary-pressed: #6d28d9;
-    --color-action-secondary-fill: #0f172a;
-    --color-action-secondary-border: #334155;
-    --color-action-secondary-hover: #334155;
-    --color-action-secondary-pressed: #334155;
-    --color-action-ghost-hover: #334155;
-    --color-action-ghost-pressed: #334155;
-    --color-action-destructive: #dc2626;
-    --color-action-destructive-hover: #dc2626;
-    --color-action-destructive-pressed: #b91c1c;
-    --color-action-ai: #4f46e5;
-    --color-action-ai-hover: #4f46e5;
-    --color-action-ai-pressed: #4338ca;
-    --color-action-disabled-fill: #334155;
-
-    --color-field-fill: #0f172a;
-    --color-field-fill-disabled: #334155;
-    --color-field-border: #334155;
-    --color-field-border-hover: #64748b;
-    --color-field-border-focus: #a78bfa;
-    --color-field-border-error: #ef4444;
-    --color-field-border-success: #10b981;
-
-    --color-focus-ring: #c4b5fd;
-
-    --color-nav-active-fill: #334155;
-    --color-nav-active-text: #c4b5fd;
-
-    --color-status-success: #6ee7b7;
-    --color-status-success-surface: #334155;
-    --color-status-warning: #fcd34d;
-    --color-status-warning-surface: #334155;
-    --color-status-danger: #fca5a5;
-    --color-status-danger-surface: #334155;
-    --color-status-info: #93c5fd;
-    --color-status-info-surface: #334155;
-    --color-status-ai: #c4b5fd;
-    --color-status-ai-surface: #334155;
-    --color-status-neutral: #e2e8f0;
-    --color-status-neutral-surface: #334155;
-
-    --color-chart-primary: #a78bfa;
-    --color-chart-secondary: #6366f1;
-    --color-chart-positive: #10b981;
-    --color-chart-negative: #ef4444;
-    --color-chart-warning: #f59e0b;
-    --color-chart-grid: #334155;
-    --color-chart-axis: #94a3b8;
-
-    --color-progress-active: #a78bfa;
-    --color-progress-completed: #10b981;
-    --color-progress-at-risk: #f59e0b;
-    --color-progress-track: #334155;
-
-    --color-skeleton-base: #334155;
-    --color-skeleton-highlight: #64748b;
-
-    --color-tooltip-fill: #334155;
-    --color-tooltip-text: #ffffff;
-  }
+html,
+body {
+  background: var(--color-bg-canvas);
 }
 
 body {
-  background: var(--color-bg-canvas);
   color: var(--color-text-primary);
   font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  transition:
+    background-color var(--motion-duration-normal) ease,
+    color var(--motion-duration-fast) ease;
 }
 
 :focus-visible {
