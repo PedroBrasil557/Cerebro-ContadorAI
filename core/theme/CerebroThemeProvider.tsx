@@ -18,6 +18,10 @@ function readTheme(): CerebroTheme {
   return isCerebroTheme(current) ? current : 'light'
 }
 
+function readServerTheme(): CerebroTheme {
+  return 'light'
+}
+
 function subscribeTheme(onStoreChange: () => void) {
   window.addEventListener(THEME_CHANGE_EVENT, onStoreChange)
   return () => window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange)
@@ -31,7 +35,7 @@ function applyTheme(theme: CerebroTheme) {
 }
 
 export function CerebroThemeProvider({ children }: { children: React.ReactNode }) {
-  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => 'light')
+  const theme = useSyncExternalStore<CerebroTheme>(subscribeTheme, readTheme, readServerTheme)
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -55,7 +59,7 @@ export function CerebroThemeProvider({ children }: { children: React.ReactNode }
     setTheme(theme === 'dark' ? 'light' : 'dark')
   }, [setTheme, theme])
 
-  const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [setTheme, theme, toggleTheme])
+  const value = useMemo<CerebroThemeContextValue>(() => ({ theme, setTheme, toggleTheme }), [setTheme, theme, toggleTheme])
 
   return (
     <CerebroThemeContext.Provider value={value}>
