@@ -17,9 +17,11 @@ const STORAGE_KEY = 'cerebro-theme'
 
 interface CerebroThemeContextValue {
   theme: CerebroTheme
+  preference: CerebroTheme
   mounted: boolean
   setTheme: (theme: CerebroTheme) => void
   toggleTheme: () => void
+  setThemeOverride: (theme: CerebroTheme | null) => void
 }
 
 const CerebroThemeContext = createContext<CerebroThemeContextValue | null>(null)
@@ -45,8 +47,10 @@ function browserTheme(): CerebroTheme {
 }
 
 export function CerebroThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<CerebroTheme>('light')
+  const [preference, setPreference] = useState<CerebroTheme>('light')
+  const [themeOverride, setThemeOverrideState] = useState<CerebroTheme | null>(null)
   const [mounted, setMounted] = useState(false)
+  const theme = themeOverride ?? preference
 
   useEffect(() => {
     const rootTheme = document.documentElement.dataset.theme
@@ -57,30 +61,40 @@ export function CerebroThemeProvider({ children }: { children: ReactNode }) {
         : persistedTheme() ?? browserTheme()
 
     applyTheme(initialTheme)
-    setThemeState(initialTheme)
+    setPreference(initialTheme)
     setMounted(true)
   }, [])
 
+  useEffect(() => {
+    if (!mounted) return
+    applyTheme(theme)
+  }, [mounted, theme])
+
   const setTheme = useCallback((nextTheme: CerebroTheme) => {
-    applyTheme(nextTheme)
     try {
       window.localStorage.setItem(STORAGE_KEY, nextTheme)
     } catch {
       // The visual preference still applies for the current session when storage is unavailable.
     }
-    setThemeState(nextTheme)
+    setPreference(nextTheme)
   }, [])
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark')
-  }, [setTheme, theme])
+    setTheme(preference === 'dark' ? 'light' : 'dark')
+  }, [preference, setTheme])
+
+  const setThemeOverride = useCallback((nextTheme: CerebroTheme | null) => {
+    setThemeOverrideState(nextTheme)
+  }, [])
 
   const value = useMemo<CerebroThemeContextValue>(() => ({
     theme,
+    preference,
     mounted,
     setTheme,
     toggleTheme,
-  }), [mounted, setTheme, theme, toggleTheme])
+    setThemeOverride,
+  }), [mounted, preference, setTheme, setThemeOverride, theme, toggleTheme])
 
   return (
     <CerebroThemeContext.Provider value={value}>
@@ -92,9 +106,7 @@ export function CerebroThemeProvider({ children }: { children: ReactNode }) {
 
 export function useCerebroTheme() {
   const context = useContext(CerebroThemeContext)
-  if (!context) {
-    throw new Error('useCerebroTheme must be used inside CerebroThemeProvider')
-  }
+  if (!context) throw new Error('useCerebroTheme must be used inside CerebroThemeProvider')
   return context
 }
 
