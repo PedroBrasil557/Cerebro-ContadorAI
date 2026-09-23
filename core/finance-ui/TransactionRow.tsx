@@ -4,6 +4,8 @@ import { motion } from 'framer-motion'
 import { ArrowDownLeft, ArrowUpRight, ArrowRightLeft } from 'lucide-react'
 import type { Transaction, TransactionType } from '@/types_db'
 import { listItemMotionVariants, motionTransition } from '@/core/motion/presets'
+import { resolveMerchantBrand } from '@/core/brand/merchantBrandRegistry'
+import { MerchantBrandAvatar } from '@/core/ui/merchant-brand-avatar'
 import { cn } from '@/lib/utils'
 
 type TransactionRowProps = {
@@ -53,12 +55,19 @@ export function TransactionRow({ transaction, onClick, className }: TransactionR
   const dateLabel = Number.isNaN(date.getTime())
     ? transaction.date
     : new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date)
+  const merchantBrand = transaction.type.startsWith('despesa')
+    ? resolveMerchantBrand({ description: transaction.description, source: transaction.source })
+    : null
 
   const content = (
     <>
-      <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)]', iconClass)}>
-        <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
-      </span>
+      {merchantBrand ? (
+        <MerchantBrandAvatar brand={merchantBrand} label={transaction.description} category={transaction.category} />
+      ) : (
+        <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)]', iconClass)}>
+          <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text-primary)]">
           {transaction.description}
