@@ -33,6 +33,7 @@ import {
 } from '@/core/navigation/config'
 import { openCerebroAssistant } from '@/lib/assistant/openCerebroAssistant'
 import { CerebroLogo } from '@/core/brand/CerebroLogo'
+import { ThemeToggle } from '@/core/theme/ThemeToggle'
 
 interface AppTopBarProps {
   user: User
@@ -110,7 +111,7 @@ export function AppTopBar({
             type="button"
             onClick={openCerebroAssistant}
             aria-label="Perguntar ao Cérebro"
-            className="group absolute left-1/2 hidden h-[52px] w-[min(638px,calc(100%_-_220px))] -translate-x-1/2 items-center gap-3 rounded-[26px] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 text-left shadow-[0_4px_12px_rgba(5,6,10,0.10)] transition-colors hover:border-[var(--color-card-accent-border)] md:flex"
+            className="group absolute left-1/2 hidden h-[52px] w-[min(638px,calc(100%_-_220px))] -translate-x-1/2 items-center gap-3 rounded-[26px] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 text-left shadow-[var(--shadow-surface)] transition-colors hover:border-[var(--color-card-accent-border)] md:flex"
           >
             <Sparkles aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-[var(--color-action-ai)]" />
             <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-secondary)]">Pergunte algo sobre seu dinheiro...</span>
@@ -127,6 +128,8 @@ export function AppTopBar({
               <Sparkles aria-hidden="true" className="h-3.5 w-3.5 text-[var(--color-action-ai)]" />
               Perguntar
             </button>
+
+            <ThemeToggle />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -192,6 +195,7 @@ export function AppTopBar({
             <p className="mt-0.5 truncate text-xs text-[var(--color-text-helper)]">Cérebro Professional</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <ProductSwitcher accountMode={accountMode} canSwitch={access.canSwitchProducts} isSwitching={isSwitchingProduct} onSwitch={onSwitchProduct} variant="compact" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild><button type="button" aria-label="Abrir menu do perfil" className="rounded-full">{avatar}</button></DropdownMenuTrigger>
