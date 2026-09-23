@@ -5,7 +5,7 @@ import { useCerebroTheme } from '@/core/theme/CerebroThemeProvider'
 import { cn } from '@/lib/utils'
 
 export function ThemeToggle({ className }: { className?: string }) {
-  const { theme, toggleTheme, mounted } = useCerebroTheme()
+  const { theme, toggleTheme } = useCerebroTheme()
   const isDark = theme === 'dark'
   const label = isDark ? 'Ativar tema claro' : 'Ativar tema escuro'
 
@@ -17,13 +17,12 @@ export function ThemeToggle({ className }: { className?: string }) {
       title={label}
       data-testid="theme-toggle"
       data-theme-value={theme}
-      disabled={!mounted}
       className={cn(
         'group relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full',
         'border border-[var(--color-border-default)] bg-[var(--color-bg-elevated)] text-[var(--color-text-secondary)]',
         'shadow-[0_3px_10px_rgba(15,23,42,0.08)] transition-[background-color,border-color,color,transform,box-shadow] duration-200',
         'hover:-translate-y-px hover:border-[var(--color-card-accent-border)] hover:text-[var(--color-nav-active-text)] hover:shadow-[0_5px_16px_rgba(79,70,229,0.14)]',
-        'active:translate-y-0 disabled:cursor-wait disabled:opacity-60 md:h-10 md:w-10',
+        'active:translate-y-0 md:h-10 md:w-10',
         className,
       )}
     >
