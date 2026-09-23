@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
   maybeSingle: vi.fn(),
   rpc: vi.fn(),
+  assertStripeReadyForCheckout: vi.fn(),
+  customerRetrieve: vi.fn(),
   customerSearch: vi.fn(),
   customerCreate: vi.fn(),
   checkoutCreate: vi.fn(),
@@ -40,8 +42,13 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/stripe', () => ({
+  assertStripeReadyForCheckout: mocks.assertStripeReadyForCheckout,
   getStripe: () => ({
-    customers: { search: mocks.customerSearch, create: mocks.customerCreate },
+    customers: {
+      retrieve: mocks.customerRetrieve,
+      search: mocks.customerSearch,
+      create: mocks.customerCreate,
+    },
     checkout: { sessions: { create: mocks.checkoutCreate } },
     subscriptions: { retrieve: mocks.subscriptionRetrieve },
     webhooks: { constructEvent: mocks.constructEvent },
@@ -54,6 +61,7 @@ describe('billing route security', () => {
     vi.clearAllMocks()
     mocks.requireUser.mockResolvedValue({ id: 'user-1', email: 'user@example.test' })
     mocks.maybeSingle.mockResolvedValue({ data: null, error: null })
+    mocks.customerRetrieve.mockResolvedValue({ id: 'cus_stored', deleted: false })
     mocks.customerSearch.mockResolvedValue({ data: [] })
     mocks.customerCreate.mockResolvedValue({ id: 'cus_server' })
     mocks.checkoutCreate.mockResolvedValue({ url: 'https://checkout.stripe.test/session' })
@@ -72,6 +80,7 @@ describe('billing route security', () => {
     }))
 
     expect(response.status).toBe(200)
+    expect(mocks.assertStripeReadyForCheckout).toHaveBeenCalledTimes(1)
     expect(mocks.checkoutCreate).toHaveBeenCalledWith(expect.objectContaining({
       customer: 'cus_server',
       line_items: [{ price: expectedPrice, quantity: 1 }],
@@ -81,6 +90,25 @@ describe('billing route security', () => {
       metadata: { userId: 'user-1', plan, product },
       subscription_data: { metadata: { userId: 'user-1', plan, product } },
     }), expect.objectContaining({ idempotencyKey: expect.stringContaining(`checkout:user-1:${plan}:`) }))
+  })
+
+  it('recovers from a stale Stripe customer id when the environment changes', async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { stripe_customer_id: 'cus_stale' }, error: null })
+    mocks.customerRetrieve.mockRejectedValue({ code: 'resource_missing' })
+
+    const { POST } = await import('../../app/api/checkout/route')
+    const response = await POST(new Request('https://preview.example.test/api/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan: 'pro' }),
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.customerSearch).toHaveBeenCalledTimes(1)
+    expect(mocks.customerCreate).toHaveBeenCalledTimes(1)
+    expect(mocks.checkoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_server' }),
+      expect.any(Object),
+    )
   })
 
   it('rejects a client-controlled Stripe Price ID', async () => {
