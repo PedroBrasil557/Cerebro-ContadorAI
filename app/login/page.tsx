@@ -8,6 +8,7 @@ import { AuthExperienceShell } from '@/core/auth/AuthExperienceShell'
 import { Button } from '@/core/ui/button'
 import { Field } from '@/core/ui/field'
 import { Input } from '@/core/ui/input'
+import { PASSWORD_MIN_LENGTH, PASSWORD_REQUIREMENT_MESSAGE, isPasswordPolicySatisfied } from '@/lib/auth/passwordPolicy'
 import { createClient } from '@/lib/supabase/client'
 
 type ViewState =
@@ -200,8 +201,8 @@ export default function AuthPage() {
         if (formData.fullName.trim().length < 2) {
           throw new Error('Informe como você quer ser chamado.')
         }
-        if (formData.password.length < 8) {
-          throw new Error('A senha deve ter pelo menos 8 caracteres.')
+        if (!isPasswordPolicySatisfied(formData.password)) {
+          throw new Error(PASSWORD_REQUIREMENT_MESSAGE)
         }
 
         const { data, error } = await supabase.auth.signUp({
@@ -215,7 +216,10 @@ export default function AuthPage() {
             },
           },
         })
-        if (error) throw new Error('Não foi possível criar sua conta agora. Revise os dados e tente novamente.')
+        if (error) {
+          const isPasswordPolicyError = error.status === 422 && /password/i.test(error.message)
+          throw new Error(isPasswordPolicyError ? PASSWORD_REQUIREMENT_MESSAGE : 'Não foi possível criar sua conta agora. Revise os dados e tente novamente.')
+        }
 
         if (!data.session) {
           setView('confirm-email')
@@ -357,15 +361,15 @@ export default function AuthPage() {
               <Field
                 label="Senha"
                 htmlFor="auth-password"
-                helperText={view === 'register' ? 'Use pelo menos 8 caracteres.' : undefined}
+                helperText={view === 'register' ? PASSWORD_REQUIREMENT_MESSAGE : undefined}
               >
                 <Input
                   id="auth-password"
                   type="password"
                   autoComplete={view === 'register' ? 'new-password' : 'current-password'}
-                  minLength={view === 'register' ? 8 : undefined}
+                  minLength={view === 'register' ? PASSWORD_MIN_LENGTH : undefined}
                   required
-                  placeholder={view === 'register' ? 'Mínimo de 8 caracteres' : 'Sua senha'}
+                  placeholder={view === 'register' ? 'Crie uma senha forte' : 'Sua senha'}
                   value={formData.password}
                   onChange={(event) => setFormData((current) => ({ ...current, password: event.target.value }))}
                 />
